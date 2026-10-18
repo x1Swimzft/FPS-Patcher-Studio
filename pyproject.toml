@@ -1,0 +1,54 @@
+[project]
+name = "fps-patcher-studio"
+version = "0.2.1b0"
+description = "High-precision MP4/MOV container timing patcher (BXD PC, Mobile, Hybrid, Clean & Mobile Repair)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "customtkinter>=6.0.0",
+    "pywinstyles>=1.8",
+    "tkinterdnd2>=0.6.3",
+]
+
+[project.scripts]
+fps-patcher-studio = "fps_patcher.__main__:main"
+
+[build-system]
+requires = ["uv_build>=0.12.13,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "fps_patcher"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.4.0",
+    "pillow>=12.3.0",
+    "pytest>=9.1.1",
+    "pytest-mock>=3.16.0",
+    "ruff>=0.16.10",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+mypy_path = "src"
+packages = ["fps_patcher"]
+
+[[tool.mypy.overrides]]
+module = ["customtkinter.*", "tkinterdnd2.*", "pywinstyles.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["fps_patcher.ui.*"]
+disallow_subclassing_any = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
