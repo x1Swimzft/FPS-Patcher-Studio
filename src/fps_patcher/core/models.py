@@ -67,7 +67,7 @@ class PatchResult:
     before: VideoInfo
     after: VideoInfo
     elapsed_s: float
-    # True when output is non-standard (e.g. BXD ghost samples / trailing bytes).
+    # True when output is non-standard (e.g. X1T ghost samples / trailing bytes).
     experimental: bool = False
 
 

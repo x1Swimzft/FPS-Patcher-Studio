@@ -13,8 +13,6 @@ from tkinterdnd2 import DND_FILES
 from ..core.models import SUPPORTED_EXTENSIONS
 from .strings import t
 from .theme import (
-    RADIUS_CARD,
-    RADIUS_CONTROL,
     STATUS_SUCCESS_BG,
     STATUS_SUCCESS_BORDER,
     STATUS_SUCCESS_TEXT,
@@ -30,12 +28,15 @@ class DropZone(ctk.CTkFrame):
     def __init__(self, master: Any, on_files: Callable[[list[Path]], None]) -> None:
         self._theme_mgr = get_theme_manager()
         tokens = self._theme_mgr.tokens
+        card_rad, ctrl_rad = self._radii()
+        lang = self._lang()
+        fsize = self._fsize()
 
         super().__init__(
             master,
             border_width=1,
             border_color=tokens.border,
-            corner_radius=RADIUS_CARD,
+            corner_radius=card_rad,
             fg_color=tokens.surface,
         )
         self._on_files = on_files
@@ -54,27 +55,27 @@ class DropZone(ctk.CTkFrame):
 
         self.label = ctk.CTkLabel(
             self,
-            text=t("drop_title"),
-            font=font_title(),
+            text=t("drop_title", lang),
+            font=font_title(fsize),
             text_color=tokens.text,
         )
         self.label.grid(row=2, column=0, pady=(0, 2))
 
         self.sub = ctk.CTkLabel(
             self,
-            text=t("drop_sub"),
-            font=font_caption(),
+            text=t("drop_sub", lang),
+            font=font_caption(fsize),
             text_color=tokens.text2,
         )
         self.sub.grid(row=3, column=0, pady=(0, 10))
 
         self.btn = ctk.CTkButton(
             self,
-            text=t("browse_files"),
-            font=font_body(bold=True),
+            text=t("browse_files", lang),
+            font=font_body(bold=True, size_opt=fsize),
             width=130,
             height=32,
-            corner_radius=RADIUS_CONTROL,
+            corner_radius=ctrl_rad,
             command=self._browse,
             fg_color=tokens.accent,
             hover_color=tokens.accent_hover,
@@ -95,16 +96,49 @@ class DropZone(ctk.CTkFrame):
 
         self._theme_mgr.subscribe(self.apply_theme)
 
+    def _lang(self) -> str:
+        s = getattr(self._theme_mgr, "settings", None)
+        return getattr(s, "language", "en") if s else "en"
+
+    def _fsize(self) -> str:
+        s = getattr(self._theme_mgr, "settings", None)
+        return getattr(s, "font_size", "M") if s else "M"
+
+    def _radii(self) -> tuple[int, int]:
+        from .theme import get_corner_radii
+
+        s = getattr(self._theme_mgr, "settings", None)
+        style = getattr(s, "radius_style", "Normal") if s else "Normal"
+        return get_corner_radii(style)
+
     def apply_theme(self, tokens: ThemeTokens) -> None:
         if not self._is_active:
-            self.configure(fg_color=tokens.surface, border_color=tokens.border)
+            card_rad, ctrl_rad = self._radii()
+            lang = self._lang()
+            fsize = self._fsize()
+            self.configure(
+                fg_color=tokens.surface,
+                border_color=tokens.border,
+                corner_radius=card_rad,
+            )
             self.icon.configure(text_color=tokens.muted)
-            self.label.configure(text_color=tokens.text)
-            self.sub.configure(text_color=tokens.text2)
+            self.label.configure(
+                text=t("drop_title", lang),
+                text_color=tokens.text,
+                font=font_title(fsize),
+            )
+            self.sub.configure(
+                text=t("drop_sub", lang),
+                text_color=tokens.text2,
+                font=font_caption(fsize),
+            )
             self.btn.configure(
+                text=t("browse_files", lang),
                 fg_color=tokens.accent,
                 hover_color=tokens.accent_hover,
                 text_color="#FFFFFF",
+                corner_radius=ctrl_rad,
+                font=font_body(bold=True, size_opt=fsize),
             )
 
     def _browse(self) -> None:

@@ -36,6 +36,7 @@ from fps_patcher.core.verifier import (
     verify_atom_structure,
     verify_mobile_compatibility,
     verify_offsets,
+    verify_payload_integrity,
     verify_sample_tables,
 )
 
@@ -67,12 +68,16 @@ def _ffmpeg_decode_check(ff: FFmpegPaths, target: Path) -> tuple[int, str]:
 def test_ui_presets_and_strategy_migration(tmp_path: Path) -> None:
     # UI_PRESETS must only expose the 4 BXD presets
     assert set(UI_PRESETS.keys()) == {"bxd-pc", "bxd-mobile", "bxd-hybrid", "bxd-clean"}
-    assert UI_PRESETS["bxd-pc"].label == "Bxd For PC"
-    assert UI_PRESETS["bxd-mobile"].label == "Bxd For Mobile"
+    assert UI_PRESETS["bxd-pc"].label in ("X1T For PC", "Bxd For PC")
+    assert UI_PRESETS["bxd-mobile"].label in ("X1T For Mobile", "Bxd For Mobile")
+    assert UI_PRESETS["x1t-pc"].label == "X1T For PC"
+    assert UI_PRESETS["x1t-mobile"].label == "X1T For Mobile"
 
     # Legacy strategy names migrate cleanly
     assert migrate_strategy_name("bxd-experimental") == ("bxd-pc", "bxd-experimental")
     assert migrate_strategy_name("bxd-bypass") == ("bxd-pc", "bxd-bypass")
+    assert migrate_strategy_name("x1t-pc") == ("bxd-pc", None)
+    assert migrate_strategy_name("x1t-mobile") == ("bxd-mobile", None)
     assert migrate_strategy_name("direct-atom") == ("bxd-clean", "direct-atom")
     assert migrate_strategy_name("v4-forensic") == ("bxd-clean", "v4-forensic")
     assert migrate_strategy_name("ffmpeg-copy") == ("bxd-clean", "ffmpeg-copy")
@@ -110,10 +115,11 @@ def test_phase0_isolation_variants_h1_to_h4(ff: FFmpegPaths, tmp_path: Path) -> 
     for key, p in variants.items():
         assert p.is_file(), f"Variant {key} was not created"
 
-    # H1: indeterminate mvhd only -> fails mvhd_duration_defined check
+    # H1: indeterminate mvhd only -> valid TikTok bypass header
     rep_h1 = verify_mobile_compatibility(variants["H1"])
-    assert rep_h1.mvhd_duration_defined is False
-    assert rep_h1.structure_ok is False
+    assert rep_h1.mvhd_duration_defined is True
+    assert rep_h1.structure_ok is True
+    assert any("indeterminate" in w.lower() for w in rep_h1.warnings)
 
     # H2: 10x stts/stsz inside mdat -> fails audio_duration_consistent (10x audio duration)
     rep_h2 = verify_mobile_compatibility(variants["H2"])
@@ -133,7 +139,19 @@ def test_phase0_isolation_variants_h1_to_h4(ff: FFmpegPaths, tmp_path: Path) -> 
     assert rep_h4.chunk_offsets_ok is True
 
 
-@pytest.mark.parametrize("preset", ["bxd-pc", "bxd-mobile", "bxd-hybrid", "bxd-clean"])
+@pytest.mark.parametrize(
+    "preset",
+    [
+        "bxd-pc",
+        "bxd-mobile",
+        "bxd-hybrid",
+        "bxd-clean",
+        "x1t-pc",
+        "x1t-mobile",
+        "x1t-hybrid",
+        "x1t-clean",
+    ],
+)
 def test_all_four_bxd_presets_and_external_ffmpeg(
     ff: FFmpegPaths, tmp_path: Path, preset: str
 ) -> None:
@@ -151,7 +169,11 @@ def test_all_four_bxd_presets_and_external_ffmpeg(
         out_dir=out_dir,
         timescale=60000,
         strategy=preset,
-        bxd_padding_bytes=4096 if preset in ("bxd-mobile", "bxd-hybrid") else 0,
+        bxd_padding_bytes=(
+            4096
+            if preset in ("bxd-mobile", "bxd-hybrid", "x1t-mobile", "x1t-hybrid")
+            else 0
+        ),
         bxd_max_tail_ms=40,
     )
     res = patch(req, ff, lambda _: None)
@@ -165,10 +187,19 @@ def test_all_four_bxd_presets_and_external_ffmpeg(
         out_rep.atom_tree
     )
 
-    # Real sample hashes inside mdat must be 100% bit-exact across ALL 4 presets
-    assert out_hashes == orig_hashes
+    # All presets must apply indeterminate mvhd
+    assert any("indeterminate" in w.lower() for w in mob.warnings)
+    moov_node = next((n for n in out_rep.atom_tree if n.type_str == "moov"), None)
+    assert moov_node is not None
+    mvhd_node = next((n for n in moov_node.children if n.type_str == "mvhd"), None)
+    assert mvhd_node is not None
+    assert mvhd_node.fields.get("duration") in (0xFFFFFFFF, 0xFFFFFFFFFFFFFFFF)
 
-    if preset == "bxd-pc":
+    # Real sample hashes inside mdat must be 100% bit-exact across ALL presets
+    assert out_hashes == orig_hashes
+    assert out_rep.mdat_payload_sha256 == orig_rep.mdat_payload_sha256
+
+    if preset in ("bxd-pc", "x1t-pc"):
         assert res.experimental is True
         assert mob.structure_ok is False
         assert mob.status_label == "Non-standard (PC-oriented / likely fails on mobile)"
@@ -176,12 +207,64 @@ def test_all_four_bxd_presets_and_external_ffmpeg(
         assert res.experimental is False
         assert mob.structure_ok is True, f"Preset {preset} failed mobile check: {mob.issues}"
         assert mob.status_label == "Structure OK (likely mobile-compatible)"
-        if preset in ("bxd-mobile", "bxd-hybrid"):
+
+        # All 6 verification gates must pass
+        assert mob.atom_structure_ok is True
+        assert mob.chunk_offsets_ok is True
+        assert mob.sample_tables_ok is True
+        assert mob.mvhd_duration_defined is True
+        assert mob.tkhd_duration_consistent is True
+        assert mob.audio_duration_consistent is True
+
+        integ = verify_payload_integrity(src, res.output)
+        assert integ["atom structure"] == "PASS"
+        assert integ["trailing data"] == "PASS"
+        assert integ["chunk offsets"] == "PASS"
+        assert integ["sample tables"] == "PASS"
+        assert integ["mobile playback"] == "PASS"
+        assert integ["mdat payload"] == "PASS"
+
+        if preset in ("bxd-mobile", "bxd-hybrid", "x1t-mobile", "x1t-hybrid"):
             assert any(n.type_str == "free" for n in out_rep.atom_tree)
         # External ffmpeg decode gate must pass with 0 errors
         rc, err = _ffmpeg_decode_check(ff, res.output)
         assert rc == 0, f"ffmpeg decode failed for {preset}: {err}"
         assert err == ""
+
+
+def test_mov_input_normalization_to_mp4(ff: FFmpegPaths, tmp_path: Path) -> None:
+    mov_src = tmp_path / "clip.mov"
+    _make_clip(ff, mov_src, "30", audio=True)
+
+    out_dir = tmp_path / "out_mov"
+    req = PatchRequest(
+        src=mov_src,
+        out_dir=out_dir,
+        timescale=60000,
+        strategy="x1t-mobile",
+    )
+    res = patch(req, ff, lambda _: None)
+    assert res.output.is_file()
+    assert res.output.suffix == ".mp4"
+    assert res.after.timescale == 60000
+
+    raw = res.output.read_bytes()
+    assert raw[4:8] == b"ftyp"
+    major_brand = raw[8:12]
+    compatible_brands = raw[16:32]
+    assert major_brand in (b"mp42", b"isom")
+    assert b"isom" in (major_brand + compatible_brands)
+    assert b"mp42" in (major_brand + compatible_brands)
+
+    forensic = MP4ForensicAnalyzer(raw, str(res.output)).parse()
+    ftyp_atom = next((a for a in forensic.atom_tree if a.type_str == "ftyp"), None)
+    assert ftyp_atom is not None
+
+    mob = verify_mobile_compatibility(res.output)
+    assert mob.structure_ok is True
+    rc, err = _ffmpeg_decode_check(ff, res.output)
+    assert rc == 0, f"ffmpeg decode failed for mov normalization: {err}"
+    assert err == ""
 
 
 def test_repair_for_mobile_lossless_and_bframe_elst(ff: FFmpegPaths, tmp_path: Path) -> None:

@@ -172,10 +172,23 @@ class InputQueue:
             item.timescale = timescale
             item.strategy = strategy
 
+    def reset_for_run(self, paths: list[Path]) -> None:
+        """Reset item status, error, progress, and output before patching."""
+        path_set = {p.resolve() for p in paths}
+        for item in self._items:
+            if item.path.resolve() in path_set:
+                item.status = "ready" if item.info is not None else "pending"
+                item.error = None
+                item.progress = 0.0
+                item.output = None
+
     def snapshot_for_run(self, only_selected: bool) -> list[QueueItem]:
-        """Items to patch. Selected-only if any selected and flag set; skips done."""
-        pool = self.selected() if only_selected else self.items
-        return [replace(i) for i in pool if i.status != "done"]
+        """Items to patch. Selected-only if flag set; re-patches done items when requested."""
+        if only_selected:
+            return [replace(i) for i in self.selected()]
+        not_done = [i for i in self._items if i.status != "done"]
+        pool = not_done if not_done else self._items
+        return [replace(i) for i in pool]
 
     # ---------- persistence ----------
     def to_dict_list(self) -> list[dict[str, Any]]:

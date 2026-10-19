@@ -46,7 +46,7 @@ class PatchingTab:
         self.strategy_menu.set(current_strat.label if current_strat else preset_labels[0])
         self.strategy_menu.pack(fill="x", pady=(0, 12))
 
-        # Custom BXD Padding Bytes & Hybrid Tail Ceiling
+        # Custom X1T Padding Bytes & Hybrid Tail Ceiling
         ctk.CTkLabel(
             self.frame,
             text=self._tr("bxd_padding_lbl"),

@@ -42,7 +42,9 @@ def validate_input(path: Path) -> None:
 
 def output_path_for(req: PatchRequest) -> Path:
     """<stem>_ts<timescale><ext>; adds (n) suffix unless overwrite or no auto_rename."""
-    base = req.out_dir / f"{req.src.stem}_ts{req.timescale}{req.src.suffix}"
+    is_x1t = req.strategy.startswith(("bxd-", "x1t-"))
+    out_ext = ".mp4" if (is_x1t and req.src.suffix.lower() == ".mov") else req.src.suffix
+    base = req.out_dir / f"{req.src.stem}_ts{req.timescale}{out_ext}"
     if req.overwrite or not base.exists():
         return base
     if not req.auto_rename:
@@ -152,6 +154,11 @@ def patch(
             "bxd-mobile",
             "bxd-hybrid",
             "bxd-clean",
+            "x1t-experimental",
+            "x1t-pc",
+            "x1t-mobile",
+            "x1t-hybrid",
+            "x1t-clean",
         ):
             emit(LogEvent(f"Executing {strategy.label}...", "INFO"))
 
@@ -163,13 +170,15 @@ def patch(
                 )
                 emit(LogEvent(msg, lvl))
 
+            norm_name = strategy.name.replace("x1t-", "bxd-")
+            is_pc = norm_name in ("bxd-experimental", "bxd-pc")
             bxd_patcher = MethodBXDDirectPatch(
                 src=src,
                 out=tmp,
                 target_timescale=req.timescale,
                 multiplier=10,
-                indeterminate_mvhd=(strategy.name in ("bxd-experimental", "bxd-pc")),
-                strip_edts=(strategy.name in ("bxd-experimental", "bxd-pc")),
+                indeterminate_mvhd=True,
+                strip_edts=is_pc,
                 preset_mode=strategy.name,
                 padding_bytes=req.bxd_padding_bytes,
                 max_tail_ms=req.bxd_max_tail_ms,
@@ -191,7 +200,8 @@ def patch(
 
         after = probe(tmp, ffprobe_bin)
         dur_tol: float | None = None
-        if strategy.name == "bxd-hybrid" and req.bxd_max_tail_ms > 0:
+        norm_strat = strategy.name.replace("x1t-", "bxd-")
+        if norm_strat == "bxd-hybrid" and req.bxd_max_tail_ms > 0:
             dur_tol = max(0.25, (req.bxd_max_tail_ms / 1000.0) + 0.1)
         warnings = verify(before, after, req.timescale, duration_tolerance_s=dur_tol)
         for w in warnings:

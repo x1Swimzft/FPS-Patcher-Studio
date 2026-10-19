@@ -348,23 +348,29 @@ class MethodBXDDirectPatch:
         self.cancel_event = cancel_event
 
         # Configure flags based on preset_mode when using standard preset names
-        if preset_mode in ("bxd-mobile", "bxd-hybrid", "bxd-clean"):
-            self.indeterminate_mvhd = False
+        # All X1T presets apply indeterminate mvhd for TikTok bypass
+        self.indeterminate_mvhd = True
+        normalized_mode = preset_mode.lower().replace("x1t-", "bxd-")
+        if normalized_mode in ("bxd-mobile", "bxd-hybrid", "bxd-clean"):
             self.strip_edts = False
             self.inflate_audio_table = False
         else:
-            self.indeterminate_mvhd = indeterminate_mvhd
             self.strip_edts = strip_edts
             self.inflate_audio_table = True
 
     def execute(self) -> None:
         mode_title = {
-            "bxd-pc": "Bxd For PC (Experimental Container Method)",
-            "bxd-experimental": "Bxd For PC (Experimental Container Method)",
-            "bxd-mobile": "Bxd For Mobile (ISO-BMFF Safe Box Inflation)",
-            "bxd-hybrid": "Bxd Hybrid (ISO-BMFF Box Inflation + Tail Delta Shaping)",
-            "bxd-clean": "Bxd Clean (ISO-BMFF Pure Timing & Faststart)",
-        }.get(self.preset_mode, f"BXD ({self.preset_mode})")
+            "bxd-pc": "X1T For PC (TikTok Transcoder Bypass)",
+            "x1t-pc": "X1T For PC (TikTok Transcoder Bypass)",
+            "bxd-experimental": "X1T For PC (TikTok Transcoder Bypass)",
+            "x1t-experimental": "X1T For PC (TikTok Transcoder Bypass)",
+            "bxd-mobile": "X1T For Mobile (TikTok Bypass + Mobile Compatible)",
+            "x1t-mobile": "X1T For Mobile (TikTok Bypass + Mobile Compatible)",
+            "bxd-hybrid": "X1T Hybrid (TikTok Bypass + Tail Delta Shaping)",
+            "x1t-hybrid": "X1T Hybrid (TikTok Bypass + Tail Delta Shaping)",
+            "bxd-clean": "X1T Clean (TikTok Bypass + Pure Timing)",
+            "x1t-clean": "X1T Clean (TikTok Bypass + Pure Timing)",
+        }.get(self.preset_mode, f"X1T ({self.preset_mode})")
 
         self.emit(f"[INIT] {mode_title}")
         self.emit(f"[READ] {self.src.name}")
@@ -382,7 +388,15 @@ class MethodBXDDirectPatch:
         if not moov or not mdat:
             raise PatchError("Missing moov or mdat atom; not a standard MP4 container.")
 
-        ftyp_bytes = ftyp.data if ftyp else b""
+        # Normalize .mov (QuickTime qt) containers to standard MP4 (mp42 / isom)
+        is_mov = self.src.suffix.lower() == ".mov" or (
+            ftyp is not None and len(ftyp.payload) >= 4 and ftyp.payload[:4] == b"qt  "
+        )
+        if is_mov or ftyp is None:
+            self.emit("[NORMALIZE] Container branding: QuickTime (.mov) -> MP4 (isom/mp42)")
+            ftyp_bytes = _build_box(b"ftyp", b"mp42\x00\x00\x02\x00isomiso2mp41mp42")
+        else:
+            ftyp_bytes = ftyp.data
         orig_mdat_payload = raw_bytes[mdat.start + mdat.header_size : mdat.start + mdat.size]
         orig_mdat_sha256 = hashlib.sha256(orig_mdat_payload).hexdigest()
 
@@ -439,10 +453,11 @@ class MethodBXDDirectPatch:
             video_scale = Fraction(eff_v_ts, v_orig_ts)
             self.emit(f"[PATCH] video timescale: {v_orig_ts} -> {eff_v_ts}")
 
-        # Calculate Hybrid tail delta extension if preset_mode == "bxd-hybrid"
+        # Calculate Hybrid tail delta extension if preset_mode == "bxd-hybrid" or "x1t-hybrid"
         tail_add_mdhd = 0
         tail_add_mvhd = 0
-        if self.preset_mode == "bxd-hybrid" and self.max_tail_ms > 0 and eff_v_ts > 0:
+        normalized_mode = self.preset_mode.lower().replace("x1t-", "bxd-")
+        if normalized_mode == "bxd-hybrid" and self.max_tail_ms > 0 and eff_v_ts > 0:
             tail_add_mdhd = max(1, round((self.max_tail_ms / 1000.0) * eff_v_ts))
             if mvhd_ts > 0:
                 tail_add_mvhd = round(tail_add_mdhd * mvhd_ts / eff_v_ts)
@@ -475,7 +490,7 @@ class MethodBXDDirectPatch:
                 ghost_nal_block = PADDING_NAL * audio_pad_count if audio_pad_count > 0 else b""
             else:
                 self.emit("[INFLATE] Video-only container (no audio ghost table inflation)")
-        elif self.preset_mode in ("bxd-mobile", "bxd-hybrid"):
+        elif normalized_mode in ("bxd-mobile", "bxd-hybrid"):
             pad_len = (
                 self.padding_bytes
                 if self.padding_bytes > 0
@@ -808,9 +823,12 @@ class MethodBXDDirectPatch:
                 if new_edts_bytes is not None:
                     parts.append(new_edts_bytes)
             elif ch.typ == b"tkhd":
-                if not self.indeterminate_mvhd and mvhd_ts > 0 and eff_v_ts > 0:
+                if not self.strip_edts and mvhd_ts > 0 and eff_v_ts > 0:
                     if elst_sum is not None and elst_sum > 0:
                         parts.append(_patch_tkhd_duration(ch, elst_sum))
+                    elif new_mdhd_dur > 0:
+                        expected_tk = round(new_mdhd_dur * mvhd_ts / eff_v_ts)
+                        parts.append(_patch_tkhd_duration(ch, expected_tk))
                     elif tail_add_mvhd > 0:
                         orig_tk_dur = _read_tkhd_duration(ch)
                         parts.append(_patch_tkhd_duration(ch, orig_tk_dur + tail_add_mvhd))
@@ -1354,7 +1372,14 @@ def repair_for_mobile(
     if not moov or not mdat:
         raise PatchError("Missing moov or mdat atom; cannot repair container.")
 
-    ftyp_bytes = ftyp.data if ftyp else b""
+    is_mov = src.suffix.lower() == ".mov" or (
+        ftyp is not None and len(ftyp.payload) >= 4 and ftyp.payload[:4] == b"qt  "
+    )
+    if is_mov or ftyp is None:
+        emit("[NORMALIZE] Container branding: QuickTime (.mov) -> MP4 (isom/mp42)")
+        ftyp_bytes = _build_box(b"ftyp", b"mp42\x00\x00\x02\x00isomiso2mp41mp42")
+    else:
+        ftyp_bytes = ftyp.data
     mdat_payload_start = mdat.start + mdat.header_size
     mdat_end = mdat.start + mdat.size
 

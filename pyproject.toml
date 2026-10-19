@@ -1,7 +1,7 @@
 [project]
 name = "fps-patcher-studio"
-version = "0.2.1b0"
-description = "High-precision MP4/MOV container timing patcher (BXD PC, Mobile, Hybrid, Clean & Mobile Repair)"
+version = "0.3.0"
+description = "High-precision MP4/MOV container timing patcher (X1T PC, Mobile, Hybrid, Clean & Mobile Repair)"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

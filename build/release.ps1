@@ -49,12 +49,12 @@ FPS Patcher Studio v$version (Windows 64-bit, portable)
 Run:   FPSPatcherStudio.exe   (no install needed; delete the folder to remove)
 Data:  %APPDATA%\FPSPatcherStudio  (settings.json, queue.json, logs)
 
-Presets (v0.2.1-beta):
-  - Bxd For PC (bxd-pc): Original BXD trick (indeterminate mvhd, 10x audio ghosts, trailing bytes).
-  - BXD For Mobile (bxd-mobile): ISO-BMFF compliant container for iOS AVPlayer / Android MediaCodec.
-  - BXD Hybrid (bxd-hybrid): Valid mvhd/tkhd/edts + bounded last-sample audio tail extension + free box.
-  - BXD Clean (bxd-clean): Pure video timescale/stts/ctts patch (audio untouched).
-  - Repair for Mobile: Lossless 6-step repair for existing BXD-patched files.
+Presets (v$version):
+  - X1T For PC (x1t-pc / bxd-pc): Full PC TikTok bypass (indeterminate mvhd, 10x audio ghosts, trailing bytes).
+  - X1T For Mobile (x1t-mobile / bxd-mobile): TikTok bypass (indeterminate mvhd) + ISO-BMFF compliant container for iOS / Android.
+  - X1T Hybrid (x1t-hybrid / bxd-hybrid): TikTok bypass + bounded last-sample tail extension + free box.
+  - X1T Clean (x1t-clean / bxd-clean): Pure video timescale patch with TikTok bypass (audio untouched).
+  - X1T Repair: Lossless repair for broken non-standard containers.
 
 FFmpeg is OPTIONAL (used for video thumbnails).
   - Put ffmpeg.exe + ffprobe.exe in a 'bin' folder next to FPSPatcherStudio.exe,

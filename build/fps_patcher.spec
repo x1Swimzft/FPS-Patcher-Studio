@@ -6,7 +6,11 @@ from PyInstaller.utils.hooks import collect_data_files
 
 ROOT = Path(SPECPATH).parent  # noqa: F821 (SPECPATH injected by PyInstaller)
 
-datas = collect_data_files("customtkinter") + collect_data_files("tkinterdnd2")
+datas = (
+    collect_data_files("customtkinter")
+    + collect_data_files("tkinterdnd2")
+    + [(str(ROOT / "src" / "fps_patcher" / "ui" / "assets"), "fps_patcher/ui/assets")]
+)
 binaries = [(str(p), "bin") for p in (ROOT / "bin").glob("*.exe")]
 
 a = Analysis(  # noqa: F821

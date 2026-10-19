@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from fractions import Fraction
 from pathlib import Path
 
 from fps_patcher.app.queue_model import InputQueue
+from fps_patcher.core.models import VideoInfo
 
 
 def _mk(tmp: Path, name: str) -> Path:
@@ -110,3 +112,76 @@ def test_queue_persistence_roundtrip_and_pruning(tmp_path: Path) -> None:
     assert item_a.selected is True
     assert item_a.timescale == 60000
     assert item_a.strategy == "direct-atom"
+
+
+def test_reset_for_run(tmp_path: Path) -> None:
+    q = InputQueue()
+    a, b = _mk(tmp_path, "a.mp4"), _mk(tmp_path, "b.mp4")
+    q.add([a, b])
+    info_a = VideoInfo(
+        path=a,
+        codec="h264",
+        width=1920,
+        height=1080,
+        avg_fps=Fraction(30, 1),
+        r_fps=Fraction(30, 1),
+        duration_s=10.0,
+        timescale=30000,
+        nb_frames=300,
+        has_audio=True,
+        stream_count=2,
+    )
+    q.set_info(a, info_a)
+    q.set_status(a, "done", output=tmp_path / "out_a.mp4")
+    item_a = q.get(a)
+    assert item_a is not None
+    item_a.progress = 1.0
+
+    q.set_status(b, "failed", error="Failed to patch")
+    item_b = q.get(b)
+    assert item_b is not None
+    item_b.progress = 0.5
+
+    # Reset both for run
+    q.reset_for_run([a, b])
+
+    assert item_a.status == "ready"
+    assert item_a.error is None
+    assert item_a.progress == 0.0
+    assert item_a.output is None
+
+    assert item_b.status == "pending"  # info is None
+    assert item_b.error is None
+    assert item_b.progress == 0.0
+    assert item_b.output is None
+
+
+def test_snapshot_for_run_allows_done_and_error_when_selected(tmp_path: Path) -> None:
+    q = InputQueue()
+    a, b = _mk(tmp_path, "a.mp4"), _mk(tmp_path, "b.mp4")
+    q.add([a, b])
+    q.set_status(a, "done")
+    q.set_status(b, "failed", error="fail")
+
+    # Select both
+    q.select_all(True)
+    snap = q.snapshot_for_run(only_selected=True)
+    assert [i.path for i in snap] == [a, b]
+
+    # Select only done item a
+    q.select_all(False)
+    q.toggle(a)
+    snap_a = q.snapshot_for_run(only_selected=True)
+    assert [i.path for i in snap_a] == [a]
+
+
+def test_snapshot_for_run_when_all_done_allows_repatch(tmp_path: Path) -> None:
+    q = InputQueue()
+    a, b = _mk(tmp_path, "a.mp4"), _mk(tmp_path, "b.mp4")
+    q.add([a, b])
+    q.set_status(a, "done")
+    q.set_status(b, "done")
+
+    # When all are done and only_selected=False, it should allow re-patching all
+    snap = q.snapshot_for_run(only_selected=False)
+    assert [i.path for i in snap] == [a, b]

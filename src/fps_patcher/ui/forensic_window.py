@@ -1,4 +1,4 @@
-"""Forensic MP4 Analyzer Window (BXD Compatibility & Semantic Diff UI)."""
+"""Forensic MP4 Analyzer Window (X1T Compatibility & Semantic Diff UI)."""
 
 from __future__ import annotations
 
@@ -190,7 +190,7 @@ class ForensicWindow(ctk.CTkToplevel):
             font=font_caption(),
         ).grid(row=0, column=2, padx=(0, 14), pady=8)
 
-        # File 2: BXD / Patched
+        # File 2: X1T / Patched
         ctk.CTkLabel(
             frame,
             text="Target / Patched:",
@@ -199,7 +199,7 @@ class ForensicWindow(ctk.CTkToplevel):
         ).grid(row=1, column=0, sticky="w", padx=14, pady=8)
         self.patch_entry = ctk.CTkEntry(
             frame,
-            placeholder_text="Path to BXD output or patched file...",
+            placeholder_text="Path to X1T output or patched file...",
             fg_color=SURFACE_RAISED,
             border_color=BORDER_HAIRLINE,
             border_width=1,
@@ -323,7 +323,7 @@ class ForensicWindow(ctk.CTkToplevel):
 
         self.repair_btn = ctk.CTkButton(
             bar,
-            text="🔧 Repair Target for Mobile",
+            text="🔧 X1T Repair",
             state="disabled",
             command=self._repair_target,
             fg_color=ACCENT,

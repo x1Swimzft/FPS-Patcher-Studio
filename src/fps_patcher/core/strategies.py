@@ -7,7 +7,7 @@ no re-encode, header/container rewrite only.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from .models import PatchRequest, VideoInfo
 
@@ -76,58 +76,66 @@ class MethodV4Strategy:
 
 
 class BXDStrategy:
-    """Experimental BXD container method (audio inflation & indeterminate mvhd duration)."""
+    """Experimental X1T container method (audio inflation & indeterminate mvhd duration)."""
 
     name = "bxd-experimental"
-    label = "Experimental BXD Container Method"
+    label = "Experimental X1T Container Method"
     direct = True
 
     def build_args(self, req: PatchRequest, info: VideoInfo, out: Path) -> list[str]:
-        raise RuntimeError("BXD Experimental strategy does not use FFmpeg arguments.")
+        raise RuntimeError("X1T Experimental strategy does not use FFmpeg arguments.")
 
 
 class BXDPCtrategy:
-    """Bxd For PC: Original non-standard BXD container inflation (PC-oriented)."""
+    """X1T For PC: Original non-standard X1T container inflation (PC-oriented)."""
 
     name = "bxd-pc"
-    label = "Bxd For PC"
+    label = "X1T For PC"
     direct = True
 
     def build_args(self, req: PatchRequest, info: VideoInfo, out: Path) -> list[str]:
-        raise RuntimeError("Bxd For PC preset does not use FFmpeg arguments.")
+        raise RuntimeError("X1T For PC preset does not use FFmpeg arguments.")
 
 
 class BXDMobileStrategy:
-    """Bxd For Mobile: ISO-BMFF compliant faststart + free-box padding + valid timing."""
+    """X1T For Mobile: ISO-BMFF compliant faststart + free-box padding + valid timing."""
 
     name = "bxd-mobile"
-    label = "Bxd For Mobile"
+    label = "X1T For Mobile"
     direct = True
 
     def build_args(self, req: PatchRequest, info: VideoInfo, out: Path) -> list[str]:
-        raise RuntimeError("Bxd For Mobile preset does not use FFmpeg arguments.")
+        raise RuntimeError("X1T For Mobile preset does not use FFmpeg arguments.")
 
 
 class BXDHybridStrategy:
-    """Bxd Hybrid: ISO-BMFF free-box padding + bounded last-sample duration shaping."""
+    """X1T Hybrid: ISO-BMFF free-box padding + bounded last-sample duration shaping."""
 
     name = "bxd-hybrid"
-    label = "Bxd Hybrid"
+    label = "X1T Hybrid"
     direct = True
 
     def build_args(self, req: PatchRequest, info: VideoInfo, out: Path) -> list[str]:
-        raise RuntimeError("Bxd Hybrid preset does not use FFmpeg arguments.")
+        raise RuntimeError("X1T Hybrid preset does not use FFmpeg arguments.")
 
 
 class BXDCleanStrategy:
-    """Bxd Clean: Pure ISO-BMFF faststart & atom timescale retiming without padding."""
+    """X1T Clean: Pure ISO-BMFF faststart & atom timescale retiming without padding."""
 
     name = "bxd-clean"
-    label = "Bxd Clean"
+    label = "X1T Clean"
     direct = True
 
     def build_args(self, req: PatchRequest, info: VideoInfo, out: Path) -> list[str]:
-        raise RuntimeError("Bxd Clean preset does not use FFmpeg arguments.")
+        raise RuntimeError("X1T Clean preset does not use FFmpeg arguments.")
+
+
+# X1T Class Aliases
+X1TStrategy = BXDStrategy
+X1TPCStrategy = BXDPCtrategy
+X1TMobileStrategy = BXDMobileStrategy
+X1THybridStrategy = BXDHybridStrategy
+X1TCleanStrategy = BXDCleanStrategy
 
 
 class FFmpegStrategy:
@@ -146,21 +154,46 @@ class FFmpegStrategy:
         ]
 
 
-UI_PRESETS: dict[str, PatchStrategy] = {
+class _PresetDict(dict[str, PatchStrategy]):
+    """Preset mapping dictionary with transparent x1t-* alias support."""
+
+    _ALIASES = {
+        "x1t-pc": "bxd-pc",
+        "x1t-mobile": "bxd-mobile",
+        "x1t-hybrid": "bxd-hybrid",
+        "x1t-clean": "bxd-clean",
+    }
+
+    def __getitem__(self, key: str) -> PatchStrategy:
+        return super().__getitem__(self._ALIASES.get(key, key))
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return super().get(self._ALIASES.get(key, key), default)
+
+    def __contains__(self, key: object) -> bool:
+        return super().__contains__(key) or (isinstance(key, str) and key in self._ALIASES)
+
+
+UI_PRESETS: dict[str, PatchStrategy] = _PresetDict({
     "bxd-pc": BXDPCtrategy(),
     "bxd-mobile": BXDMobileStrategy(),
     "bxd-hybrid": BXDHybridStrategy(),
     "bxd-clean": BXDCleanStrategy(),
-}
+})
 
 STRATEGIES: dict[str, PatchStrategy] = {
     "bxd-pc": UI_PRESETS["bxd-pc"],
     "bxd-mobile": UI_PRESETS["bxd-mobile"],
     "bxd-hybrid": UI_PRESETS["bxd-hybrid"],
     "bxd-clean": UI_PRESETS["bxd-clean"],
+    "x1t-pc": UI_PRESETS["bxd-pc"],
+    "x1t-mobile": UI_PRESETS["bxd-mobile"],
+    "x1t-hybrid": UI_PRESETS["bxd-hybrid"],
+    "x1t-clean": UI_PRESETS["bxd-clean"],
     "direct-atom": DirectAtomStrategy(),
     "v4-forensic": MethodV4Strategy(),
     "bxd-experimental": BXDStrategy(),
+    "x1t-experimental": BXDStrategy(),
     "ffmpeg-copy": FFmpegStrategy(),
 }
 
@@ -169,11 +202,23 @@ _STRATEGY_ALIASES: dict[str, str] = {
     "timescale": "ffmpeg-copy",
     "timescale+movie": "ffmpeg-copy",
     "bxd-bypass": "bxd-experimental",
+    "x1t-bypass": "bxd-experimental",
+    "x1t-pc": "bxd-pc",
+    "x1t-mobile": "bxd-mobile",
+    "x1t-hybrid": "bxd-hybrid",
+    "x1t-clean": "bxd-clean",
+    "x1t-experimental": "bxd-experimental",
 }
 
 _UI_MIGRATION_MAP: dict[str, str] = {
     "bxd-bypass": "bxd-pc",
     "bxd-experimental": "bxd-pc",
+    "x1t-bypass": "bxd-pc",
+    "x1t-experimental": "bxd-pc",
+    "x1t-pc": "bxd-pc",
+    "x1t-mobile": "bxd-mobile",
+    "x1t-hybrid": "bxd-hybrid",
+    "x1t-clean": "bxd-clean",
     "direct-atom": "bxd-clean",
     "v4-forensic": "bxd-clean",
     "ffmpeg-copy": "bxd-clean",
@@ -187,8 +232,10 @@ def migrate_strategy_name(name: str) -> tuple[str, str | None]:
 
     Returns (resolved_preset_key, original_legacy_key_if_migrated).
     """
-    if name in UI_PRESETS:
+    if name in ("bxd-pc", "bxd-mobile", "bxd-hybrid", "bxd-clean"):
         return name, None
+    if name in ("x1t-pc", "x1t-mobile", "x1t-hybrid", "x1t-clean"):
+        return name.replace("x1t-", "bxd-"), None
     if name in _UI_MIGRATION_MAP:
         return _UI_MIGRATION_MAP[name], name
     return "bxd-mobile", name

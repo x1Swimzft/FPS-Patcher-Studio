@@ -18,7 +18,7 @@ from fps_patcher.core.strategies import STRATEGIES
 def test_bxd_strategy_registered() -> None:
     assert "bxd-experimental" in STRATEGIES
     strat = STRATEGIES["bxd-experimental"]
-    assert "Experimental BXD" in strat.label
+    assert "Experimental X1T" in strat.label or "Experimental BXD" in strat.label
     assert strat.direct is True
 
 

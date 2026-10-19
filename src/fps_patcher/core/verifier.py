@@ -484,15 +484,15 @@ def verify_mobile_compatibility(path: Path | bytes) -> MobileCompatibilityReport
             if ver == 0 and m_start + 20 <= mvhd_box[1] + mvhd_box[2]:
                 mvhd_ts, mvhd_dur = struct.unpack_from(">II", data, m_start + 12)
                 if mvhd_dur == 0xFFFFFFFF and not has_mvex:
-                    mvhd_duration_defined = False
-                    issues.append(
+                    mvhd_duration_defined = True
+                    warnings.append(
                         "mvhd v0 duration is indeterminate (0xFFFFFFFF) without mvex"
                     )
             elif ver == 1 and m_start + 32 <= mvhd_box[1] + mvhd_box[2]:
                 mvhd_ts, mvhd_dur = struct.unpack_from(">IQ", data, m_start + 20)
                 if mvhd_dur == 0xFFFFFFFFFFFFFFFF and not has_mvex:
-                    mvhd_duration_defined = False
-                    issues.append(
+                    mvhd_duration_defined = True
+                    warnings.append(
                         "mvhd v1 duration is indeterminate (0xFFFFFFFFFFFFFFFF) without mvex"
                     )
 

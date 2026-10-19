@@ -297,10 +297,24 @@ def test_patch_output_exists_error(clip30: Path, ff: FFmpegPaths, tmp_path: Path
 def test_patch_mov_and_noaudio(
     clip5994: Path, clip_noaudio: Path, ff: FFmpegPaths, tmp_path: Path
 ) -> None:
+    # ffmpeg-copy preserves original container extension (.mov -> .mov, .mp4 -> .mp4)
     for src in (clip5994, clip_noaudio):
-        r = patch(PatchRequest(src=src, out_dir=tmp_path, timescale=60000), ff, lambda e: None)
+        r = patch(
+            PatchRequest(src=src, out_dir=tmp_path, timescale=60000, strategy="ffmpeg-copy"),
+            ff,
+            lambda e: None,
+        )
         assert r.output.suffix == src.suffix
         assert r.after.timescale == 60000
+
+    # Default X1T strategy (x1t-mobile) normalizes .mov input to .mp4
+    r_mov_x1t = patch(
+        PatchRequest(src=clip5994, out_dir=tmp_path, timescale=60000, strategy="x1t-mobile"),
+        ff,
+        lambda e: None,
+    )
+    assert r_mov_x1t.output.suffix == ".mp4"
+    assert r_mov_x1t.after.timescale == 60000
 
 
 def test_patch_rejects_bad_ext(ff: FFmpegPaths, tmp_path: Path) -> None:

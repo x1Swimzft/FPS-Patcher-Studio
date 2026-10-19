@@ -151,8 +151,11 @@ class AppController:
         return n
 
     def clear_queue(self) -> None:
+        if self.busy:
+            return
         self.items.clear(locked_path=self.current_patching_path)
         self.queue = self.items.paths()
+        self.current = None
         self.emit(QueueChangedEvent("cleared"))
 
     # ---------- actions ----------
@@ -250,6 +253,8 @@ class AppController:
                 )
                 self.emit(LogEvent(msg, "WARN"))
                 return
+            self.items.reset_for_run(items)
+            self.emit(QueueChangedEvent("reset"))
         else:
             fallback = [self.current.path] if self.current else []
             items = list(self.queue) if self.queue else fallback
