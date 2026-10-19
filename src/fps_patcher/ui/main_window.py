@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import subprocess
@@ -70,6 +71,8 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
         self._settings_win: Any = None
         self._applied_ui_scale: int = 100
         self._theme_mgr = get_theme_manager(settings)
+        self._window_has_focus: bool = True
+        self._focus_debounce_timer: str | None = None
 
         ctk.set_appearance_mode(settings.appearance)
         self._apply_ui_scale(settings.ui_scale)
@@ -213,11 +216,50 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
         self.bind("<Control-O>", lambda _: self.input_list._browse_files())
         self.bind("<Return>", lambda _: self._kbd_apply_selected())
 
+        # Window focus tracking (<FocusIn>, <FocusOut>)
+        self.bind("<FocusIn>", self._on_window_focus_in, add="+")
+        self.bind("<FocusOut>", self._on_window_focus_out, add="+")
+
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self._theme_mgr.subscribe(self._on_theme_updated)
 
         self._init_ffmpeg()
         self.after(POLL_MS, self._poll)
+
+    # ---------- window focus awareness ----------
+    def _on_window_focus_in(self, event: Any) -> None:
+        if self._focus_debounce_timer is not None:
+            self.after_cancel(self._focus_debounce_timer)
+            self._focus_debounce_timer = None
+        self._update_window_focus(True)
+
+    def _on_window_focus_out(self, event: Any) -> None:
+        if self._focus_debounce_timer is not None:
+            self.after_cancel(self._focus_debounce_timer)
+        self._focus_debounce_timer = self.after(35, self._debounced_check_focus)
+
+    def _debounced_check_focus(self) -> None:
+        self._focus_debounce_timer = None
+        try:
+            focused = self.focus_get() is not None
+        except Exception:
+            focused = False
+        self._update_window_focus(focused)
+
+    def _update_window_focus(self, focused: bool) -> None:
+        if getattr(self, "_window_has_focus", None) == focused:
+            return
+        self._window_has_focus = focused
+        if hasattr(self, "input_list") and hasattr(self.input_list, "set_window_focused"):
+            self.input_list.set_window_focused(focused)
+
+    def set_window_focused(self, focused: bool) -> None:
+        """Explicitly set window focus state (used by OS listeners or tests)."""
+        self._update_window_focus(focused)
+
+    @property
+    def is_window_focused(self) -> bool:
+        return getattr(self, "_window_has_focus", True)
 
     # ---------- window drag handling ----------
     def _setup_window_dragging(self) -> None:
@@ -964,6 +1006,10 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
                     )
 
     def _on_close(self) -> None:
+        if self._focus_debounce_timer is not None:
+            with contextlib.suppress(Exception):
+                self.after_cancel(self._focus_debounce_timer)
+            self._focus_debounce_timer = None
         self.controller.cancel()
         try:
             if self.settings.remember_geometry:

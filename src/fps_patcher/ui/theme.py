@@ -568,3 +568,154 @@ def apply_window_backdrop(
             applied = True
 
     return applied
+
+
+# ============================================================================
+# 7. MACOS CONTROLS STYLING & FOCUS RING HELPERS
+# ============================================================================
+
+FOCUS_RING_COLOR: tuple[str, str] = ("#007AFF", "#0A84FF")
+DISABLED_TEXT: tuple[str, str] = ("#AEAEB2", "#8E8E93")
+DISABLED_BORDER: tuple[str, str] = ("#E5E5EA", "#38383A")
+DISABLED_SURFACE: tuple[str, str] = ("#F2F2F7", "#2C2C2E")
+
+MAC_SWITCH_PROGRESS_COLOR: tuple[str, str] = ("#34C759", "#30D158")
+MAC_SWITCH_TRACK_COLOR: tuple[str, str] = ("#E5E5EA", "#39393D")
+MAC_SWITCH_THUMB_COLOR: str = "#FFFFFF"
+MAC_SWITCH_WIDTH: int = 38
+MAC_SWITCH_HEIGHT: int = 22
+MAC_SWITCH_RADIUS: int = 11
+
+MAC_CHECKBOX_WIDTH: int = 14
+MAC_CHECKBOX_HEIGHT: int = 14
+MAC_CHECKBOX_RADIUS: int = 4
+MAC_CHECKBOX_BORDER_WIDTH: float = 1.5
+MAC_CHECKBOX_FG_COLOR: tuple[str, str] = ("#007AFF", "#0A84FF")
+MAC_CHECKBOX_BORDER_COLOR: tuple[str, str] = ("#C7C7CC", "#48484A")
+MAC_CHECKBOX_CHECKMARK_COLOR: str = "#FFFFFF"
+
+MAC_DROPDOWN_RADIUS: int = 8
+
+
+def attach_focus_ring(
+    widget: Any,
+    focus_color: tuple[str, str] | str | None = None,
+    normal_color: tuple[str, str] | str | None = None,
+    border_width: int = 2,
+) -> Any:
+    """Attach macOS keyboard/mouse focus ring to an interactive widget.
+
+    When widget gains focus via <FocusIn>, border_color is set to macOS Focus Blue
+    (#007AFF Light / #0A84FF Dark) and border_width=2.
+    When widget loses focus via <FocusOut>, normal_color and normal border width are restored.
+    """
+    if focus_color is None:
+        focus_color = FOCUS_RING_COLOR
+
+    orig_color = normal_color
+    if orig_color is None:
+        with contextlib.suppress(Exception):
+            orig_color = widget.cget("border_color")
+    if orig_color is None:
+        orig_color = BORDER_HAIRLINE
+
+    orig_width = 1
+    with contextlib.suppress(Exception):
+        val = widget.cget("border_width")
+        if val is not None:
+            orig_width = int(val)
+
+    widget._focus_normal_border_color = orig_color
+    widget._focus_normal_border_width = orig_width
+    widget._focus_ring_color = focus_color
+    widget._focus_ring_width = border_width
+    widget._is_focus_ring_active = False
+
+    def _on_focus_in(_event: Any = None) -> None:
+        with contextlib.suppress(Exception):
+            if hasattr(widget, "cget") and str(widget.cget("state")).lower() == "disabled":
+                return
+            widget._is_focus_ring_active = True
+            widget.configure(border_color=focus_color, border_width=border_width)
+
+    def _on_focus_out(_event: Any = None) -> None:
+        with contextlib.suppress(Exception):
+            widget._is_focus_ring_active = False
+            restored_col = getattr(widget, "_focus_normal_border_color", orig_color)
+            restored_w = getattr(widget, "_focus_normal_border_width", orig_width)
+            widget.configure(border_color=restored_col, border_width=restored_w)
+
+    with contextlib.suppress(Exception):
+        widget.bind("<FocusIn>", _on_focus_in, add="+")
+        widget.bind("<FocusOut>", _on_focus_out, add="+")
+
+    widget._on_focus_in = _on_focus_in
+    widget._on_focus_out = _on_focus_out
+    return widget
+
+
+def style_mac_switch(
+    switch: ctk.CTkSwitch,
+    progress_color: tuple[str, str] = MAC_SWITCH_PROGRESS_COLOR,
+    track_color: tuple[str, str] = MAC_SWITCH_TRACK_COLOR,
+    thumb_color: str = MAC_SWITCH_THUMB_COLOR,
+) -> ctk.CTkSwitch:
+    """Apply macOS HIG Switch styling to a CTkSwitch."""
+    switch.configure(
+        switch_width=MAC_SWITCH_WIDTH,
+        switch_height=MAC_SWITCH_HEIGHT,
+        corner_radius=MAC_SWITCH_RADIUS,
+        progress_color=progress_color,
+        fg_color=track_color,
+        button_color=thumb_color,
+        button_hover_color=thumb_color,
+    )
+    return switch
+
+
+def style_mac_checkbox(
+    checkbox: ctk.CTkCheckBox,
+    fg_color: tuple[str, str] = MAC_CHECKBOX_FG_COLOR,
+    border_color: tuple[str, str] = MAC_CHECKBOX_BORDER_COLOR,
+    checkmark_color: str = MAC_CHECKBOX_CHECKMARK_COLOR,
+    border_width: float = MAC_CHECKBOX_BORDER_WIDTH,
+) -> ctk.CTkCheckBox:
+    """Apply macOS HIG Checkbox styling to a CTkCheckBox."""
+    checkbox.configure(
+        checkbox_width=MAC_CHECKBOX_WIDTH,
+        checkbox_height=MAC_CHECKBOX_HEIGHT,
+        corner_radius=MAC_CHECKBOX_RADIUS,
+        border_width=border_width,
+        fg_color=fg_color,
+        border_color=border_color,
+        checkmark_color=checkmark_color,
+    )
+    return checkbox
+
+
+class MacSwitch(ctk.CTkSwitch):
+    """CustomTkinter CTkSwitch with default macOS HIG dimensions, track colors, and thumb."""
+
+    def __init__(self, master: Any, **kwargs: Any) -> None:
+        kwargs.setdefault("switch_width", MAC_SWITCH_WIDTH)
+        kwargs.setdefault("switch_height", MAC_SWITCH_HEIGHT)
+        kwargs.setdefault("corner_radius", MAC_SWITCH_RADIUS)
+        kwargs.setdefault("progress_color", MAC_SWITCH_PROGRESS_COLOR)
+        kwargs.setdefault("fg_color", MAC_SWITCH_TRACK_COLOR)
+        kwargs.setdefault("button_color", MAC_SWITCH_THUMB_COLOR)
+        kwargs.setdefault("button_hover_color", MAC_SWITCH_THUMB_COLOR)
+        super().__init__(master, **kwargs)
+
+
+class MacCheckBox(ctk.CTkCheckBox):
+    """CustomTkinter CTkCheckBox with default macOS HIG 14px size, 4px radius, and blue fill."""
+
+    def __init__(self, master: Any, **kwargs: Any) -> None:
+        kwargs.setdefault("checkbox_width", MAC_CHECKBOX_WIDTH)
+        kwargs.setdefault("checkbox_height", MAC_CHECKBOX_HEIGHT)
+        kwargs.setdefault("corner_radius", MAC_CHECKBOX_RADIUS)
+        kwargs.setdefault("border_width", MAC_CHECKBOX_BORDER_WIDTH)
+        kwargs.setdefault("fg_color", MAC_CHECKBOX_FG_COLOR)
+        kwargs.setdefault("border_color", MAC_CHECKBOX_BORDER_COLOR)
+        kwargs.setdefault("checkmark_color", MAC_CHECKBOX_CHECKMARK_COLOR)
+        super().__init__(master, **kwargs)

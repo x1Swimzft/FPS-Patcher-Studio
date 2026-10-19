@@ -8,7 +8,13 @@ from typing import Any
 import customtkinter as ctk
 
 from ...config import Settings, render_filename_template
-from ..theme import font_caption, font_mono, font_section
+from ..theme import (
+    MacSwitch,
+    attach_focus_ring,
+    font_caption,
+    font_mono,
+    font_section,
+)
 
 
 class OutputTab:
@@ -46,10 +52,12 @@ class OutputTab:
             font=font_caption(),
             fg_color=tokens.surface_raised,
             border_color=tokens.border,
+            border_width=1,
             text_color=tokens.text,
         )
         self.out_dir_entry.insert(0, draft.output_dir)
         self.out_dir_entry.pack(side="left", fill="x", expand=True, padx=(0, 6))
+        attach_focus_ring(self.out_dir_entry)
 
         ctk.CTkButton(
             out_row,
@@ -98,11 +106,13 @@ class OutputTab:
             font=font_mono(),
             fg_color=tokens.surface_raised,
             border_color=tokens.border,
+            border_width=1,
             text_color=tokens.text,
         )
         self.tpl_entry.insert(0, draft.filename_template)
         self.tpl_entry.pack(fill="x", pady=(0, 4))
         self.tpl_entry.bind("<KeyRelease>", self._update_template_preview)
+        attach_focus_ring(self.tpl_entry)
 
         self.tpl_preview_lbl = ctk.CTkLabel(
             self.frame,
@@ -114,23 +124,21 @@ class OutputTab:
         self._update_template_preview()
 
         # Switches
-        self.open_done_switch = ctk.CTkSwitch(
+        self.open_done_switch = MacSwitch(
             self.frame,
             text=self._tr("open_when_done"),
             font=font_caption(),
             text_color=tokens.text,
-            progress_color=tokens.accent,
         )
         if draft.open_when_done:
             self.open_done_switch.select()
         self.open_done_switch.pack(anchor="w", pady=(4, 4))
 
-        self.preserve_mtime_switch = ctk.CTkSwitch(
+        self.preserve_mtime_switch = MacSwitch(
             self.frame,
             text=self._tr("preserve_mtime"),
             font=font_caption(),
             text_color=tokens.text,
-            progress_color=tokens.accent,
         )
         if draft.preserve_mtime:
             self.preserve_mtime_switch.select()

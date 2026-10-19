@@ -14,8 +14,13 @@ from ..config import Settings
 from ..core.models import FPS_PRESETS
 from ..core.strategies import UI_PRESETS, migrate_strategy_name
 from .icons import get_icon
+from .option_menu import MacOptionMenu
+from .segmented_control import MacSegmentedControl
 from .strings import t
 from .theme import (
+    MAC_CHECKBOX_BORDER_COLOR,
+    MAC_CHECKBOX_CHECKMARK_COLOR,
+    MAC_CHECKBOX_FG_COLOR,
     RADIUS_PILL,
     STATUS_DANGER_BG,
     STATUS_DANGER_BORDER,
@@ -23,7 +28,9 @@ from .theme import (
     STATUS_WARNING_BG,
     STATUS_WARNING_BORDER,
     STATUS_WARNING_TEXT,
+    MacCheckBox,
     ThemeTokens,
+    attach_focus_ring,
     font_body,
     font_caption,
     font_mono,
@@ -82,21 +89,16 @@ class ControlPanel(ctk.CTkFrame):
         )
         self.target_label.grid(row=0, column=0, sticky="ew", padx=6, pady=(6, 4))
 
-        self.preset = ctk.CTkSegmentedButton(
+        self.fps_seg = MacSegmentedControl(
             self,
             values=[*FPS_PRESETS, CUSTOM],
             command=self._preset_changed,
-            selected_color=tokens.accent,
-            selected_hover_color=tokens.accent_hover,
-            unselected_color=tokens.surface_raised,
-            unselected_hover_color=tokens.surface_hover,
-            text_color=tokens.text,
-            corner_radius=ctrl_rad,
+            corner_radius=8,
             font=font_body(bold=True, size_opt=fsize),
             height=34,
-            border_width=1,
         )
-        self.preset.grid(row=1, column=0, sticky="ew", padx=6, pady=(0, 6))
+        self.fps_seg.grid(row=1, column=0, sticky="ew", padx=6, pady=(0, 6))
+        self.preset = self.fps_seg
 
         # ── 2. 2-Column Grid: Timescale + Preset ──
         self.grid_two_col = ctk.CTkFrame(self, fg_color="transparent")
@@ -133,18 +135,24 @@ class ControlPanel(ctk.CTkFrame):
             font=font_mono(),
         )
         self.timescale.grid(row=1, column=0, sticky="ew", padx=(0, 5))
+        attach_focus_ring(self.timescale)
 
         labels = list(self._label_to_strategy)
-        self.strategy = ctk.CTkOptionMenu(
+        self.strategy = MacOptionMenu(
             self.grid_two_col,
             height=32,
-            corner_radius=ctrl_rad,
+            corner_radius=8,
+            border_width=1,
+            border_color=tokens.border,
             values=labels,
             command=self._strategy_selected,
-            fg_color=tokens.surface,
+            fg_color=tokens.surface_raised,
             button_color=tokens.surface_raised,
-            button_hover_color=tokens.accent,
+            button_hover_color=tokens.surface_hover,
             text_color=tokens.text,
+            dropdown_fg_color=tokens.surface,
+            dropdown_hover_color=tokens.surface_hover,
+            dropdown_text_color=tokens.text,
             font=font_caption(fsize),
             dynamic_resizing=False,
         )
@@ -152,6 +160,7 @@ class ControlPanel(ctk.CTkFrame):
         current = UI_PRESETS.get(resolved_key)
         self.strategy.set(current.label if current else labels[0])
         self.strategy.grid(row=1, column=1, sticky="ew", padx=(5, 0))
+        self.strategy_menu = self.strategy
 
         # ── 2b. Amber Warning Callout (shown only for "X1T For PC") ──
         self.pc_warn_frame = ctk.CTkFrame(
@@ -260,6 +269,7 @@ class ControlPanel(ctk.CTkFrame):
             state="disabled",
         )
         self.btn_set_override.pack(side="left", padx=(0, 6))
+        attach_focus_ring(self.btn_set_override)
 
         self.btn_clear_override = ctk.CTkButton(
             override_btns,
@@ -275,6 +285,7 @@ class ControlPanel(ctk.CTkFrame):
             state="disabled",
         )
         self.btn_clear_override.pack(side="left")
+        attach_focus_ring(self.btn_clear_override)
 
         # ── 3. Output Directory + Vertically Stacked Checkboxes ──
         self.output_lbl = ctk.CTkLabel(
@@ -304,6 +315,7 @@ class ControlPanel(ctk.CTkFrame):
         self.out_entry.grid(row=0, column=0, sticky="ew")
         self.out_entry.bind("<FocusOut>", self._on_out_entry_edited)
         self.out_entry.bind("<Return>", self._on_out_entry_edited)
+        attach_focus_ring(self.out_entry)
 
         # Compatibility alias for out_label
         self.out_label = self.out_entry
@@ -324,6 +336,7 @@ class ControlPanel(ctk.CTkFrame):
             border_color=tokens.border,
         )
         self.btn_pick_out.grid(row=0, column=1, padx=(5, 0))
+        attach_focus_ring(self.btn_pick_out)
 
         self.btn_reset_out = ctk.CTkButton(
             out_row,
@@ -339,6 +352,7 @@ class ControlPanel(ctk.CTkFrame):
             command=self._reset_out,
         )
         self.btn_reset_out.grid(row=0, column=2, padx=(4, 0))
+        attach_focus_ring(self.btn_reset_out)
         self._refresh_out()
 
         # Stack checkboxes vertically so Thai labels never clip at 340px
@@ -346,41 +360,61 @@ class ControlPanel(ctk.CTkFrame):
         opt_col.grid(row=7, column=0, sticky="ew", padx=6, pady=(0, 4))
         opt_col.grid_columnconfigure(0, weight=1)
 
-        self.overwrite_check = ctk.CTkCheckBox(
+        self.overwrite_check = MacCheckBox(
             opt_col,
             text=t("overwrite_lbl", lang),
             font=font_caption(fsize),
             text_color=tokens.text2,
-            checkmark_color="#FFFFFF",
-            fg_color=tokens.accent,
-            hover_color=tokens.accent_hover,
-            border_color=tokens.border,
-            checkbox_width=18,
-            checkbox_height=18,
-            corner_radius=5,
             command=self._options_changed,
         )
         self.overwrite_check.grid(row=0, column=0, sticky="w", pady=(0, 2))
         if settings.overwrite:
             self.overwrite_check.select()
+        self.overwrite_cb = self.overwrite_check
 
-        self.auto_rename_check = ctk.CTkCheckBox(
+        self.auto_rename_check = MacCheckBox(
             opt_col,
             text=t("auto_rename_lbl", lang),
             font=font_caption(fsize),
             text_color=tokens.text2,
-            checkmark_color="#FFFFFF",
-            fg_color=tokens.accent,
-            hover_color=tokens.accent_hover,
-            border_color=tokens.border,
-            checkbox_width=18,
-            checkbox_height=18,
-            corner_radius=5,
             command=self._options_changed,
         )
-        self.auto_rename_check.grid(row=1, column=0, sticky="w")
+        self.auto_rename_check.grid(row=1, column=0, sticky="w", pady=(0, 2))
         if settings.auto_rename:
             self.auto_rename_check.select()
+
+        self.dry_run_cb = MacCheckBox(
+            opt_col,
+            text=t("v4_dry_run", lang),
+            font=font_caption(fsize),
+            text_color=tokens.text2,
+            command=self._options_changed,
+        )
+        self.dry_run_cb.grid(row=2, column=0, sticky="w", pady=(0, 2))
+        if settings.v4_dry_run:
+            self.dry_run_cb.select()
+
+        self.safe_write_cb = MacCheckBox(
+            opt_col,
+            text=t("backup_original", lang),
+            font=font_caption(fsize),
+            text_color=tokens.text2,
+            command=self._options_changed,
+        )
+        self.safe_write_cb.grid(row=3, column=0, sticky="w", pady=(0, 2))
+        if settings.backup_original:
+            self.safe_write_cb.select()
+
+        self.verify_cb = MacCheckBox(
+            opt_col,
+            text=t("verify_after", lang),
+            font=font_caption(fsize),
+            text_color=tokens.text2,
+            command=self._options_changed,
+        )
+        self.verify_cb.grid(row=4, column=0, sticky="w")
+        if settings.verify_after:
+            self.verify_cb.select()
 
         # ── 4 & 5. Pinned Footer: Progress Bars + Start Patch / Cancel ──
         btn_parent = footer_master if footer_master is not None else self
@@ -484,6 +518,7 @@ class ControlPanel(ctk.CTkFrame):
             state="disabled",
         )
         self.patch_btn.grid(row=1, column=0, sticky="ew", pady=(0, 6))
+        attach_focus_ring(self.patch_btn)
 
         self.cancel_btn = ctk.CTkButton(
             btns,
@@ -500,6 +535,7 @@ class ControlPanel(ctk.CTkFrame):
             state="disabled",
         )
         self.cancel_btn.grid(row=2, column=0, sticky="ew")
+        attach_focus_ring(self.cancel_btn)
 
         preset = (
             settings.last_preset if settings.last_preset in [*FPS_PRESETS, CUSTOM] else "60 FPS"
@@ -555,11 +591,16 @@ class ControlPanel(ctk.CTkFrame):
             font=font_mono(),
         )
         self.strategy.configure(
-            fg_color=tokens.surface,
+            fg_color=tokens.surface_raised,
             button_color=tokens.surface_raised,
-            button_hover_color=tokens.accent,
+            button_hover_color=tokens.surface_hover,
+            border_color=tokens.border,
+            border_width=1,
             text_color=tokens.text,
-            corner_radius=ctrl_rad,
+            dropdown_fg_color=tokens.surface,
+            dropdown_hover_color=tokens.surface_hover,
+            dropdown_text_color=tokens.text,
+            corner_radius=8,
             font=font_caption(fsize),
         )
         self.pc_warn_frame.configure(
@@ -628,21 +669,32 @@ class ControlPanel(ctk.CTkFrame):
             border_color=tokens.border,
             corner_radius=ctrl_rad,
         )
+        chk_common = {
+            "font": font_caption(fsize),
+            "text_color": tokens.text2,
+            "fg_color": MAC_CHECKBOX_FG_COLOR,
+            "border_color": MAC_CHECKBOX_BORDER_COLOR,
+            "checkmark_color": MAC_CHECKBOX_CHECKMARK_COLOR,
+        }
         self.overwrite_check.configure(
             text=t("overwrite_lbl", lang),
-            text_color=tokens.text2,
-            fg_color=tokens.accent,
-            hover_color=tokens.accent_hover,
-            border_color=tokens.border,
-            font=font_caption(fsize),
+            **chk_common,
         )
         self.auto_rename_check.configure(
             text=t("auto_rename_lbl", lang),
-            text_color=tokens.text2,
-            fg_color=tokens.accent,
-            hover_color=tokens.accent_hover,
-            border_color=tokens.border,
-            font=font_caption(fsize),
+            **chk_common,
+        )
+        self.dry_run_cb.configure(
+            text=t("v4_dry_run", lang),
+            **chk_common,
+        )
+        self.safe_write_cb.configure(
+            text=t("backup_original", lang),
+            **chk_common,
+        )
+        self.verify_cb.configure(
+            text=t("verify_after", lang),
+            **chk_common,
         )
 
         self._prog_card.configure(
@@ -893,6 +945,9 @@ class ControlPanel(ctk.CTkFrame):
     def _options_changed(self) -> None:
         self.settings.overwrite = bool(self.overwrite_check.get())
         self.settings.auto_rename = bool(self.auto_rename_check.get())
+        self.settings.v4_dry_run = bool(self.dry_run_cb.get())
+        self.settings.backup_original = bool(self.safe_write_cb.get())
+        self.settings.verify_after = bool(self.verify_cb.get())
 
     def _preset_changed(self, value: str) -> None:
         tokens = self._theme_mgr.tokens

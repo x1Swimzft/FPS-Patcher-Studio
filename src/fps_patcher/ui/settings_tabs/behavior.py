@@ -7,7 +7,12 @@ from typing import Any
 import customtkinter as ctk
 
 from ...config import NOTIFY_MODES, Settings
-from ..theme import font_caption, font_section
+from ..option_menu import MacOptionMenu
+from ..theme import (
+    MacSwitch,
+    font_caption,
+    font_section,
+)
 
 
 class BehaviorTab:
@@ -24,45 +29,41 @@ class BehaviorTab:
         draft: Settings = self.dialog._draft
 
         # Switches
-        self.remember_geo_switch = ctk.CTkSwitch(
+        self.remember_geo_switch = MacSwitch(
             self.frame,
             text=self._tr("remember_geometry"),
             font=font_caption(),
             text_color=tokens.text,
-            progress_color=tokens.accent,
         )
         if draft.remember_geometry:
             self.remember_geo_switch.select()
         self.remember_geo_switch.pack(anchor="w", pady=4)
 
-        self.ontop_switch = ctk.CTkSwitch(
+        self.ontop_switch = MacSwitch(
             self.frame,
             text=self._tr("always_on_top"),
             font=font_caption(),
             text_color=tokens.text,
-            progress_color=tokens.accent,
         )
         if draft.always_on_top:
             self.ontop_switch.select()
         self.ontop_switch.pack(anchor="w", pady=4)
 
-        self.confirm_cancel_switch = ctk.CTkSwitch(
+        self.confirm_cancel_switch = MacSwitch(
             self.frame,
             text=self._tr("confirm_cancel"),
             font=font_caption(),
             text_color=tokens.text,
-            progress_color=tokens.accent,
         )
         if draft.confirm_cancel:
             self.confirm_cancel_switch.select()
         self.confirm_cancel_switch.pack(anchor="w", pady=4)
 
-        self.confirm_overwrite_switch = ctk.CTkSwitch(
+        self.confirm_overwrite_switch = MacSwitch(
             self.frame,
             text=self._tr("confirm_overwrite"),
             font=font_caption(),
             text_color=tokens.text,
-            progress_color=tokens.accent,
         )
         if draft.confirm_overwrite:
             self.confirm_overwrite_switch.select()
@@ -94,13 +95,20 @@ class BehaviorTab:
         ).pack(anchor="w", pady=(4, 4))
 
         lang_labels = ["English (en)", "ไทย (th)"]
-        self.lang_menu = ctk.CTkOptionMenu(
+        self.lang_menu = MacOptionMenu(
             self.frame,
             values=lang_labels,
             font=font_caption(),
             fg_color=tokens.surface_raised,
-            button_color=tokens.border,
+            button_color=tokens.surface_raised,
+            button_hover_color=tokens.surface_hover,
+            border_color=tokens.border,
+            border_width=1,
             text_color=tokens.text,
+            dropdown_fg_color=tokens.surface,
+            dropdown_hover_color=tokens.surface_hover,
+            dropdown_text_color=tokens.text,
+            corner_radius=8,
             command=self._on_lang_changed,
         )
         current_idx = 1 if draft.language == "th" else 0

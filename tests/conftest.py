@@ -2,8 +2,16 @@
 
 from __future__ import annotations
 
+import contextlib
 import subprocess
+import sys
 from pathlib import Path
+
+if sys.platform == "win32":
+    with contextlib.suppress(Exception):
+        import ctypes
+
+        ctypes.cdll.ucrtbase._setmaxstdio(2048)
 
 import pytest
 

@@ -8,7 +8,13 @@ import customtkinter as ctk
 
 from ...config import MAX_BXD_PADDING_BYTES, Settings
 from ...core.strategies import UI_PRESETS, migrate_strategy_name
-from ..theme import font_caption, font_section
+from ..option_menu import MacOptionMenu
+from ..theme import (
+    MacSwitch,
+    attach_focus_ring,
+    font_caption,
+    font_section,
+)
 
 
 class PatchingTab:
@@ -33,13 +39,20 @@ class PatchingTab:
         ).pack(anchor="w", pady=(0, 4))
 
         preset_labels = [s.label for s in UI_PRESETS.values()]
-        self.strategy_menu = ctk.CTkOptionMenu(
+        self.strategy_menu = MacOptionMenu(
             self.frame,
             values=preset_labels,
             font=font_caption(),
             fg_color=tokens.surface_raised,
-            button_color=tokens.border,
+            button_color=tokens.surface_raised,
+            button_hover_color=tokens.surface_hover,
+            border_color=tokens.border,
+            border_width=1,
             text_color=tokens.text,
+            dropdown_fg_color=tokens.surface,
+            dropdown_hover_color=tokens.surface_hover,
+            dropdown_text_color=tokens.text,
+            corner_radius=8,
         )
         resolved_key, _ = migrate_strategy_name(draft.strategy)
         current_strat = UI_PRESETS.get(resolved_key)
@@ -58,11 +71,13 @@ class PatchingTab:
             height=28,
             fg_color=tokens.surface_raised,
             border_color=tokens.border,
+            border_width=1,
             text_color=tokens.text,
             font=font_caption(),
         )
         self.padding_entry.insert(0, str(draft.bxd_padding_bytes))
         self.padding_entry.pack(fill="x", pady=(0, 8))
+        attach_focus_ring(self.padding_entry)
 
         ctk.CTkLabel(
             self.frame,
@@ -75,18 +90,19 @@ class PatchingTab:
             height=28,
             fg_color=tokens.surface_raised,
             border_color=tokens.border,
+            border_width=1,
             text_color=tokens.text,
             font=font_caption(),
         )
         self.tail_ms_entry.insert(0, str(draft.bxd_max_tail_ms))
         self.tail_ms_entry.pack(fill="x", pady=(0, 10))
+        attach_focus_ring(self.tail_ms_entry)
 
-        self.mask_paths_switch = ctk.CTkSwitch(
+        self.mask_paths_switch = MacSwitch(
             self.frame,
             text=self._tr("mask_paths_lbl"),
             font=font_caption(),
             text_color=tokens.text,
-            progress_color=tokens.accent,
         )
         if draft.mask_diagnostic_paths:
             self.mask_paths_switch.select()
@@ -100,34 +116,31 @@ class PatchingTab:
             text_color=tokens.text,
         ).pack(anchor="w", pady=(4, 4))
 
-        self.v4_strict_switch = ctk.CTkSwitch(
+        self.v4_strict_switch = MacSwitch(
             self.frame,
             text=self._tr("v4_strict"),
             font=font_caption(),
             text_color=tokens.text2,
-            progress_color=tokens.accent,
         )
         if draft.v4_strict_lossless:
             self.v4_strict_switch.select()
         self.v4_strict_switch.pack(anchor="w", pady=2)
 
-        self.v4_sync_switch = ctk.CTkSwitch(
+        self.v4_sync_switch = MacSwitch(
             self.frame,
             text=self._tr("v4_sync_mvhd"),
             font=font_caption(),
             text_color=tokens.text2,
-            progress_color=tokens.accent,
         )
         if draft.v4_sync_mvhd:
             self.v4_sync_switch.select()
         self.v4_sync_switch.pack(anchor="w", pady=2)
 
-        self.v4_report_switch = ctk.CTkSwitch(
+        self.v4_report_switch = MacSwitch(
             self.frame,
             text=self._tr("v4_export_report"),
             font=font_caption(),
             text_color=tokens.text2,
-            progress_color=tokens.accent,
         )
         if draft.v4_export_report:
             self.v4_report_switch.select()
@@ -141,34 +154,31 @@ class PatchingTab:
             text_color=tokens.text,
         ).pack(anchor="w", pady=(12, 4))
 
-        self.verify_switch = ctk.CTkSwitch(
+        self.verify_switch = MacSwitch(
             self.frame,
             text=self._tr("verify_after"),
             font=font_caption(),
             text_color=tokens.text,
-            progress_color=tokens.accent,
         )
         if draft.verify_after:
             self.verify_switch.select()
         self.verify_switch.pack(anchor="w", pady=2)
 
-        self.backup_switch = ctk.CTkSwitch(
+        self.backup_switch = MacSwitch(
             self.frame,
             text=self._tr("backup_original"),
             font=font_caption(),
             text_color=tokens.text,
-            progress_color=tokens.accent,
         )
         if draft.backup_original:
             self.backup_switch.select()
         self.backup_switch.pack(anchor="w", pady=2)
 
-        self.stop_err_switch = ctk.CTkSwitch(
+        self.stop_err_switch = MacSwitch(
             self.frame,
             text=self._tr("stop_on_error"),
             font=font_caption(),
             text_color=tokens.text,
-            progress_color=tokens.accent,
         )
         if draft.stop_on_error:
             self.stop_err_switch.select()

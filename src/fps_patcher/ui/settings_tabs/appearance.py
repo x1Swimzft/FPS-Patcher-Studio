@@ -7,7 +7,14 @@ from typing import Any
 import customtkinter as ctk
 
 from ...config import BACKDROP_MODES, RADIUS_STYLES, THEME_PRESETS, Settings
-from ..theme import font_caption, font_mono, font_section
+from ..option_menu import MacOptionMenu
+from ..theme import (
+    MacSwitch,
+    attach_focus_ring,
+    font_caption,
+    font_mono,
+    font_section,
+)
 
 SWATCHES = ["#3B82F6", "#8B5CF6", "#10B981", "#F43F5E", "#F59E0B", "#06B6D4", "#EC4899"]
 
@@ -33,17 +40,25 @@ class AppearanceTab:
             text_color=tokens.text,
         ).pack(anchor="w", pady=(0, 4))
 
-        self.preset_menu = ctk.CTkOptionMenu(
+        self.preset_menu = MacOptionMenu(
             self.frame,
             values=THEME_PRESETS,
             command=self._on_preset_selected,
             font=font_caption(),
             fg_color=tokens.surface_raised,
-            button_color=tokens.border,
+            button_color=tokens.surface_raised,
+            button_hover_color=tokens.surface_hover,
+            border_color=tokens.border,
+            border_width=1,
             text_color=tokens.text,
+            dropdown_fg_color=tokens.surface,
+            dropdown_hover_color=tokens.surface_hover,
+            dropdown_text_color=tokens.text,
+            corner_radius=8,
         )
         self.preset_menu.set(draft.theme_preset)
         self.preset_menu.pack(fill="x", pady=(0, 12))
+        self.appearance_menu = self.preset_menu
 
         # Section: Custom Accent Color
         ctk.CTkLabel(
@@ -62,10 +77,12 @@ class AppearanceTab:
             font=font_mono(),
             fg_color=tokens.surface_raised,
             border_color=tokens.border,
+            border_width=1,
             text_color=tokens.text,
         )
         self.accent_entry.insert(0, draft.custom_accent)
         self.accent_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        attach_focus_ring(self.accent_entry)
 
         # Swatches
         for sw in SWATCHES:
@@ -82,12 +99,11 @@ class AppearanceTab:
             btn.pack(side="left", padx=2)
 
         # Section: Backdrop Mode & Glass
-        self.glass_switch = ctk.CTkSwitch(
+        self.glass_switch = MacSwitch(
             self.frame,
             text=self._tr("glass_effect"),
             font=font_caption(),
             text_color=tokens.text,
-            progress_color=tokens.accent,
         )
         if draft.glass:
             self.glass_switch.select()
@@ -102,16 +118,24 @@ class AppearanceTab:
             font=font_caption(),
             text_color=tokens.text2,
         ).pack(side="left", padx=(0, 12))
-        self.glass_mode_menu = ctk.CTkOptionMenu(
+        self.glass_mode_menu = MacOptionMenu(
             bd_row,
             values=BACKDROP_MODES,
             font=font_caption(),
             fg_color=tokens.surface_raised,
-            button_color=tokens.border,
+            button_color=tokens.surface_raised,
+            button_hover_color=tokens.surface_hover,
+            border_color=tokens.border,
+            border_width=1,
             text_color=tokens.text,
+            dropdown_fg_color=tokens.surface,
+            dropdown_hover_color=tokens.surface_hover,
+            dropdown_text_color=tokens.text,
+            corner_radius=8,
         )
         self.glass_mode_menu.set(draft.glass_mode)
         self.glass_mode_menu.pack(side="right")
+        self.backdrop_menu = self.glass_mode_menu
 
         # Sliders: Tint Strength
         ctk.CTkLabel(
@@ -166,12 +190,11 @@ class AppearanceTab:
         self.radius_menu.pack(side="right")
 
         # Reduce motion switch
-        self.motion_switch = ctk.CTkSwitch(
+        self.motion_switch = MacSwitch(
             self.frame,
             text=self._tr("reduce_motion"),
             font=font_caption(),
             text_color=tokens.text2,
-            progress_color=tokens.accent,
         )
         if draft.reduce_motion:
             self.motion_switch.select()

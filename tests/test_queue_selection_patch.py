@@ -206,6 +206,13 @@ def test_strings_clear_all() -> None:
 def test_clear_all_button_ui_and_state(tmp_path: Path) -> None:
     from unittest.mock import PropertyMock, patch
 
+    from fps_patcher.ui.input_list import (
+        MAC_ACCENT_BLUE,
+        MAC_UNFOCUSED_BORDER,
+        MAC_UNFOCUSED_GREY,
+        TEXT_SOFT_WHITE,
+        TEXT_WHITE,
+    )
     from fps_patcher.ui.main_window import MainWindow
 
     with patch("fps_patcher.ui.main_window.app_data_dir", return_value=tmp_path):
@@ -213,24 +220,78 @@ def test_clear_all_button_ui_and_state(tmp_path: Path) -> None:
         w.withdraw()
         try:
             assert len(w.controller.items) == 0
-            p = tmp_path / "test.mp4"
-            p.write_bytes(b"dummy")
-            w.controller.add_files([p])
-            w.controller.items.set_override(p, timescale=60000, strategy="direct-atom")
-            w._sync_info_panel(p)
+            p1 = tmp_path / "test1.mp4"
+            p2 = tmp_path / "test2.mp4"
+            p1.write_bytes(b"dummy1")
+            p2.write_bytes(b"dummy2")
+            w.controller.add_files([p1, p2])
+            w.controller.items.set_override(p1, timescale=60000, strategy="direct-atom")
+            w._sync_info_panel(p1)
+            w.input_list.set_focused_path(p1)
             w.input_list.render()
 
-            assert len(w.controller.items) == 1
-            assert w.input_list.lbl_selected_count.cget("text") == "1 of 1 selected"
+            assert len(w.controller.items) == 2
+            assert w.input_list.lbl_selected_count.cget("text") == "2 of 2 selected"
             assert w.controls._focused_item is not None
 
-            # Disabled while batch patch operation is running (busy=True)
+            # Retrieve row widgets
+            it1 = w.controller.items.get(p1)
+            it2 = w.controller.items.get(p2)
+            assert it1 is not None and it2 is not None
+            row1 = w.input_list._row_widgets[it1.item_id]
+            row2 = w.input_list._row_widgets[it2.item_id]
+            tokens = w.input_list._theme_mgr.tokens
+
+            # 1. Focused macOS Accent Blue state (Window has OS focus)
+            assert row1.is_focused is True
+            assert row1.cget("fg_color") == MAC_ACCENT_BLUE
+            assert row1.cget("border_color") == MAC_ACCENT_BLUE
+            assert row1.lbl_name.cget("text_color") == TEXT_WHITE
+            assert row1.lbl_meta.cget("text_color") == TEXT_SOFT_WHITE
+            assert row1.btn_remove.cget("text_color") == TEXT_WHITE
+
+            # 2. Unfocused/unselected card remains on normal surface tokens
+            assert row2.is_focused is False
+            assert row2.cget("fg_color") == tokens.surface
+            assert row2.cget("border_color") == tokens.border
+            assert row2.lbl_name.cget("text_color") == tokens.text
+            assert row2.lbl_meta.cget("text_color") == tokens.muted
+
+            # 3. Window loses OS focus (set_window_focused(False))
+            w.set_window_focused(False)
+            assert w.input_list.window_focused is False
+            assert row1.cget("fg_color") == MAC_UNFOCUSED_GREY
+            assert row1.cget("border_color") == MAC_UNFOCUSED_BORDER
+            assert row1.lbl_name.cget("text_color") == tokens.text
+            assert row1.lbl_meta.cget("text_color") == tokens.text2
+            # Unselected row2 still unchanged
+            assert row2.cget("fg_color") == tokens.surface
+
+            # 4. Window regains OS focus (set_window_focused(True))
+            w.set_window_focused(True)
+            assert w.input_list.window_focused is True
+            assert row1.cget("fg_color") == MAC_ACCENT_BLUE
+            assert row1.cget("border_color") == MAC_ACCENT_BLUE
+            assert row1.lbl_name.cget("text_color") == TEXT_WHITE
+            assert row1.lbl_meta.cget("text_color") == TEXT_SOFT_WHITE
+
+            # 5. Row remove button state under busy
             w.input_list.set_state(busy=True)
             assert w.input_list.btn_clear_all.cget("state") == "disabled"
+            assert row1.btn_remove.cget("state") == "disabled"
+            assert row2.btn_remove.cget("state") == "disabled"
             w.input_list.set_state(busy=False)
             assert w.input_list.btn_clear_all.cget("state") == "normal"
+            assert row1.btn_remove.cget("state") == "normal"
+            assert row2.btn_remove.cget("state") == "normal"
 
-            # Clear all blocked while controller is busy
+            # 6. Click row remove button for row2
+            row2.btn_remove._command()
+            assert len(w.controller.items) == 1
+            assert w.controller.items.get(p2) is None
+            assert w.input_list.lbl_selected_count.cget("text") == "1 of 1 selected"
+
+            # 7. Clear all blocked while controller is busy
             busy_patch = patch.object(
                 type(w.controller), "busy", new_callable=PropertyMock, return_value=True
             )
@@ -239,12 +300,12 @@ def test_clear_all_button_ui_and_state(tmp_path: Path) -> None:
                 mock_ask.assert_not_called()
             assert len(w.controller.items) == 1
 
-            # Clear all dialog cancelled
+            # 8. Clear all dialog cancelled
             with patch("tkinter.messagebox.askyesno", return_value=False):
                 w.input_list._clear_all()
             assert len(w.controller.items) == 1
 
-            # Clear all confirmed: clears queue, resets counter, clears preview and overrides
+            # 9. Clear all confirmed: clears queue, resets counter, clears preview and overrides
             with patch("tkinter.messagebox.askyesno", return_value=True):
                 w.input_list._clear_all()
 
@@ -254,5 +315,6 @@ def test_clear_all_button_ui_and_state(tmp_path: Path) -> None:
             assert w.input_list.preview_name_lbl.cget("text") == "—"
         finally:
             w.destroy()
+
 
 

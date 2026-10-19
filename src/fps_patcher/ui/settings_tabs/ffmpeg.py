@@ -11,7 +11,13 @@ import customtkinter as ctk
 
 from ...config import Settings
 from ...core.ffmpeg_locator import locate
-from ..theme import font_caption, font_mono, font_section
+from ..theme import (
+    MacSwitch,
+    attach_focus_ring,
+    font_caption,
+    font_mono,
+    font_section,
+)
 
 
 class FFmpegTab:
@@ -42,10 +48,12 @@ class FFmpegTab:
             font=font_caption(),
             fg_color=tokens.surface_raised,
             border_color=tokens.border,
+            border_width=1,
             text_color=tokens.text,
         )
         self.ff_dir_entry.insert(0, draft.ffmpeg_dir)
         self.ff_dir_entry.pack(side="left", fill="x", expand=True, padx=(0, 6))
+        attach_focus_ring(self.ff_dir_entry)
 
         ctk.CTkButton(
             ff_row,
@@ -100,23 +108,21 @@ class FFmpegTab:
         self.ff_test_res.pack(side="left")
 
         # Switches
-        self.check_on_start_switch = ctk.CTkSwitch(
+        self.check_on_start_switch = MacSwitch(
             self.frame,
             text=self._tr("check_on_start"),
             font=font_caption(),
             text_color=tokens.text,
-            progress_color=tokens.accent,
         )
         if draft.check_ffmpeg_on_start:
             self.check_on_start_switch.select()
         self.check_on_start_switch.pack(anchor="w", pady=4)
 
-        self.show_ff_out_switch = ctk.CTkSwitch(
+        self.show_ff_out_switch = MacSwitch(
             self.frame,
             text=self._tr("show_output_console"),
             font=font_caption(),
             text_color=tokens.text,
-            progress_color=tokens.accent,
         )
         if draft.show_ffmpeg_output:
             self.show_ff_out_switch.select()
@@ -141,10 +147,12 @@ class FFmpegTab:
             font=font_mono(),
             fg_color=tokens.surface_raised,
             border_color=tokens.border,
+            border_width=1,
             text_color=tokens.text,
         )
         self.extra_ff_entry.insert(0, draft.extra_ffmpeg_args)
         self.extra_ff_entry.pack(fill="x", pady=(0, 8))
+        attach_focus_ring(self.extra_ff_entry)
 
     def _browse_ffmpeg_dir(self) -> None:
         folder = filedialog.askdirectory(parent=self.dialog)

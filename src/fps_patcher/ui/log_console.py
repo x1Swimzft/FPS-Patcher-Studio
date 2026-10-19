@@ -17,12 +17,20 @@ import customtkinter as ctk
 
 from ..core.diagnostic_logger import export_diagnostic_log, logs_dir
 from ..core.models import LogLevel
+from .animation import animate
 from .icons import get_icon
 from .strings import t
 from .theme import (
     CONSOLE_LEVEL_COLORS,
+    MAC_SWITCH_HEIGHT,
+    MAC_SWITCH_PROGRESS_COLOR,
+    MAC_SWITCH_RADIUS,
+    MAC_SWITCH_THUMB_COLOR,
+    MAC_SWITCH_TRACK_COLOR,
+    MAC_SWITCH_WIDTH,
     RADIUS_PILL,
     ThemeTokens,
+    attach_focus_ring,
     font_caption,
     font_mono,
     font_section,
@@ -187,11 +195,14 @@ class LogConsole(ctk.CTkFrame):
             text=t("ffmpeg_logs", lang),
             font=font_caption(fsize),
             text_color="#A1A1AA",
-            progress_color=tokens.accent,
-            button_color="#F4F4F5",
-            fg_color=tokens.console_border,
-            width=36,
-            height=20,
+            progress_color=MAC_SWITCH_PROGRESS_COLOR,
+            fg_color=MAC_SWITCH_TRACK_COLOR,
+            button_color=MAC_SWITCH_THUMB_COLOR,
+            button_hover_color=MAC_SWITCH_THUMB_COLOR,
+            switch_width=MAC_SWITCH_WIDTH,
+            switch_height=MAC_SWITCH_HEIGHT,
+            corner_radius=MAC_SWITCH_RADIUS,
+            height=MAC_SWITCH_HEIGHT,
             command=self._on_verbose_toggled,
         )
         if self._get_show_ffmpeg_output():
@@ -212,6 +223,7 @@ class LogConsole(ctk.CTkFrame):
             command=self._copy_all,
         )
         self.btn_copy.pack(side="left", padx=(0, 6))
+        attach_focus_ring(self.btn_copy)
 
         self.btn_clear = ctk.CTkButton(
             right_cluster,
@@ -227,6 +239,7 @@ class LogConsole(ctk.CTkFrame):
             command=self.clear,
         )
         self.btn_clear.pack(side="left", padx=(0, 6))
+        attach_focus_ring(self.btn_clear)
 
         # "Save Log" calls existing diagnostic-log function (_save_diagnostic_log)
         self.btn_save_diag = ctk.CTkButton(
@@ -243,6 +256,7 @@ class LogConsole(ctk.CTkFrame):
             command=self._save_diagnostic_log,
         )
         self.btn_save_diag.pack(side="left", padx=(0, 6))
+        attach_focus_ring(self.btn_save_diag)
 
         # Kept as attributes for compatibility; reachable via overflow menu (btn_more)
         self.btn_open_logs = ctk.CTkButton(
@@ -259,6 +273,7 @@ class LogConsole(ctk.CTkFrame):
             text_color="#A1A1AA",
             command=self._open_logs_folder,
         )
+        attach_focus_ring(self.btn_open_logs)
 
         self.btn_repair_mobile = ctk.CTkButton(
             right_cluster,
@@ -274,6 +289,7 @@ class LogConsole(ctk.CTkFrame):
             text_color="#A1A1AA",
             command=self._repair_for_mobile,
         )
+        attach_focus_ring(self.btn_repair_mobile)
 
         more_ico = get_icon("more", (16, 16), force_dark=True)
         self.btn_more = ctk.CTkButton(
@@ -291,6 +307,7 @@ class LogConsole(ctk.CTkFrame):
             command=self._show_overflow_btn_menu,
         )
         self.btn_more.pack(side="left")
+        attach_focus_ring(self.btn_more)
 
         # ── Terminal Textbox Body ──
         self.box = ctk.CTkTextbox(
@@ -393,16 +410,39 @@ class LogConsole(ctk.CTkFrame):
             image=chev_ico,
             text="" if chev_ico else ("▾" if self._expanded else "▸"),
         )
+        target_height = EXPANDED_HEIGHT if self._expanded else COLLAPSED_HEIGHT
+        current_height = float(self.cget("height"))
+
+        reduce_motion = self._get_reduce_motion()
+
         if self._expanded:
             self.box.grid(row=2, column=0, sticky="nsew", padx=12, pady=(0, 8))
-            if self._get_reduce_motion():
-                self.configure(height=EXPANDED_HEIGHT)
-            else:
-                self.configure(height=125)
-                self.after(16, lambda: self.configure(height=EXPANDED_HEIGHT))
-        else:
-            self.box.grid_remove()
-            self.configure(height=COLLAPSED_HEIGHT)
+
+        is_mapped = bool(self.winfo_ismapped()) if hasattr(self, "winfo_ismapped") else True
+        if reduce_motion or not is_mapped:
+            self.configure(height=target_height)
+            if not self._expanded:
+                self.box.grid_remove()
+            return
+
+        def _on_step(h: float) -> None:
+            self.configure(height=int(round(h)))
+
+        def _on_done() -> None:
+            self.configure(height=target_height)
+            if not self._expanded:
+                self.box.grid_remove()
+
+        animate(
+            self,
+            start_val=current_height,
+            end_val=float(target_height),
+            duration_ms=200,
+            on_step=_on_step,
+            on_done=_on_done,
+            reduce_motion=False,
+            prop_key="console_drawer_height",
+        )
 
     # ---------- theme & settings sync ----------
     def apply_theme(self, tokens: ThemeTokens) -> None:
@@ -433,8 +473,10 @@ class LogConsole(ctk.CTkFrame):
         )
         self.verbose.configure(
             text=t("ffmpeg_logs", lang),
-            progress_color=tokens.accent,
-            fg_color=tokens.console_border,
+            progress_color=MAC_SWITCH_PROGRESS_COLOR,
+            fg_color=MAC_SWITCH_TRACK_COLOR,
+            button_color=MAC_SWITCH_THUMB_COLOR,
+            button_hover_color=MAC_SWITCH_THUMB_COLOR,
             font=font_caption(fsize),
         )
         if self._get_show_ffmpeg_output():

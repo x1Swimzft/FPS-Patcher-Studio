@@ -20,6 +20,16 @@ from .drop_zone import DropZone
 from .icons import get_icon
 from .strings import t
 from .theme import (
+    MAC_CHECKBOX_BORDER_WIDTH,
+    MAC_CHECKBOX_HEIGHT,
+    MAC_CHECKBOX_RADIUS,
+    MAC_CHECKBOX_WIDTH,
+    MAC_SWITCH_HEIGHT,
+    MAC_SWITCH_PROGRESS_COLOR,
+    MAC_SWITCH_RADIUS,
+    MAC_SWITCH_THUMB_COLOR,
+    MAC_SWITCH_TRACK_COLOR,
+    MAC_SWITCH_WIDTH,
     RADIUS_PILL,
     STATUS_DANGER_BG,
     STATUS_DANGER_TEXT,
@@ -30,6 +40,7 @@ from .theme import (
     STATUS_WARNING_BG,
     STATUS_WARNING_TEXT,
     ThemeTokens,
+    attach_focus_ring,
     font_body,
     font_caption,
     get_corner_radii,
@@ -38,6 +49,13 @@ from .theme import (
 from .thumbnails import request_thumbnail
 
 THUMB_SIZE = (72, 44)
+
+# macOS Queue Card Selection Tokens
+MAC_ACCENT_BLUE = ("#007AFF", "#0A84FF")
+MAC_UNFOCUSED_GREY = ("#D1D1D6", "#3A3A3C")
+MAC_UNFOCUSED_BORDER = ("#C7C7CC", "#48484A")
+TEXT_WHITE: tuple[str, str] = ("#FFFFFF", "#FFFFFF")
+TEXT_SOFT_WHITE: tuple[str, str] = ("#E5F1FF", "#D0E4FF")
 
 
 def _format_duration(seconds: float) -> str:
@@ -77,6 +95,8 @@ class InputList(ctk.CTkFrame):
         self.settings = controller.settings
         self._on_start_patch_selected = on_start_patch_selected
         self._on_focus_change: Callable[[Path | None], None] | None = None
+        self._window_focused: bool = True
+        self._focused_path: Path | None = None
         self._theme_mgr = get_theme_manager(self.settings)
         tokens = self._theme_mgr.tokens
         card_rad, _ = get_corner_radii(self.settings.radius_style)
@@ -104,6 +124,45 @@ class InputList(ctk.CTkFrame):
         self._build_bottom_toolbar()
 
         self._theme_mgr.subscribe(self.apply_theme)
+
+    @property
+    def window_focused(self) -> bool:
+        return self._window_focused
+
+    @property
+    def focused_path(self) -> Path | None:
+        return self._focused_path
+
+    def set_window_focused(self, focused: bool) -> None:
+        """Update window focus state and re-render active selection row(s) immediately."""
+        if getattr(self, "_window_focused", None) == focused:
+            return
+        self._window_focused = focused
+        items = self.controller.items.items
+        if not items:
+            return
+        active_item = self._resolve_active_item(items)
+        active_id = active_item.item_id if active_item is not None else None
+        tokens = self._theme_mgr.tokens
+
+        for item in items:
+            is_focused = item.item_id == active_id
+            if is_focused and item.item_id in self._row_widgets:
+                row_frame = self._row_widgets[item.item_id]
+                self._update_row_content(row_frame, item, tokens, is_focused=is_focused)
+                self._row_sigs[item.item_id] = self._make_sig(item, is_focused=is_focused)
+
+    def set_focused_path(self, path: Path | None) -> None:
+        self._focused_path = path
+        if path is not None:
+            item = self.controller.items.get(path)
+            if item is not None and item.info is not None:
+                self.controller.current = item.info
+        if self._on_focus_change is not None:
+            self._on_focus_change(path)
+        self.render()
+
+    select_card = set_focused_path
 
     def set_on_focus_change(self, callback: Callable[[Path | None], None]) -> None:
         self._on_focus_change = callback
@@ -351,7 +410,14 @@ class InputList(ctk.CTkFrame):
             text=self._tr("preview_player"),
             font=font_caption(fsize),
             text_color=tokens.text,
-            progress_color=tokens.success,
+            progress_color=MAC_SWITCH_PROGRESS_COLOR,
+            fg_color=MAC_SWITCH_TRACK_COLOR,
+            button_color=MAC_SWITCH_THUMB_COLOR,
+            button_hover_color=MAC_SWITCH_THUMB_COLOR,
+            switch_width=MAC_SWITCH_WIDTH,
+            switch_height=MAC_SWITCH_HEIGHT,
+            corner_radius=MAC_SWITCH_RADIUS,
+            height=MAC_SWITCH_HEIGHT,
             command=self._toggle_player,
         )
         self.player_switch.grid(row=1, column=0, sticky="w", padx=4)
@@ -380,6 +446,7 @@ class InputList(ctk.CTkFrame):
             command=self._on_start_patch_selected,
         )
         self.btn_apply_selected.grid(row=1, column=2, sticky="e", padx=2)
+        attach_focus_ring(self.btn_apply_selected)
 
     # ---------- focus & state helpers ----------
     def set_state(self, *, busy: bool) -> None:
@@ -400,11 +467,20 @@ class InputList(ctk.CTkFrame):
                 with contextlib.suppress(Exception):
                     if btn.cget("state") != state:
                         btn.configure(state=state)
+        for row in self._row_widgets.values():
+            btn_rem = getattr(row, "_btn_remove", None)
+            if btn_rem is not None:
+                with contextlib.suppress(Exception):
+                    btn_rem.configure(state=state)
 
     def _resolve_active_item(self, items: list[QueueItem]) -> QueueItem | None:
         """Resolve active QueueItem from controller/queue_model without duplicate state."""
         if not items:
             return None
+        if self._focused_path is not None:
+            found = self.controller.items.get(self._focused_path)
+            if found is not None:
+                return found
         if self.controller.current_patching_path is not None:
             found = self.controller.items.get(self.controller.current_patching_path)
             if found is not None:
@@ -417,12 +493,28 @@ class InputList(ctk.CTkFrame):
         return selected[0] if selected else items[0]
 
     def _on_card_clicked(self, path: Path) -> None:
+        self._focused_path = path
         item = self.controller.items.get(path)
         if item is not None and item.info is not None:
             self.controller.current = item.info
         if self._on_focus_change is not None:
             self._on_focus_change(path)
         self.render()
+
+    def _make_sig(self, item: QueueItem, *, is_focused: bool) -> tuple[Any, ...]:
+        return (
+            item.selected,
+            item.status,
+            item.error,
+            id(item.info) if item.info is not None else None,
+            item.timescale,
+            item.strategy,
+            is_focused,
+            self._window_focused,
+            self.settings.language,
+            self.settings.radius_style,
+            self.settings.font_size,
+        )
 
     # ---------- render queue ----------
     def render(self) -> None:
@@ -485,18 +577,7 @@ class InputList(ctk.CTkFrame):
         # Render or update rows only when row signature changes
         for item in items:
             is_focused = item.item_id == active_id
-            sig = (
-                item.selected,
-                item.status,
-                item.error,
-                id(item.info) if item.info is not None else None,
-                item.timescale,
-                item.strategy,
-                is_focused,
-                self.settings.language,
-                self.settings.radius_style,
-                self.settings.font_size,
-            )
+            sig = self._make_sig(item, is_focused=is_focused)
             is_new = item.item_id not in self._row_widgets
             if is_new:
                 row_frame = self._create_row_frame(item, tokens, is_focused=is_focused)
@@ -524,13 +605,56 @@ class InputList(ctk.CTkFrame):
         card_rad, _ = self._radii()
         fsize = self._fsize()
 
+        if is_focused:
+            if self._window_focused:
+                card_bg = MAC_ACCENT_BLUE
+                card_border = MAC_ACCENT_BLUE
+                primary_text_color = TEXT_WHITE
+                meta_text_color = TEXT_SOFT_WHITE
+                sub_text_color = ("#FFE2E2", "#FFD1D1") if item.error else TEXT_SOFT_WHITE
+                rem_btn_color = TEXT_WHITE
+                rem_btn_hover = ("#0062CC", "#0071E3")
+                chk_border_color = ("#FFFFFF", "#D0E4FF")
+                chk_fg_color = ("#FFFFFF", "#FFFFFF")
+                chk_mark_color = ("#007AFF", "#0A84FF")
+                chk_hover_color = ("#E5F1FF", "#E5F1FF")
+                status_cfg = self._status_style(item.status, is_selected=True, window_focused=True)
+            else:
+                card_bg = MAC_UNFOCUSED_GREY
+                card_border = MAC_UNFOCUSED_BORDER
+                primary_text_color = tokens.text
+                meta_text_color = tokens.text2
+                sub_text_color = STATUS_DANGER_TEXT if item.error else tokens.text2
+                rem_btn_color = tokens.text2
+                rem_btn_hover = ("#BCBCBF", "#48484A")
+                chk_border_color = tokens.border
+                chk_fg_color = tokens.accent
+                chk_mark_color = ("#FFFFFF", "#FFFFFF")
+                chk_hover_color = tokens.accent_hover
+                status_cfg = self._status_style(item.status, is_selected=True, window_focused=False)
+        else:
+            card_bg = tokens.surface
+            card_border = tokens.border
+            primary_text_color = tokens.text
+            meta_text_color = tokens.muted
+            sub_text_color = STATUS_DANGER_TEXT if item.error else tokens.muted
+            rem_btn_color = tokens.muted
+            rem_btn_hover = tokens.surface_hover
+            chk_border_color = tokens.border
+            chk_fg_color = tokens.accent
+            chk_mark_color = ("#FFFFFF", "#FFFFFF")
+            chk_hover_color = tokens.accent_hover
+            status_cfg = self._status_style(
+                item.status, is_selected=False, window_focused=self._window_focused
+            )
+
         row = ctk.CTkFrame(
             self.scroll,
             height=64,
             corner_radius=card_rad,
-            fg_color=tokens.surface_drop_hover if is_focused else tokens.surface,
+            fg_color=card_bg,
             border_width=1,
-            border_color=tokens.border_focus if is_focused else tokens.border,
+            border_color=card_border,
         )
         row.grid_columnconfigure(2, weight=1)
 
@@ -540,14 +664,14 @@ class InputList(ctk.CTkFrame):
             text="",
             width=20,
             height=20,
-            checkbox_width=18,
-            checkbox_height=18,
-            corner_radius=5,
-            border_width=1,
-            fg_color=tokens.accent,
-            hover_color=tokens.accent_hover,
-            border_color=tokens.border,
-            checkmark_color="#FFFFFF",
+            checkbox_width=MAC_CHECKBOX_WIDTH,
+            checkbox_height=MAC_CHECKBOX_HEIGHT,
+            corner_radius=MAC_CHECKBOX_RADIUS,
+            border_width=MAC_CHECKBOX_BORDER_WIDTH,
+            fg_color=chk_fg_color,
+            hover_color=chk_hover_color,
+            border_color=chk_border_color,
+            checkmark_color=chk_mark_color,
             command=lambda p=item.path: self._on_toggle(p),
         )
         chk.grid(row=0, column=0, padx=(12, 8), pady=10)
@@ -555,10 +679,22 @@ class InputList(ctk.CTkFrame):
             chk.select()
         else:
             chk.deselect()
-        row._chk = chk
 
         # 2. Thumbnail (72x44 rounded 8px)
         cached_img = self._ctk_images.get(item.item_id)
+        if cached_img:
+            t_bg = tokens.surface_raised
+            t_fg = tokens.muted
+        elif is_focused and self._window_focused:
+            t_bg = ("#005FB8", "#0066CC")
+            t_fg = TEXT_WHITE
+        elif is_focused and not self._window_focused:
+            t_bg = ("#B8B8BD", "#2C2C2E")
+            t_fg = tokens.text2
+        else:
+            t_bg = tokens.surface_raised
+            t_fg = tokens.muted
+
         thumb_lbl = ctk.CTkLabel(
             row,
             text="" if cached_img else "🎬",
@@ -566,12 +702,11 @@ class InputList(ctk.CTkFrame):
             width=THUMB_SIZE[0],
             height=THUMB_SIZE[1],
             corner_radius=8,
-            fg_color=tokens.surface_raised,
-            text_color=tokens.muted,
+            fg_color=t_bg,
+            text_color=t_fg,
             font=font_caption(fsize),
         )
         thumb_lbl.grid(row=0, column=1, padx=(0, 12), pady=10)
-        row._thumb = thumb_lbl
 
         # 3. Filename & Path / Error / Overrides
         center_box = ctk.CTkFrame(row, fg_color="transparent")
@@ -581,35 +716,30 @@ class InputList(ctk.CTkFrame):
             center_box,
             text=item.path.name,
             font=font_body(bold=True, size_opt=fsize),
-            text_color=tokens.text,
+            text_color=primary_text_color,
             anchor="w",
         )
         lbl_path.pack(anchor="w", fill="x")
-        row._lbl_path = lbl_path
 
         sub_info, is_err = self._format_sub_line(item)
         lbl_sub = ctk.CTkLabel(
             center_box,
             text=sub_info,
             font=font_caption(fsize),
-            text_color=STATUS_DANGER_TEXT if is_err else tokens.muted,
+            text_color=sub_text_color,
             anchor="w",
         )
         lbl_sub.pack(anchor="w", fill="x")
-        row._lbl_sub = lbl_sub
 
         # 4. Metadata ("1920×1080 · 00:42 · 60 fps")
         lbl_meta = ctk.CTkLabel(
             row,
             text=_format_meta(item),
             font=font_caption(fsize),
-            text_color=tokens.muted,
+            text_color=meta_text_color,
             anchor="e",
         )
-        lbl_meta.grid(row=0, column=3, sticky="e", padx=(0, 12), pady=10)
-        row._lbl_meta = lbl_meta
-        row._res_badge = lbl_meta
-        row._fps_badge = lbl_meta
+        lbl_meta.grid(row=0, column=3, sticky="e", padx=(0, 10), pady=10)
 
         # 5. Status Pill Badge
         status_badge = ctk.CTkLabel(
@@ -619,10 +749,53 @@ class InputList(ctk.CTkFrame):
             corner_radius=RADIUS_PILL,
             padx=10,
             height=22,
-            **self._status_style(item.status),
+            **status_cfg,
         )
-        status_badge.grid(row=0, column=4, sticky="e", padx=(0, 14), pady=10)
+        status_badge.grid(row=0, column=4, sticky="e", padx=(0, 8), pady=10)
+
+        # 6. Row Action / Remove Button (✕)
+        btn_remove = ctk.CTkButton(
+            row,
+            text="✕",
+            width=22,
+            height=22,
+            corner_radius=6,
+            font=font_caption(fsize),
+            fg_color="transparent",
+            hover_color=rem_btn_hover,
+            text_color=rem_btn_color,
+            border_width=0,
+            command=lambda p=item.path: self._remove_item(p),
+        )
+        btn_remove.grid(row=0, column=5, sticky="e", padx=(0, 12), pady=10)
+        if self._busy:
+            btn_remove.configure(state="disabled")
+
+        # Compatibility & public attributes
+        row._chk = chk
+        row.chk = chk
+        row._thumb = thumb_lbl
+        row.thumb = thumb_lbl
+        row._lbl_path = lbl_path
+        row.lbl_path = lbl_path
+        row._lbl_name = lbl_path
+        row.lbl_name = lbl_path
+        row._lbl_sub = lbl_sub
+        row.lbl_sub = lbl_sub
+        row._lbl_meta = lbl_meta
+        row.lbl_meta = lbl_meta
+        row._res_badge = lbl_meta
+        row.res_badge = lbl_meta
+        row._fps_badge = lbl_meta
+        row.fps_badge = lbl_meta
         row._status_badge = status_badge
+        row.status_badge = status_badge
+        row._btn_remove = btn_remove
+        row.btn_remove = btn_remove
+        row._is_focused = is_focused
+        row.is_focused = is_focused
+        row._is_selected = is_focused
+        row.is_selected = is_focused
 
         # Click to focus & lazy right-click context menu
         self._bind_row_events(row, item.path)
@@ -666,42 +839,100 @@ class InputList(ctk.CTkFrame):
         card_rad, _ = self._radii()
         fsize = self._fsize()
 
+        if is_focused:
+            if self._window_focused:
+                card_bg = MAC_ACCENT_BLUE
+                card_border = MAC_ACCENT_BLUE
+                primary_text_color = TEXT_WHITE
+                meta_text_color = TEXT_SOFT_WHITE
+                sub_text_color = ("#FFE2E2", "#FFD1D1") if item.error else TEXT_SOFT_WHITE
+                rem_btn_color = TEXT_WHITE
+                rem_btn_hover = ("#0062CC", "#0071E3")
+                chk_border_color = ("#FFFFFF", "#D0E4FF")
+                chk_fg_color = ("#FFFFFF", "#FFFFFF")
+                chk_mark_color = ("#007AFF", "#0A84FF")
+                chk_hover_color = ("#E5F1FF", "#E5F1FF")
+                status_cfg = self._status_style(item.status, is_selected=True, window_focused=True)
+            else:
+                card_bg = MAC_UNFOCUSED_GREY
+                card_border = MAC_UNFOCUSED_BORDER
+                primary_text_color = tokens.text
+                meta_text_color = tokens.text2
+                sub_text_color = STATUS_DANGER_TEXT if item.error else tokens.text2
+                rem_btn_color = tokens.text2
+                rem_btn_hover = ("#BCBCBF", "#48484A")
+                chk_border_color = tokens.border
+                chk_fg_color = tokens.accent
+                chk_mark_color = ("#FFFFFF", "#FFFFFF")
+                chk_hover_color = tokens.accent_hover
+                status_cfg = self._status_style(item.status, is_selected=True, window_focused=False)
+        else:
+            card_bg = tokens.surface
+            card_border = tokens.border
+            primary_text_color = tokens.text
+            meta_text_color = tokens.muted
+            sub_text_color = STATUS_DANGER_TEXT if item.error else tokens.muted
+            rem_btn_color = tokens.muted
+            rem_btn_hover = tokens.surface_hover
+            chk_border_color = tokens.border
+            chk_fg_color = tokens.accent
+            chk_mark_color = ("#FFFFFF", "#FFFFFF")
+            chk_hover_color = tokens.accent_hover
+            status_cfg = self._status_style(
+                item.status, is_selected=False, window_focused=self._window_focused
+            )
+
         row.configure(
             corner_radius=card_rad,
-            fg_color=tokens.surface_drop_hover if is_focused else tokens.surface,
-            border_color=tokens.border_focus if is_focused else tokens.border,
+            fg_color=card_bg,
+            border_color=card_border,
         )
 
         chk_w = getattr(row, "_chk", None)
         if chk_w:
             chk_w.configure(
-                fg_color=tokens.accent,
-                hover_color=tokens.accent_hover,
-                border_color=tokens.border,
+                fg_color=chk_fg_color,
+                hover_color=chk_hover_color,
+                border_color=chk_border_color,
+                checkmark_color=chk_mark_color,
             )
             if item.selected:
                 chk_w.select()
             else:
                 chk_w.deselect()
 
+        cached_img = self._ctk_images.get(item.item_id)
+        if cached_img:
+            t_bg = tokens.surface_raised
+            t_fg = tokens.muted
+        elif is_focused and self._window_focused:
+            t_bg = ("#005FB8", "#0066CC")
+            t_fg = TEXT_WHITE
+        elif is_focused and not self._window_focused:
+            t_bg = ("#B8B8BD", "#2C2C2E")
+            t_fg = tokens.text2
+        else:
+            t_bg = tokens.surface_raised
+            t_fg = tokens.muted
+
         thumb_w = getattr(row, "_thumb", None)
         if thumb_w:
-            thumb_w.configure(fg_color=tokens.surface_raised, text_color=tokens.muted)
+            thumb_w.configure(fg_color=t_bg, text_color=t_fg)
 
         path_w = getattr(row, "_lbl_path", None)
         if path_w:
             path_w.configure(
                 text=item.path.name,
-                text_color=tokens.text,
+                text_color=primary_text_color,
                 font=font_body(bold=True, size_opt=fsize),
             )
 
         sub_w = getattr(row, "_lbl_sub", None)
         if sub_w:
-            sub_info, is_err = self._format_sub_line(item)
+            sub_info, _ = self._format_sub_line(item)
             sub_w.configure(
                 text=sub_info,
-                text_color=STATUS_DANGER_TEXT if is_err else tokens.muted,
+                text_color=sub_text_color,
                 font=font_caption(fsize),
             )
 
@@ -709,7 +940,7 @@ class InputList(ctk.CTkFrame):
         if meta_w:
             meta_w.configure(
                 text=_format_meta(item),
-                text_color=tokens.muted,
+                text_color=meta_text_color,
                 font=font_caption(fsize),
             )
 
@@ -718,11 +949,43 @@ class InputList(ctk.CTkFrame):
             status_w.configure(
                 text=self._tr(f"status_{item.status}"),
                 font=font_caption(fsize),
-                **self._status_style(item.status),
+                **status_cfg,
             )
 
-    def _status_style(self, status: str) -> dict[str, Any]:
+        rem_w = getattr(row, "_btn_remove", None)
+        if rem_w:
+            rem_w.configure(
+                hover_color=rem_btn_hover,
+                text_color=rem_btn_color,
+                state="disabled" if self._busy else "normal",
+            )
+
+        row._is_focused = is_focused
+        row.is_focused = is_focused
+        row._is_selected = is_focused
+        row.is_selected = is_focused
+
+    def _status_style(
+        self,
+        status: str,
+        *,
+        is_selected: bool = False,
+        window_focused: bool = True,
+    ) -> dict[str, Any]:
         tokens = self._theme_mgr.tokens
+        if is_selected and window_focused:
+            # Contrast-friendly badges on macOS Accent Blue (#007AFF / #0A84FF)
+            if status in ("done", "ready"):
+                return {"fg_color": ("#198754", "#1E7E34"), "text_color": "#FFFFFF"}
+            if status == "failed":
+                return {"fg_color": ("#DC3545", "#BD2130"), "text_color": "#FFFFFF"}
+            if status == "patching":
+                return {"fg_color": ("#0056B3", "#004085"), "text_color": "#FFFFFF"}
+            if status in ("skipped", "probing"):
+                return {"fg_color": ("#D39E00", "#B9770E"), "text_color": "#FFFFFF"}
+            # pending
+            return {"fg_color": ("#0056B3", "#004DB3"), "text_color": "#E5F1FF"}
+
         if status in ("done", "ready"):
             return {"fg_color": STATUS_SUCCESS_BG, "text_color": STATUS_SUCCESS_TEXT}
         if status == "failed":
@@ -785,6 +1048,7 @@ class InputList(ctk.CTkFrame):
     # ---------- user actions ----------
     def _on_dropped_files(self, paths: list[Path]) -> None:
         if paths:
+            self._focused_path = paths[-1]
             self.controller.add_files(paths)
             self.render()
             if self._on_focus_change is not None:
@@ -834,6 +1098,7 @@ class InputList(ctk.CTkFrame):
             self.controller.clear_queue()
             self._ctk_images.clear()
             self._thumb_requested.clear()
+            self._focused_path = None
             if self._on_focus_change is not None:
                 self._on_focus_change(None)
             self.render()
@@ -863,6 +1128,7 @@ class InputList(ctk.CTkFrame):
         )
         if files:
             paths = [Path(p) for p in files]
+            self._focused_path = paths[-1]
             self.controller.add_files(paths)
             self.render()
             if self._on_focus_change is not None:
@@ -881,6 +1147,7 @@ class InputList(ctk.CTkFrame):
                     if ext in SUPPORTED_EXTENSIONS:
                         paths.append(Path(root) / name)
             if paths:
+                self._focused_path = paths[-1]
                 self.controller.add_files(paths)
                 self.render()
                 if self._on_focus_change is not None:
@@ -897,6 +1164,7 @@ class InputList(ctk.CTkFrame):
     # ---------- events & lazy context menu ----------
     def _bind_row_events(self, row: ctk.CTkFrame, path: Path) -> None:
         chk = getattr(row, "_chk", None)
+        btn_remove = getattr(row, "_btn_remove", None)
 
         def on_left_click(_event: Any, p: Path = path) -> None:
             self._on_card_clicked(p)
@@ -906,6 +1174,9 @@ class InputList(ctk.CTkFrame):
 
         def bind_tree(w: Any) -> None:
             if chk is not None and w is chk:
+                w.bind("<Button-3>", on_right_click)
+                return
+            if btn_remove is not None and w is btn_remove:
                 w.bind("<Button-3>", on_right_click)
                 return
             w.bind("<Button-1>", on_left_click)
@@ -1008,8 +1279,13 @@ class InputList(ctk.CTkFrame):
                 break
 
     def _remove_item(self, path: Path) -> None:
+        if self._focused_path == path:
+            self._focused_path = None
         self.controller.items.remove(path)
         self.render()
+        if self._on_focus_change is not None:
+            active = self._resolve_active_item(self.controller.items.items)
+            self._on_focus_change(active.path if active else None)
 
     def _open_dir(self, directory: Path) -> None:
         if hasattr(os, "startfile"):

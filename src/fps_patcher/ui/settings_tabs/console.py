@@ -9,7 +9,13 @@ from typing import Any
 import customtkinter as ctk
 
 from ...config import Settings, app_data_dir
-from ..theme import font_caption, font_mono, font_section
+from ..theme import (
+    MacSwitch,
+    attach_focus_ring,
+    font_caption,
+    font_mono,
+    font_section,
+)
 
 
 class ConsoleTab:
@@ -56,40 +62,39 @@ class ConsoleTab:
             font=font_mono(),
             fg_color=tokens.surface_raised,
             border_color=tokens.border,
+            border_width=1,
             text_color=tokens.text,
         )
         self.max_log_entry.insert(0, str(draft.max_log_lines))
         self.max_log_entry.pack(fill="x", pady=(0, 8))
+        attach_focus_ring(self.max_log_entry)
 
         # Switches
-        self.log_ts_switch = ctk.CTkSwitch(
+        self.log_ts_switch = MacSwitch(
             self.frame,
             text=self._tr("log_timestamps"),
             font=font_caption(),
             text_color=tokens.text,
-            progress_color=tokens.accent,
         )
         if draft.log_timestamps:
             self.log_ts_switch.select()
         self.log_ts_switch.pack(anchor="w", pady=4)
 
-        self.log_scroll_switch = ctk.CTkSwitch(
+        self.log_scroll_switch = MacSwitch(
             self.frame,
             text=self._tr("log_autoscroll"),
             font=font_caption(),
             text_color=tokens.text,
-            progress_color=tokens.accent,
         )
         if draft.log_autoscroll:
             self.log_scroll_switch.select()
         self.log_scroll_switch.pack(anchor="w", pady=4)
 
-        self.log_file_switch = ctk.CTkSwitch(
+        self.log_file_switch = MacSwitch(
             self.frame,
             text=self._tr("log_to_file"),
             font=font_caption(),
             text_color=tokens.text,
-            progress_color=tokens.accent,
         )
         if draft.log_to_file:
             self.log_file_switch.select()
