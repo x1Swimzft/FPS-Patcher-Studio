@@ -154,11 +154,11 @@ def _contrast_ratio(hex1: str, hex2: str) -> float:
 
 def test_theme_wcag_contrast() -> None:
     obsidian = PRESETS["Obsidian"]
-    dark_bg = obsidian.bg[1]  # "#0B0F16"
-    dark_text2 = obsidian.text2[1]  # "#CBD5E1"
-    dark_muted = obsidian.muted[1]  # "#8896AB"
+    dark_bg = obsidian.bg[1]
+    dark_text = obsidian.text[1]
+    dark_text2 = obsidian.text2[1]
 
-    # WCAG AA for normal text requires >= 4.5:1
-    assert _contrast_ratio(dark_text2, dark_bg) >= 7.0  # high contrast body/secondary
-    assert _contrast_ratio(dark_muted, dark_bg) >= 4.5  # AA compliant muted labels
+    # WCAG AAA requires >= 7.0:1, AA requires >= 4.5:1
+    assert _contrast_ratio(dark_text, dark_bg) >= 7.0  # AAA compliant primary text
+    assert _contrast_ratio(dark_text2, dark_bg) >= 4.5  # AA compliant secondary text
 

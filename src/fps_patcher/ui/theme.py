@@ -8,6 +8,7 @@ import os
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import customtkinter as ctk
@@ -55,22 +56,22 @@ PRESETS: dict[str, ThemeTokens] = {
         surface_raised=("#EAEAEF", "#2E2E33"),
         surface_hover=("#DFDFE6", "#38383E"),
         surface_drop_hover=("#EFF6FF", "#1E2638"),
-        border=("#E4E4E7", "#323236"),
-        border_hover=("#3B82F6", "#3B82F6"),
-        border_focus=("#2563EB", "#3B82F6"),
-        text=("#18181B", "#F4F4F5"),
-        text2=("#52525B", "#B4B4BD"),
-        muted=("#71717A", "#A1A1AA"),
-        accent=("#2563EB", "#2563EB"),
-        accent_hover=("#3B82F6", "#3B82F6"),
-        accent_pressed=("#1D4ED8", "#1D4ED8"),
-        accent_light=("#DBEAFE", "#1E2D4A"),
-        accent_glow=("#93C5FD", "#2563EB"),
-        success=("#16A34A", "#22C55E"),
-        warn=("#D97706", "#F59E0B"),
-        danger=("#DC2626", "#EF4444"),
+        border=("#D2D2D7", "#2C2C2E"),
+        border_hover=("#007AFF", "#0A84FF"),
+        border_focus=("#007AFF", "#0A84FF"),
+        text=("#1D1D1F", "#D9D9DC"),
+        text2=("#6E6E73", "#8E8E93"),
+        muted=("#AEAEB2", "#545458"),
+        accent=("#007AFF", "#0A84FF"),
+        accent_hover=("#0062CC", "#409CFF"),
+        accent_pressed=("#004FB0", "#0071E3"),
+        accent_light=("#E5F2FF", "#142D4D"),
+        accent_glow=("#B3D7FF", "#0A84FF"),
+        success=("#34C759", "#30D158"),
+        warn=("#FF9500", "#FF9F0A"),
+        danger=("#FF3B30", "#FF453A"),
         console_bg=("#141417", "#141417"),
-        console_border=("#27272A", "#27272A"),
+        console_border=("#2C2C2E", "#2C2C2E"),
         toolbar_bg=("#FAFAFC", "#222226"),
         inspector_bg=("#EEF0F5", "#18181B"),
     ),
@@ -81,23 +82,23 @@ PRESETS: dict[str, ThemeTokens] = {
         surface_raised=("#F3E8FF", "#2D2738"),
         surface_hover=("#EDE9FE", "#373045"),
         surface_drop_hover=("#F3E8FF", "#261E38"),
-        border=("#E9D5FF", "#342E42"),
+        border=("#D2D2D7", "#2C2C2E"),
         border_hover=("#8B5CF6", "#A78BFA"),
         border_focus=("#7C3AED", "#C4B5FD"),
-        text=("#1E1B4B", "#F4F4F5"),
-        text2=("#4C1D95", "#B4B4BD"),
-        muted=("#71717A", "#A1A1AA"),
+        text=("#1D1D1F", "#D9D9DC"),
+        text2=("#6E6E73", "#8E8E93"),
+        muted=("#AEAEB2", "#545458"),
         accent=("#7C3AED", "#8B5CF6"),
         accent_hover=("#6D28D9", "#A78BFA"),
         accent_pressed=("#5B21B6", "#7C3AED"),
         accent_light=("#F3E8FF", "#2E1065"),
         accent_glow=("#DDD6FE", "#3B1E6D"),
-        success=("#16A34A", "#22C55E"),
-        warn=("#D97706", "#F59E0B"),
-        danger=("#DC2626", "#EF4444"),
+        success=("#34C759", "#30D158"),
+        warn=("#FF9500", "#FF9F0A"),
+        danger=("#FF3B30", "#FF453A"),
         console_bg=("#141417", "#141417"),
-        console_border=("#27272A", "#27272A"),
-        toolbar_bg=("#FCFaff", "#201C28"),
+        console_border=("#2C2C2E", "#2C2C2E"),
+        toolbar_bg=("#FCFAFF", "#201C28"),
         inspector_bg=("#F3EFFC", "#16131C"),
     ),
     "Emerald Terminal": ThemeTokens(
@@ -107,22 +108,22 @@ PRESETS: dict[str, ThemeTokens] = {
         surface_raised=("#DCFCE7", "#283530"),
         surface_hover=("#BBF7D0", "#32423C"),
         surface_drop_hover=("#ECFDF5", "#1C2D26"),
-        border=("#A7F3D0", "#2E3D37"),
+        border=("#D2D2D7", "#2C2C2E"),
         border_hover=("#10B981", "#34D399"),
         border_focus=("#059669", "#6EE7B7"),
-        text=("#064E3B", "#F4F4F5"),
-        text2=("#065F46", "#B4B4BD"),
-        muted=("#059669", "#A1A1AA"),
+        text=("#1D1D1F", "#D9D9DC"),
+        text2=("#6E6E73", "#8E8E93"),
+        muted=("#AEAEB2", "#545458"),
         accent=("#059669", "#10B981"),
         accent_hover=("#047857", "#34D399"),
         accent_pressed=("#065F46", "#059669"),
         accent_light=("#D1FAE5", "#064E3B"),
         accent_glow=("#A7F3D0", "#0D3A2C"),
-        success=("#16A34A", "#22C55E"),
-        warn=("#D97706", "#F59E0B"),
-        danger=("#DC2626", "#EF4444"),
+        success=("#34C759", "#30D158"),
+        warn=("#FF9500", "#FF9F0A"),
+        danger=("#FF3B30", "#FF453A"),
         console_bg=("#141417", "#141417"),
-        console_border=("#27272A", "#27272A"),
+        console_border=("#2C2C2E", "#2C2C2E"),
         toolbar_bg=("#F7FEF9", "#1B2420"),
         inspector_bg=("#E9F9EF", "#131A17"),
     ),
@@ -133,22 +134,22 @@ PRESETS: dict[str, ThemeTokens] = {
         surface_raised=("#FFE4E6", "#34282C"),
         surface_hover=("#FECDD3", "#403136"),
         surface_drop_hover=("#FFF1F2", "#2D1E22"),
-        border=("#FDA4AF", "#3B2D31"),
+        border=("#D2D2D7", "#2C2C2E"),
         border_hover=("#F43F5E", "#FB7185"),
         border_focus=("#E11D48", "#FDA4AF"),
-        text=("#881337", "#F4F4F5"),
-        text2=("#9F1239", "#B4B4BD"),
-        muted=("#BE123C", "#A1A1AA"),
+        text=("#1D1D1F", "#D9D9DC"),
+        text2=("#6E6E73", "#8E8E93"),
+        muted=("#AEAEB2", "#545458"),
         accent=("#E11D48", "#F43F5E"),
         accent_hover=("#BE123C", "#FB7185"),
         accent_pressed=("#9F1239", "#E11D48"),
         accent_light=("#FFE4E6", "#4C0519"),
         accent_glow=("#FECDD3", "#45121B"),
-        success=("#16A34A", "#22C55E"),
-        warn=("#D97706", "#F59E0B"),
-        danger=("#DC2626", "#EF4444"),
+        success=("#34C759", "#30D158"),
+        warn=("#FF9500", "#FF9F0A"),
+        danger=("#FF3B30", "#FF453A"),
         console_bg=("#141417", "#141417"),
-        console_border=("#27272A", "#27272A"),
+        console_border=("#2C2C2E", "#2C2C2E"),
         toolbar_bg=("#FFF7F8", "#241C1E"),
         inspector_bg=("#FCE7E9", "#1A1416"),
     ),
@@ -159,22 +160,22 @@ PRESETS: dict[str, ThemeTokens] = {
         surface_raised=("#E4E4E7", "#2E2E33"),
         surface_hover=("#D4D4D8", "#38383E"),
         surface_drop_hover=("#F4F4F5", "#252529"),
-        border=("#E4E4E7", "#323236"),
-        border_hover=("#71717A", "#A1A1AA"),
-        border_focus=("#52525B", "#E4E4E7"),
-        text=("#18181B", "#F4F4F5"),
-        text2=("#52525B", "#B4B4BD"),
-        muted=("#71717A", "#A1A1AA"),
-        accent=("#2563EB", "#3B82F6"),
-        accent_hover=("#3B82F6", "#60A5FA"),
-        accent_pressed=("#1D4ED8", "#2563EB"),
-        accent_light=("#DBEAFE", "#1E2D4A"),
-        accent_glow=("#93C5FD", "#2563EB"),
-        success=("#16A34A", "#22C55E"),
-        warn=("#D97706", "#F59E0B"),
-        danger=("#DC2626", "#EF4444"),
+        border=("#D2D2D7", "#2C2C2E"),
+        border_hover=("#6E6E73", "#8E8E93"),
+        border_focus=("#1D1D1F", "#D9D9DC"),
+        text=("#1D1D1F", "#D9D9DC"),
+        text2=("#6E6E73", "#8E8E93"),
+        muted=("#AEAEB2", "#545458"),
+        accent=("#007AFF", "#0A84FF"),
+        accent_hover=("#0062CC", "#409CFF"),
+        accent_pressed=("#004FB0", "#0071E3"),
+        accent_light=("#E5F2FF", "#142D4D"),
+        accent_glow=("#B3D7FF", "#0A84FF"),
+        success=("#34C759", "#30D158"),
+        warn=("#FF9500", "#FF9F0A"),
+        danger=("#FF3B30", "#FF453A"),
         console_bg=("#141417", "#141417"),
-        console_border=("#27272A", "#27272A"),
+        console_border=("#2C2C2E", "#2C2C2E"),
         toolbar_bg=("#FAFAFC", "#222226"),
         inspector_bg=("#EEF0F5", "#18181B"),
     ),
@@ -185,22 +186,22 @@ PRESETS: dict[str, ThemeTokens] = {
         surface_raised=("#FEF3C7", "#332E25"),
         surface_hover=("#FDE68A", "#3E382D"),
         surface_drop_hover=("#FFFBEB", "#2B251B"),
-        border=("#FCD34D", "#3A342A"),
-        border_hover=("#F59E0B", "#FBBF24"),
-        border_focus=("#D97706", "#FDE68A"),
-        text=("#78350F", "#F4F4F5"),
-        text2=("#92400E", "#B4B4BD"),
-        muted=("#B45309", "#A1A1AA"),
-        accent=("#D97706", "#F59E0B"),
-        accent_hover=("#B45309", "#FBBF24"),
-        accent_pressed=("#92400E", "#D97706"),
+        border=("#D2D2D7", "#2C2C2E"),
+        border_hover=("#FF9500", "#FF9F0A"),
+        border_focus=("#FF9500", "#FF9F0A"),
+        text=("#1D1D1F", "#D9D9DC"),
+        text2=("#6E6E73", "#8E8E93"),
+        muted=("#AEAEB2", "#545458"),
+        accent=("#FF9500", "#FF9F0A"),
+        accent_hover=("#E08500", "#FFB340"),
+        accent_pressed=("#C67600", "#FF9500"),
         accent_light=("#FEF3C7", "#451A03"),
         accent_glow=("#FDE68A", "#422808"),
-        success=("#16A34A", "#22C55E"),
-        warn=("#D97706", "#F59E0B"),
-        danger=("#DC2626", "#EF4444"),
+        success=("#34C759", "#30D158"),
+        warn=("#FF9500", "#FF9F0A"),
+        danger=("#FF3B30", "#FF453A"),
         console_bg=("#141417", "#141417"),
-        console_border=("#27272A", "#27272A"),
+        console_border=("#2C2C2E", "#2C2C2E"),
         toolbar_bg=("#FFFDF5", "#24201A"),
         inspector_bg=("#FAF3DC", "#191612"),
     ),
@@ -211,22 +212,22 @@ PRESETS: dict[str, ThemeTokens] = {
         surface_raised=("#EAEAEF", "#2E2E33"),
         surface_hover=("#DFDFE6", "#38383E"),
         surface_drop_hover=("#EFF6FF", "#1E2638"),
-        border=("#E4E4E7", "#323236"),
-        border_hover=("#3B82F6", "#3B82F6"),
-        border_focus=("#2563EB", "#3B82F6"),
-        text=("#18181B", "#F4F4F5"),
-        text2=("#52525B", "#B4B4BD"),
-        muted=("#71717A", "#A1A1AA"),
-        accent=("#2563EB", "#2563EB"),
-        accent_hover=("#3B82F6", "#3B82F6"),
-        accent_pressed=("#1D4ED8", "#1D4ED8"),
-        accent_light=("#DBEAFE", "#1E2D4A"),
-        accent_glow=("#93C5FD", "#2563EB"),
-        success=("#16A34A", "#22C55E"),
-        warn=("#D97706", "#F59E0B"),
-        danger=("#DC2626", "#EF4444"),
+        border=("#D2D2D7", "#2C2C2E"),
+        border_hover=("#007AFF", "#0A84FF"),
+        border_focus=("#007AFF", "#0A84FF"),
+        text=("#1D1D1F", "#D9D9DC"),
+        text2=("#6E6E73", "#8E8E93"),
+        muted=("#AEAEB2", "#545458"),
+        accent=("#007AFF", "#0A84FF"),
+        accent_hover=("#0062CC", "#409CFF"),
+        accent_pressed=("#004FB0", "#0071E3"),
+        accent_light=("#E5F2FF", "#142D4D"),
+        accent_glow=("#B3D7FF", "#0A84FF"),
+        success=("#34C759", "#30D158"),
+        warn=("#FF9500", "#FF9F0A"),
+        danger=("#FF3B30", "#FF453A"),
         console_bg=("#141417", "#141417"),
-        console_border=("#27272A", "#27272A"),
+        console_border=("#2C2C2E", "#2C2C2E"),
         toolbar_bg=("#FAFAFC", "#222226"),
         inspector_bg=("#EEF0F5", "#18181B"),
     ),
@@ -334,38 +335,38 @@ ACCENT_PRESSED = _default.accent_pressed
 ACCENT_LIGHT = _default.accent_light
 ACCENT_TOP_BORDER = _default.accent_glow
 
-STATUS_SUCCESS_BG = ("#DCFCE7", "#142E1F")
-STATUS_SUCCESS_TEXT = ("#15803D", "#22C55E")
-STATUS_SUCCESS_BORDER = ("#86EFAC", "#22C55E")
+STATUS_SUCCESS_BG = ("#E8F8ED", "#132E1D")
+STATUS_SUCCESS_TEXT = ("#34C759", "#30D158")
+STATUS_SUCCESS_BORDER = ("#34C759", "#30D158")
 
-STATUS_WARNING_BG = ("#FEF3C7", "#2B2111")
-STATUS_WARNING_TEXT = ("#92400E", "#FCD34D")
-STATUS_WARNING_BORDER = ("#F59E0B", "#92400E")
+STATUS_WARNING_BG = ("#FFF4E5", "#2B1D0A")
+STATUS_WARNING_TEXT = ("#FF9500", "#FF9F0A")
+STATUS_WARNING_BORDER = ("#FF9500", "#FF9F0A")
 
-STATUS_DANGER_BG = ("#FEE2E2", "#2D1619")
-STATUS_DANGER_TEXT = ("#DC2626", "#EF4444")
-STATUS_DANGER_BORDER = ("#FCA5A5", "#EF4444")
+STATUS_DANGER_BG = ("#FFEBEA", "#2D1619")
+STATUS_DANGER_TEXT = ("#FF3B30", "#FF453A")
+STATUS_DANGER_BORDER = ("#FF3B30", "#FF453A")
 
 STATUS_EXPERIMENTAL_BG = ("#F3E8FF", "#2E1065")
-STATUS_EXPERIMENTAL_TEXT = ("#7E22CE", "#C084FC")
-STATUS_EXPERIMENTAL_BORDER = ("#D8B4FE", "#A855F7")
+STATUS_EXPERIMENTAL_TEXT = ("#AF52DE", "#BF5AF2")
+STATUS_EXPERIMENTAL_BORDER = ("#AF52DE", "#BF5AF2")
 
 STATUS_MUTED_BG = ("#EAEAEF", "#2E2E33")
-STATUS_MUTED_TEXT = ("#71717A", "#A1A1AA")
-STATUS_MUTED_BORDER = ("#D4D4D8", "#3F3F46")
+STATUS_MUTED_TEXT = ("#AEAEB2", "#545458")
+STATUS_MUTED_BORDER = ("#D2D2D7", "#2C2C2E")
 
 CONSOLE_BG = _default.console_bg
 CONSOLE_BORDER = _default.console_border
-CONSOLE_TEXT = ("#D4D4D8", "#D4D4D8")
+CONSOLE_TEXT = ("#D9D9DC", "#D9D9DC")
 
 CONSOLE_LEVEL_COLORS: dict[str, str] = {
-    "INFO": "#D4D4D8",
-    "OK": "#22C55E",
-    "WARN": "#FBBF24",
-    "ERROR": "#EF4444",
-    "CMD": "#7DD3FC",
-    "DIM": "#71717A",
-    "DEBUG": "#71717A",
+    "INFO": "#D9D9DC",
+    "OK": "#30D158",
+    "WARN": "#FF9F0A",
+    "ERROR": "#FF453A",
+    "CMD": "#0A84FF",
+    "DIM": "#545458",
+    "DEBUG": "#545458",
 }
 
 # ============================================================================
@@ -394,12 +395,43 @@ def get_corner_radii(style: str = "Normal") -> tuple[int, int]:
 # 5. TYPOGRAPHY WITH THAI & DYNAMIC SIZING
 # ============================================================================
 
+_FONTS_LOADED = False
+
+
+def load_bundled_fonts() -> None:
+    """Load bundled Inter fonts into Windows GDI font table."""
+    global _FONTS_LOADED
+    if _FONTS_LOADED:
+        return
+    _FONTS_LOADED = True
+    if sys.platform != "win32":
+        return
+    fonts_dir = Path(__file__).resolve().parent / "assets" / "fonts"
+    if not fonts_dir.is_dir():
+        return
+    for font_path in fonts_dir.glob("*.ttf"):
+        with contextlib.suppress(Exception):
+            ctypes.windll.gdi32.AddFontResourceExW(str(font_path), 0x10, 0)
+
+
+_load_bundled_fonts = load_bundled_fonts
+
+
+def init_theme() -> None:
+    """Initialize theme resources including bundled fonts."""
+    load_bundled_fonts()
+
+
+# Auto-load fonts on module import
+with contextlib.suppress(Exception):
+    load_bundled_fonts()
+
 _FONT_FAMILY_UI = (
-    "SF Pro Text, -apple-system, sans-serif"
+    "Inter, SF Pro Text, -apple-system, sans-serif"
     if sys.platform == "darwin"
-    else "Segoe UI Variable, Segoe UI, Leelawadee UI, Noto Sans Thai, sans-serif"
+    else "Inter, Noto Sans Thai, Segoe UI Variable, Segoe UI, Leelawadee UI, sans-serif"
 )
-_FONT_FAMILY_MONO = "SF Mono, Cascadia Mono, Consolas, Courier New, monospace"
+_FONT_FAMILY_MONO = "SF Mono, Cascadia Mono, Consolas, monospace"
 
 
 def _font_scale(base: int, size_opt: str = "M") -> int:
@@ -421,13 +453,17 @@ def font_section(size_opt: str = "M") -> ctk.CTkFont:
 def font_body(bold: bool = False, size_opt: str = "M") -> ctk.CTkFont:
     return ctk.CTkFont(
         family=_FONT_FAMILY_UI,
-        size=_font_scale(14 if bold else 13, size_opt),
+        size=_font_scale(13, size_opt),
         weight="bold" if bold else "normal",
     )
 
 
 def font_caption(size_opt: str = "M") -> ctk.CTkFont:
     return ctk.CTkFont(family=_FONT_FAMILY_UI, size=_font_scale(12, size_opt), weight="normal")
+
+
+def font_badge(size_opt: str = "M") -> ctk.CTkFont:
+    return ctk.CTkFont(family=_FONT_FAMILY_UI, size=_font_scale(11, size_opt), weight="bold")
 
 
 def font_big_stat(size_opt: str = "M") -> ctk.CTkFont:
@@ -439,25 +475,57 @@ def font_mono(size: int = 12) -> ctk.CTkFont:
 
 
 # ============================================================================
-# 6. WINDOW BACKDROP & DARK TINT ENGINE (WINDOWS 10/11)
+# 6. WINDOW BACKDROP & TITLE BAR (WINDOWS 10/11 DWM)
 # ============================================================================
 
 DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+DWMWA_USE_IMMERSIVE_DARK_MODE_FALLBACK = 19
+DWMWA_CAPTION_COLOR = 35
 DWMWA_SYSTEMBACKDROP_TYPE = 38
 BACKDROP_TYPE_MICA = 2
 BACKDROP_TYPE_ACRYLIC = 3
 
 
-def enable_dark_title_bar(window: Any) -> None:
-    """Enables Windows 10/11 DWM dark title bar via Win32 API."""
+def _hex_to_colorref(hex_color: str) -> int:
+    """Convert hex string (e.g. #222226) to Win32 COLORREF (0x00BBGGRR)."""
+    clean = hex_color.lstrip("#")
+    if len(clean) == 6:
+        r = int(clean[0:2], 16)
+        g = int(clean[2:4], 16)
+        b = int(clean[4:6], 16)
+        return (b << 16) | (g << 8) | r
+    return 0
+
+
+def update_title_bar_theme(window: Any, is_dark: bool, bg_color: str | None = None) -> None:
+    """Updates Windows 10/11 DWM title bar theme and caption color."""
     if sys.platform != "win32":
         return
     with contextlib.suppress(Exception):
         hwnd = ctypes.windll.user32.GetParent(window.winfo_id()) or window.winfo_id()
-        value = ctypes.c_int(1)
-        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+        value = ctypes.c_int(1 if is_dark else 0)
+        res = ctypes.windll.dwmapi.DwmSetWindowAttribute(
             hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ctypes.byref(value), ctypes.sizeof(value)
         )
+        if res != 0:
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                hwnd,
+                DWMWA_USE_IMMERSIVE_DARK_MODE_FALLBACK,
+                ctypes.byref(value),
+                ctypes.sizeof(value),
+            )
+
+        if bg_color and bg_color.startswith("#"):
+            colorref = _hex_to_colorref(bg_color)
+            color_val = ctypes.c_int(colorref)
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                hwnd, DWMWA_CAPTION_COLOR, ctypes.byref(color_val), ctypes.sizeof(color_val)
+            )
+
+
+def enable_dark_title_bar(window: Any) -> None:
+    """Enables Windows 10/11 DWM dark title bar via Win32 API."""
+    update_title_bar_theme(window, is_dark=True)
 
 
 def apply_window_backdrop(
@@ -472,7 +540,8 @@ def apply_window_backdrop(
     if os.name != "nt":
         return False
 
-    enable_dark_title_bar(window)
+    is_dark = ctk.get_appearance_mode().lower() == "dark"
+    update_title_bar_theme(window, is_dark=is_dark)
 
     # Always keep whole-window alpha at 1.0 so queue, inspector, and console never bleed through
     with contextlib.suppress(Exception):

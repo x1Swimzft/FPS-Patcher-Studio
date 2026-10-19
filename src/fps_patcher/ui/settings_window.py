@@ -12,6 +12,7 @@ import customtkinter as ctk
 
 from .. import APP_NAME
 from ..config import Settings
+from .icons import get_icon
 from .settings_tabs import (
     AboutTab,
     AppearanceTab,
@@ -70,7 +71,7 @@ class SettingsWindow(ctk.CTkToplevel):
         self._tabs = [
             ("appearance", "tab_appearance", "🎨"),
             ("output", "tab_output", "📁"),
-            ("patching", "tab_patching", "⚡"),
+            ("patching", "tab_patching", ""),
             ("ffmpeg", "tab_ffmpeg", "🎬"),
             ("console", "tab_console", "📟"),
             ("behavior", "tab_behavior", "⚙"),
@@ -115,10 +116,16 @@ class SettingsWindow(ctk.CTkToplevel):
         ).pack(anchor="w", padx=16, pady=(16, 12))
 
         # Nav Buttons
+        zap_ico = get_icon("zap", (15, 15))
         for key, str_key, icon in self._tabs:
+            tab_ico = zap_ico if key == "patching" else None
+            txt = self._tr(str_key)
+            label_text = f"  {txt}" if tab_ico else (f"{icon}  {txt}" if icon else txt)
             btn = ctk.CTkButton(
                 self.sidebar,
-                text=f"{icon}  {self._tr(str_key)}",
+                text=label_text,
+                image=tab_ico,
+                compound="left",
                 anchor="w",
                 height=34,
                 corner_radius=RADIUS_CONTROL,

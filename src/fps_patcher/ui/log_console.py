@@ -137,9 +137,12 @@ class LogConsole(ctk.CTkFrame):
         left_cluster = ctk.CTkFrame(self.header, fg_color="transparent")
         left_cluster.grid(row=0, column=0, sticky="w", pady=4)
 
+        chev_name = "chevron_down" if self._expanded else "chevron_right"
+        chev_ico = get_icon(chev_name, (12, 12), force_dark=True)
         self.chevron_btn = ctk.CTkButton(
             left_cluster,
-            text="▾",
+            text="" if chev_ico else ("▾" if self._expanded else "▸"),
+            image=chev_ico,
             width=24,
             height=24,
             corner_radius=6,
@@ -384,7 +387,12 @@ class LogConsole(ctk.CTkFrame):
 
     def set_expanded(self, expanded: bool) -> None:
         self._expanded = bool(expanded)
-        self.chevron_btn.configure(text="▾" if self._expanded else "▸")
+        chev_name = "chevron_down" if self._expanded else "chevron_right"
+        chev_ico = get_icon(chev_name, (12, 12), force_dark=True)
+        self.chevron_btn.configure(
+            image=chev_ico,
+            text="" if chev_ico else ("▾" if self._expanded else "▸"),
+        )
         if self._expanded:
             self.box.grid(row=2, column=0, sticky="nsew", padx=12, pady=(0, 8))
             if self._get_reduce_motion():
@@ -406,7 +414,11 @@ class LogConsole(ctk.CTkFrame):
         self.top_divider.configure(fg_color=tokens.console_border)
         self.header.configure(fg_color=tokens.console_bg)
 
+        chev_name = "chevron_down" if self._expanded else "chevron_right"
+        chev_ico = get_icon(chev_name, (12, 12), force_dark=True)
         self.chevron_btn.configure(
+            image=chev_ico,
+            text="" if chev_ico else ("▾" if self._expanded else "▸"),
             hover_color=tokens.console_border,
             font=font_section(fsize),
         )

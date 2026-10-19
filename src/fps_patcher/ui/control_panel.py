@@ -96,11 +96,11 @@ class ControlPanel(ctk.CTkFrame):
             height=34,
             border_width=1,
         )
-        self.preset.grid(row=1, column=0, sticky="ew", padx=6, pady=(0, 10))
+        self.preset.grid(row=1, column=0, sticky="ew", padx=6, pady=(0, 6))
 
         # ── 2. 2-Column Grid: Timescale + Preset ──
         self.grid_two_col = ctk.CTkFrame(self, fg_color="transparent")
-        self.grid_two_col.grid(row=2, column=0, sticky="ew", padx=6, pady=(0, 8))
+        self.grid_two_col.grid(row=2, column=0, sticky="ew", padx=6, pady=(0, 6))
         self.grid_two_col.grid_columnconfigure(0, weight=1, uniform="insp_col")
         self.grid_two_col.grid_columnconfigure(1, weight=1, uniform="insp_col")
 
@@ -184,19 +184,21 @@ class ControlPanel(ctk.CTkFrame):
             border_width=1,
             border_color=tokens.border,
         )
-        self.override_card.grid(row=4, column=0, sticky="ew", padx=6, pady=(2, 8))
+        self.override_card.grid(row=4, column=0, sticky="ew", padx=6, pady=(2, 4))
         self.override_card.grid_columnconfigure(0, weight=1)
 
         override_top = ctk.CTkFrame(self.override_card, fg_color="transparent")
-        override_top.grid(row=0, column=0, sticky="ew", padx=8, pady=5)
+        override_top.grid(row=0, column=0, sticky="ew", padx=6, pady=3)
         override_top.grid_columnconfigure(1, weight=1)
 
+        chev_right_ico = get_icon("chevron_right", (12, 12))
         self.override_toggle_btn = ctk.CTkButton(
             override_top,
-            text="▸",
-            width=22,
-            height=22,
-            corner_radius=6,
+            text="" if chev_right_ico else "▸",
+            image=chev_right_ico,
+            width=18,
+            height=18,
+            corner_radius=4,
             fg_color="transparent",
             hover_color=tokens.surface_hover,
             text_color=tokens.text2,
@@ -239,10 +241,10 @@ class ControlPanel(ctk.CTkFrame):
             wraplength=255,
             justify="left",
         )
-        self.override_status_lbl.grid(row=0, column=0, sticky="ew", padx=10, pady=(0, 4))
+        self.override_status_lbl.grid(row=0, column=0, sticky="ew", padx=8, pady=(0, 2))
 
         override_btns = ctk.CTkFrame(self.override_body, fg_color="transparent")
-        override_btns.grid(row=1, column=0, sticky="w", padx=10, pady=(0, 7))
+        override_btns.grid(row=1, column=0, sticky="w", padx=8, pady=(0, 4))
 
         self.btn_set_override = ctk.CTkButton(
             override_btns,
@@ -282,10 +284,10 @@ class ControlPanel(ctk.CTkFrame):
             text_color=tokens.text2,
             anchor="w",
         )
-        self.output_lbl.grid(row=5, column=0, sticky="ew", padx=6, pady=(2, 4))
+        self.output_lbl.grid(row=5, column=0, sticky="ew", padx=6, pady=(2, 2))
 
         out_row = ctk.CTkFrame(self, fg_color="transparent")
-        out_row.grid(row=6, column=0, sticky="ew", padx=6, pady=(0, 6))
+        out_row.grid(row=6, column=0, sticky="ew", padx=6, pady=(0, 4))
         out_row.grid_columnconfigure(0, weight=1)
 
         self.out_entry = ctk.CTkEntry(
@@ -341,7 +343,7 @@ class ControlPanel(ctk.CTkFrame):
 
         # Stack checkboxes vertically so Thai labels never clip at 340px
         opt_col = ctk.CTkFrame(self, fg_color="transparent")
-        opt_col.grid(row=7, column=0, sticky="ew", padx=6, pady=(0, 6))
+        opt_col.grid(row=7, column=0, sticky="ew", padx=6, pady=(0, 4))
         opt_col.grid_columnconfigure(0, weight=1)
 
         self.overwrite_check = ctk.CTkCheckBox(
@@ -358,7 +360,7 @@ class ControlPanel(ctk.CTkFrame):
             corner_radius=5,
             command=self._options_changed,
         )
-        self.overwrite_check.grid(row=0, column=0, sticky="w", pady=(0, 5))
+        self.overwrite_check.grid(row=0, column=0, sticky="w", pady=(0, 2))
         if settings.overwrite:
             self.overwrite_check.select()
 
@@ -465,9 +467,12 @@ class ControlPanel(ctk.CTkFrame):
         self.progress_batch.set(0)
         self.progress_batch.grid(row=3, column=0, sticky="ew", padx=10, pady=(0, 8))
 
+        zap_ico = get_icon("zap", (16, 16))
         self.patch_btn = ctk.CTkButton(
             btns,
             text=t("start_patch", lang),
+            image=zap_ico,
+            compound="left",
             height=40,
             corner_radius=ctrl_rad,
             font=font_body(bold=True, size_opt=fsize),
@@ -660,7 +665,9 @@ class ControlPanel(ctk.CTkFrame):
         self.progress.configure(progress_color=tokens.accent, fg_color=tokens.surface_raised)
         self.progress_batch.configure(progress_color=tokens.accent, fg_color=tokens.surface_raised)
 
+        zap_ico = get_icon("zap", (16, 16))
         self.patch_btn.configure(
+            image=zap_ico,
             corner_radius=ctrl_rad,
             font=font_body(bold=True, size_opt=fsize),
         )
@@ -694,7 +701,11 @@ class ControlPanel(ctk.CTkFrame):
 
         has_override = bool(parts)
         show_body = self._override_expanded or has_override
-        self.override_toggle_btn.configure(text="▾" if show_body else "▸")
+        ico = get_icon("chevron_down" if show_body else "chevron_right", (12, 12))
+        self.override_toggle_btn.configure(
+            image=ico,
+            text="" if ico else ("▾" if show_body else "▸"),
+        )
         if show_body:
             self.override_body.grid(row=1, column=0, sticky="ew")
         else:
@@ -772,10 +783,13 @@ class ControlPanel(ctk.CTkFrame):
         tokens = self._theme_mgr.tokens
         lang = self.settings.language
 
+        zap_ico = get_icon("zap", (16, 16))
+
         if busy:
             self.patch_btn.configure(
                 state="disabled",
                 text=t("patching_btn", lang, pct=self._last_pct),
+                image=zap_ico,
                 fg_color=tokens.surface_raised,
                 text_color=tokens.muted,
             )
@@ -791,6 +805,7 @@ class ControlPanel(ctk.CTkFrame):
             self.patch_btn.configure(
                 state="normal",
                 text=t("start_patch", lang),
+                image=zap_ico,
                 fg_color=tokens.accent,
                 hover_color=tokens.accent_hover,
                 text_color="#FFFFFF",
@@ -807,6 +822,7 @@ class ControlPanel(ctk.CTkFrame):
             self.patch_btn.configure(
                 state="disabled",
                 text=t("start_patch", lang),
+                image=zap_ico,
                 fg_color=tokens.surface_raised,
                 text_color=tokens.muted,
             )

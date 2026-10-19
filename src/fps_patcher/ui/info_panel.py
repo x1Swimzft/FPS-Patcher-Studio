@@ -52,7 +52,7 @@ class InfoPanel(ctk.CTkFrame):
             font=font_section(fsize),
             text_color=tokens.text,
         )
-        self.header_label.grid(row=0, column=0, columnspan=2, sticky="w", padx=12, pady=(10, 4))
+        self.header_label.grid(row=0, column=0, columnspan=2, sticky="w", padx=12, pady=(8, 2))
 
         self._labels: dict[str, ctk.CTkLabel] = {}
         self._values: dict[str, ctk.CTkLabel] = {}
@@ -85,7 +85,7 @@ class InfoPanel(ctk.CTkFrame):
             text_color=tokens.muted,
         )
         self.files_count.grid(
-            row=row_idx, column=0, columnspan=2, sticky="w", padx=12, pady=(6, 8)
+            row=row_idx, column=0, columnspan=2, sticky="w", padx=12, pady=(4, 6)
         )
 
         self._theme_mgr.subscribe(self.apply_theme)

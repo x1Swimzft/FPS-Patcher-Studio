@@ -42,17 +42,21 @@ from .theme import (
     STATUS_SUCCESS_TEXT,
     ThemeTokens,
     apply_window_backdrop,
+    font_badge,
     font_body,
     font_caption,
     font_title,
     get_corner_radii,
     get_theme_manager,
+    update_title_bar_theme,
 )
 
 log = logging.getLogger("fps_patcher.ui.main_window")
 
 POLL_MS = 50
 INSPECTOR_WIDTH = 340
+
+__all__ = ["MainWindow", "update_title_bar_theme"]
 
 
 class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
@@ -94,6 +98,7 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
             backdrop_mode=settings.glass_mode,
             tint_strength=settings.tint_strength,
         )
+        self._refresh_theme(tokens)
 
         # Layout grid:
         # Row 0: Unified toolbar (~52px)
@@ -168,10 +173,10 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
             on_override_change=self._on_item_override_changed,
             footer_master=self.inspector_footer,
         )
-        self.controls.grid(row=0, column=0, sticky="ew", padx=6, pady=(6, 4))
+        self.controls.grid(row=0, column=0, sticky="ew", padx=6, pady=(4, 2))
 
         self.info_panel = InfoPanel(self.inspector_pane)
-        self.info_panel.grid(row=1, column=0, sticky="ew", padx=6, pady=(4, 10))
+        self.info_panel.grid(row=1, column=0, sticky="ew", padx=6, pady=(2, 6))
 
         # Restore persisted queue if present
         queue_save_file = app_data_dir() / "queue.json"
@@ -301,7 +306,7 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
         self.version_badge = ctk.CTkLabel(
             brand_frame,
             text=f"v{__version__}",
-            font=font_caption(fsize),
+            font=font_badge(fsize),
             fg_color=tokens.accent_light,
             text_color=tokens.accent,
             corner_radius=6,
@@ -324,7 +329,7 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
             corner_radius=RADIUS_PILL,
             height=28,
             width=120,
-            font=font_caption(fsize),
+            font=font_badge(fsize),
             fg_color=STATUS_MUTED_BG,
             hover_color=tokens.surface_hover,
             text_color=STATUS_MUTED_TEXT,
@@ -476,7 +481,7 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
                 fg_color=STATUS_SUCCESS_BG,
                 hover_color=tokens.surface_hover,
                 text_color=STATUS_SUCCESS_TEXT,
-                font=font_caption(fsize),
+                font=font_badge(fsize),
             )
         elif self._ff_state == "not_found":
             self.ff_badge.configure(
@@ -484,7 +489,7 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
                 fg_color=STATUS_DANGER_BG,
                 hover_color=tokens.surface_hover,
                 text_color=STATUS_DANGER_TEXT,
-                font=font_caption(fsize),
+                font=font_badge(fsize),
             )
         else:
             self.ff_badge.configure(
@@ -492,8 +497,27 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
                 fg_color=STATUS_MUTED_BG,
                 hover_color=tokens.surface_hover,
                 text_color=STATUS_MUTED_TEXT,
-                font=font_caption(fsize),
+                font=font_badge(fsize),
             )
+
+    def _refresh_theme(self, tokens: ThemeTokens | None = None) -> None:
+        """Update window title bar and theme styling."""
+        if tokens is None:
+            tokens = self._theme_mgr.tokens
+        is_dark = ctk.get_appearance_mode().lower() == "dark"
+        caption_bg = tokens.toolbar_bg[1] if is_dark else tokens.toolbar_bg[0]
+        update_title_bar_theme(self, is_dark=is_dark, bg_color=caption_bg)
+
+    def update_title_bar_theme(
+        self, is_dark: bool | None = None, bg_color: str | None = None
+    ) -> None:
+        """Instance method to update title bar theme."""
+        if is_dark is None:
+            is_dark = ctk.get_appearance_mode().lower() == "dark"
+        if bg_color is None:
+            tokens = self._theme_mgr.tokens
+            bg_color = tokens.toolbar_bg[1] if is_dark else tokens.toolbar_bg[0]
+        update_title_bar_theme(self, is_dark=is_dark, bg_color=bg_color)
 
     def _apply_ui_scale(self, ui_scale: int) -> None:
         import contextlib
@@ -507,6 +531,7 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
 
     def _on_theme_updated(self, tokens: ThemeTokens) -> None:
         """Dynamically update main window appearance and backdrop."""
+        self._refresh_theme(tokens)
         _, ctrl_rad = get_corner_radii(self.settings.radius_style)
         fsize = self.settings.font_size
         lang = self.settings.language
@@ -530,7 +555,7 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
         self.version_badge.configure(
             fg_color=tokens.accent_light,
             text_color=tokens.accent,
-            font=font_caption(fsize),
+            font=font_badge(fsize),
         )
         self._apply_ff_badge_style(tokens)
 
@@ -591,6 +616,7 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
         else:
             self.attributes("-topmost", False)
 
+        self._refresh_theme()
         apply_window_backdrop(
             self,
             glass=settings.glass,
