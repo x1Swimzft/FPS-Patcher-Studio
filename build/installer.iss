@@ -1,6 +1,6 @@
 ; Inno Setup script for FPS Patcher Studio. Build via build\release.ps1 (passes /DAppVersion=x.y.z).
 #ifndef AppVersion
-  #define AppVersion "0.3.0"
+  #define AppVersion "0.3.5"
 #endif
 
 [Setup]
