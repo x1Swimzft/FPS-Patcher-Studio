@@ -3,17 +3,20 @@
 from __future__ import annotations
 
 import contextlib
+import ctypes
 import logging
 import os
 import subprocess
+import sys
 from pathlib import Path
 from tkinter import filedialog, messagebox
 from typing import Any
 
 import customtkinter as ctk
+from PIL import Image, ImageTk
 from tkinterdnd2 import TkinterDnD
 
-from .. import APP_NAME, __version__
+from .. import APP_NAME, APP_USER_MODEL_ID, __version__
 from ..app.controller import AppController
 from ..app.queue_model import InputQueue
 from ..config import Settings, app_data_dir
@@ -27,7 +30,7 @@ from ..core.models import (
 )
 from ..core.strategies import strategy_requires_ffmpeg
 from .control_panel import ControlPanel
-from .icons import get_icon
+from .icons import get_asset_path, get_icon
 from .info_panel import InfoPanel
 from .input_list import InputList
 from .log_console import LogConsole
@@ -77,6 +80,7 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
         ctk.set_appearance_mode(settings.appearance)
         self._apply_ui_scale(settings.ui_scale)
         self.title(APP_NAME)
+        self._set_app_icon()
 
         if settings.remember_geometry and settings.geometry:
             try:
@@ -314,6 +318,23 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
 
     def _on_drag_release(self, event: Any) -> None:
         self._drag_active = False
+
+    def _set_app_icon(self) -> None:
+        """Apply app icon to window title bar and Windows taskbar."""
+        if sys.platform == "win32":
+            with contextlib.suppress(AttributeError, OSError):
+                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_USER_MODEL_ID)
+
+        ico_path = get_asset_path("app.ico")
+        if ico_path.is_file():
+            with contextlib.suppress(Exception):
+                self.iconbitmap(str(ico_path))
+
+        png_path = get_asset_path("app_icon.png")
+        if png_path.is_file():
+            with contextlib.suppress(Exception), Image.open(png_path) as im:
+                self._app_icon_photo: Any = ImageTk.PhotoImage(im.resize((64, 64)))
+                self.iconphoto(False, self._app_icon_photo)
 
     # ---------- layout: unified toolbar (~52px) ----------
     def _build_header(self) -> None:

@@ -28,5 +28,6 @@ exe = EXE(  # noqa: F821
     exclude_binaries=True,
     name="FPSPatcherStudio",
     console=False,
+    icon=str(ROOT / "build" / "app.ico"),
 )
 coll = COLLECT(exe, a.binaries, a.datas, name="FPSPatcherStudio")  # noqa: F821

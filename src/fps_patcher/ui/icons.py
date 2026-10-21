@@ -14,6 +14,11 @@ _ASSETS_DIR = Path(__file__).with_name("assets")
 _ICON_CACHE: dict[tuple[str, tuple[int, int], bool], ctk.CTkImage] = {}
 
 
+def get_asset_path(filename: str) -> Path:
+    """Return path to asset file located in ui/assets/."""
+    return _ASSETS_DIR / filename
+
+
 def get_icon(
     name: str,
     size: tuple[int, int] = (16, 16),

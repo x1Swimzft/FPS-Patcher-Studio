@@ -20,7 +20,8 @@ OutputBaseFilename=FPSPatcherStudio-v{#AppVersion}-Setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-UninstallDisplayIcon={app}\FPSPatcherStudio.exe
+SetupIconFile=app.ico
+UninstallDisplayIcon={app}\app.ico
 SetupLogging=yes
 
 [Tasks]
@@ -28,10 +29,11 @@ Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription
 
 [Files]
 Source: "..\dist\FPSPatcherStudio\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "app.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{autoprograms}\FPS Patcher Studio"; Filename: "{app}\FPSPatcherStudio.exe"
-Name: "{autodesktop}\FPS Patcher Studio"; Filename: "{app}\FPSPatcherStudio.exe"; Tasks: desktopicon
+Name: "{autoprograms}\FPS Patcher Studio"; Filename: "{app}\FPSPatcherStudio.exe"; IconFilename: "{app}\app.ico"
+Name: "{autodesktop}\FPS Patcher Studio"; Filename: "{app}\FPSPatcherStudio.exe"; IconFilename: "{app}\app.ico"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\FPSPatcherStudio.exe"; Description: "Launch FPS Patcher Studio"; Flags: nowait postinstall skipifsilent

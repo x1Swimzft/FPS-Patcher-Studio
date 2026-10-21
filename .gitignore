@@ -9,6 +9,7 @@ build/*
 !build/fps_patcher.spec
 !build/installer.iss
 !build/release.ps1
+!build/app.ico
 bin/*.exe
 *.part
 release/

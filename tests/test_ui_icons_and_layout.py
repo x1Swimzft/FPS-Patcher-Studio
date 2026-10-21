@@ -6,7 +6,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from fps_patcher.ui.icons import get_icon
+from fps_patcher.ui.icons import get_asset_path, get_icon
 from fps_patcher.ui.log_console import LogConsole
 from fps_patcher.ui.strings import t
 
@@ -101,3 +101,32 @@ def test_log_console_format_line_count() -> None:
     assert LogConsole._format_line_count(th_console, 0) == "0 รายการ"  # type: ignore[arg-type]
     assert LogConsole._format_line_count(th_console, 1) == "1 รายการ"  # type: ignore[arg-type]
     assert LogConsole._format_line_count(th_console, 5) == "5 รายการ"  # type: ignore[arg-type]
+
+
+def test_midnight_app_icon_assets_exist_and_specs() -> None:
+    svg_full = ASSETS_DIR / "app_icon.svg"
+    svg_small = ASSETS_DIR / "app_icon_small.svg"
+    assert svg_full.is_file() and svg_full.stat().st_size > 0
+    assert svg_small.is_file() and svg_small.stat().st_size > 0
+    full_text = svg_full.read_text(encoding="utf-8")
+    small_text = svg_small.read_text(encoding="utf-8")
+    assert "M585,170" in full_text
+    assert "M585,170" in small_text
+    assert "stroke-dasharray" in full_text
+    assert "stroke-dasharray" not in small_text
+
+    png_path = ASSETS_DIR / "app_icon.png"
+    assert png_path.is_file()
+    with Image.open(png_path) as im:
+        assert im.size == (1024, 1024)
+        assert im.mode == "RGBA"
+
+    expected_sizes = {(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)}
+    build_ico = ASSETS_DIR.parents[3] / "build" / "app.ico"
+    for ico_path in (ASSETS_DIR / "app.ico", build_ico):
+        assert ico_path.is_file(), f"Missing {ico_path}"
+        with Image.open(ico_path) as ico:
+            assert expected_sizes.issubset(ico.info["sizes"])
+
+    assert get_asset_path("app.ico") == ASSETS_DIR / "app.ico"
+    assert get_asset_path("app_icon.png") == ASSETS_DIR / "app_icon.png"
