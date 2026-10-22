@@ -8,7 +8,7 @@ import pytest
 
 from fps_patcher.core.atom_patcher import patch_video_track_timescale
 from fps_patcher.core.errors import PatchError
-from fps_patcher.core.ffmpeg_locator import locate
+from fps_patcher.core.ffmpeg_locator import FFmpegPaths
 from fps_patcher.core.prober import probe
 
 
@@ -31,8 +31,7 @@ def _top_level_mdat_payload(path: Path) -> bytes:
     raise AssertionError("mdat not found")
 
 
-def test_direct_atom_patch_preserves_media_and_timing(tmp_path: Path) -> None:
-    ff = locate()
+def test_direct_atom_patch_preserves_media_and_timing(tmp_path: Path, ff: FFmpegPaths) -> None:
     src = tmp_path / "src.mp4"
     out = tmp_path / "out.mp4"
     subprocess.run(
@@ -83,3 +82,21 @@ def test_direct_atom_refuses_same_path(tmp_path: Path) -> None:
     src.write_bytes(b"dummy")
     with pytest.raises(PatchError, match="refusing in-place overwrite"):
         patch_video_track_timescale(src, src, 60000)
+
+
+def _box(typ: bytes, payload: bytes) -> bytes:
+    return struct.pack(">I4s", 8 + len(payload), typ) + payload
+
+
+def test_huge_stts_sample_count_rejected_without_expansion(tmp_path: Path) -> None:
+    hdlr = _box(b"hdlr", bytes(8) + b"vide" + bytes(12))
+    mdhd = _box(b"mdhd", struct.pack(">B3xIIIIHH", 0, 0, 0, 600, 600, 0, 0))
+    stts = _box(b"stts", struct.pack(">B3xIII", 0, 1, 0xFFFFFFFF, 1))
+    stbl = _box(b"stbl", stts)
+    minf = _box(b"minf", stbl)
+    mdia = _box(b"mdia", mdhd + hdlr + minf)
+    moov = _box(b"moov", _box(b"trak", mdia))
+    src = tmp_path / "evil.mp4"
+    src.write_bytes(moov + _box(b"mdat", b"\x00" * 16))
+    with pytest.raises(PatchError, match="exceeds file size"):
+        patch_video_track_timescale(src, tmp_path / "out.mp4", 90000)

@@ -11,6 +11,10 @@ class FFmpegNotFoundError(FPSPatcherError):
     """No working ffmpeg/ffprobe binary could be located."""
 
 
+class FFmpegDownloadError(FPSPatcherError):
+    """Automatic FFmpeg download/installation failed or was cancelled."""
+
+
 class ProbeError(FPSPatcherError):
     """ffprobe failed or returned unusable data."""
 

@@ -10,6 +10,9 @@ build/*
 !build/installer.iss
 !build/release.ps1
 !build/app.ico
+!build/version_info.txt
+!build/sign_binaries.ps1
+*.pfx
 bin/*.exe
 *.part
 release/

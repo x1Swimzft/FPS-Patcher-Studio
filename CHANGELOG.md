@@ -2,6 +2,14 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
+## [0.3.5] - 2026-10-21
+
+### Features & Enhancements
+- **Midnight App Icon**: Introduced high-contrast Midnight application icon featuring high-voltage zap with precision FPS gauge across taskbar, title bar, and installer branding.
+- **Binary Code Signing & Version Resources**: Added native Windows version info resource (`version_info.txt`) and automated Signtool certificate signing (`build\sign_binaries.ps1`) for PyInstaller executables and Inno Setup installers.
+- **FFmpeg Auto-Locator & Downloader**: Enhanced embedded FFmpeg binary resolution with graceful fallback and dedicated downloader support for thumbnail and probe features.
+- **Atom Patcher Hardening**: Added zero-length run validation for `stts` and timescale delta bounds checking in MP4 atom stream rewriting.
+
 ## [0.3.0] - 2026-10-19
 
 ### Major Features & Rebranding

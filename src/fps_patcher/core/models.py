@@ -5,7 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from fractions import Fraction
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from .ffmpeg_locator import FFmpegPaths
 
 SUPPORTED_EXTENSIONS: frozenset[str] = frozenset({".mp4", ".mov", ".m4v"})
 
@@ -115,4 +118,28 @@ class QueueChangedEvent:
     reason: str = ""
 
 
-Event = LogEvent | ProgressEvent | ProbeDoneEvent | PatchDoneEvent | QueueChangedEvent
+@dataclass(frozen=True)
+class FFmpegDownloadEvent:
+    """Auto-download progress; ``stage`` is downloading/extracting/verifying/done/error."""
+
+    stage: str
+    downloaded: int = 0
+    total: int = 0
+    error: str | None = None
+    paths: FFmpegPaths | None = None
+
+    @property
+    def percent(self) -> int:
+        if self.total <= 0:
+            return 0
+        return max(0, min(100, int(self.downloaded * 100 / self.total)))
+
+
+Event = (
+    LogEvent
+    | ProgressEvent
+    | ProbeDoneEvent
+    | PatchDoneEvent
+    | QueueChangedEvent
+    | FFmpegDownloadEvent
+)

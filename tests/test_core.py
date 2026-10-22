@@ -39,6 +39,7 @@ def test_locate_finds_working_pair(ff: FFmpegPaths) -> None:
     assert "ffmpeg version" in ff.version
 
 
+@pytest.mark.usefixtures("ff")  # skips when no ffmpeg is installed to fall back to
 def test_locate_custom_dir_invalid_falls_back(tmp_path: Path) -> None:
     paths = locate(tmp_path)  # empty dir -> falls back to PATH/bin
     assert paths.ffmpeg.parent != tmp_path

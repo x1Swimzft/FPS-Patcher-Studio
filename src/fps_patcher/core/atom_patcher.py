@@ -169,10 +169,15 @@ def _patch_stts(data: bytearray, box: Box, scale: Fraction) -> None:
         raise PatchError("Malformed stts entry count.")
 
     deltas: list[int] = []
+    # Every sample occupies at least one byte of the file, so a larger total is a
+    # malformed/hostile table (prevents multi-GB list expansion).
+    max_samples = len(data)
     for _ in range(count):
         sample_count, delta = struct.unpack_from(">II", data, pos)
         if sample_count == 0:
             raise PatchError("stts contains zero-length run.")
+        if len(deltas) + sample_count > max_samples:
+            raise PatchError("stts sample count exceeds file size.")
         deltas.extend([delta] * sample_count)
         pos += 8
 

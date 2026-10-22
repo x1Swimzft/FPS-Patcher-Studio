@@ -4,11 +4,16 @@
 .DESCRIPTION
   1. ruff + mypy + pytest gates (abort on failure; skip with -SkipChecks)
   2. PyInstaller one-folder windowed build
-  3. Launch smoke test (exe must stay alive for a few seconds)
-  4. release/FPSPatcherStudio-v<version>-win64.zip + .sha256
+  3. Optional Authenticode signing (-Sign; see build\sign_binaries.ps1)
+  4. Launch smoke test (exe must stay alive for a few seconds)
+  5. release/FPSPatcherStudio-v<version>-win64.zip + .sha256 (+ Setup.exe and combined manifest)
   Run from project root:  powershell -ExecutionPolicy Bypass -File build\release.ps1
+.PARAMETER Sign
+  Sign the exe and installer (env CERT_PFX_PATH / CERT_PASSWORD). Unsigned with a warning if signtool is missing.
+.PARAMETER GenerateSelfSigned
+  With -Sign: create/use a local dev certificate when no production cert is configured (untrusted).
 #>
-param([switch]$SkipChecks)
+param([switch]$SkipChecks, [switch]$Sign, [switch]$GenerateSelfSigned)
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
@@ -21,6 +26,13 @@ function Step($name, [scriptblock]$cmd) {
 }
 
 $version = (Select-String -Path "src\fps_patcher\__init__.py" -Pattern '__version__\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
+if (-not (Select-String -Path "build\version_info.txt" -SimpleMatch "'FileVersion', '$version.0'" -Quiet)) {
+    throw "build\version_info.txt is out of sync with __version__ $version"
+}
+
+$signScript = Join-Path $PSScriptRoot "sign_binaries.ps1"
+$signArgs = @()
+if ($GenerateSelfSigned) { $signArgs += "-GenerateSelfSigned" }
 
 if (-not $SkipChecks) {
     Step "ruff"   { uv run ruff check src tests }
@@ -33,6 +45,10 @@ Step "pyinstaller" { uv run --with pyinstaller pyinstaller build/fps_patcher.spe
 $appDir = Join-Path $root "dist\FPSPatcherStudio"
 $exe = Join-Path $appDir "FPSPatcherStudio.exe"
 if (-not (Test-Path $exe)) { throw "Build output missing: $exe" }
+
+if ($Sign) {
+    Step "sign exe" { powershell -NoProfile -ExecutionPolicy Bypass -File $signScript -Path $exe @signArgs }
+}
 
 # Smoke test: exe must still be running after 6 s (no instant crash)
 Write-Host "== launch smoke test" -ForegroundColor Cyan
@@ -81,12 +97,24 @@ $iscc = @(
 ) | Where-Object { Test-Path $_ } | Select-Object -First 1
 $setup = Join-Path $releaseDir "FPSPatcherStudio-v$version-Setup.exe"
 if ($iscc) {
-    Step "inno setup" { & $iscc "/DAppVersion=$version" "build\installer.iss" | Out-Null }
+    $isccArgs = @("/DAppVersion=$version")
+    if ($Sign) {
+        $cmd = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `$q$signScript`$q $($signArgs -join ' ') -Path `$f"
+        $isccArgs += @("/DSignEnabled", "/Sfpssign=$cmd")
+    }
+    Step "inno setup" { & $iscc @isccArgs "build\installer.iss" | Out-Null }
     $setupHash = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLower()
     "$setupHash  $(Split-Path -Leaf $setup)" | Set-Content -Path "$setup.sha256" -Encoding ASCII
 } else {
     Write-Host "Inno Setup not found: skipping installer (zip only)." -ForegroundColor Yellow
 }
+
+# Combined SHA-256 manifest (sha256sum format) for every shipped artifact
+$manifest = Join-Path $releaseDir "FPSPatcherStudio-v$version.sha256"
+Get-ChildItem $releaseDir -File | Where-Object { $_.Name -like "FPSPatcherStudio-v$version-*" -and $_.Extension -ne ".sha256" } |
+    ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)" } |
+    Set-Content -Path $manifest -Encoding ASCII
+Write-Host "manifest: $manifest"
 
 Write-Host "== DONE" -ForegroundColor Green
 Write-Host "zip:    $zip"

@@ -20,10 +20,12 @@ from ..core.errors import (
     PatchCancelledError,
     PatchError,
 )
+from ..core.ffmpeg_downloader import DOWNLOAD_URL, download_ffmpeg
 from ..core.ffmpeg_locator import FFmpegPaths, locate
 from ..core.models import (
     SUPPORTED_EXTENSIONS,
     Event,
+    FFmpegDownloadEvent,
     LogEvent,
     LogLevel,
     PatchDoneEvent,
@@ -55,6 +57,7 @@ class AppController:
         self.current_patching_path: Path | None = None
         self._cancel = threading.Event()
         self._worker: threading.Thread | None = None
+        self._ff_download: threading.Thread | None = None
 
         mig = getattr(self.settings, "migrated_strategy_from", None)
         if mig:
@@ -95,6 +98,8 @@ class AppController:
                 if event.result:
                     self.current = event.result.after
                 self._worker = None
+            elif isinstance(event, FFmpegDownloadEvent) and event.paths is not None:
+                self.ffmpeg = event.paths
             handler(event)
 
     # ---------- ffmpeg ----------
@@ -108,6 +113,45 @@ class AppController:
             self.ffmpeg = None
             self.emit(LogEvent(str(exc), "ERROR"))
         return self.ffmpeg
+
+    @property
+    def ffmpeg_downloading(self) -> bool:
+        return self._ff_download is not None and self._ff_download.is_alive()
+
+    def start_ffmpeg_download(self) -> None:
+        """Download + install FFmpeg on a background thread; result via FFmpegDownloadEvent."""
+        if self.ffmpeg_downloading:
+            return
+        custom = Path(self.settings.ffmpeg_dir) if self.settings.ffmpeg_dir else None
+
+        def job() -> None:
+            last: tuple[int, str] = (-1, "")
+
+            def on_progress(done: int, total: int, stage: str) -> None:
+                nonlocal last
+                evt = FFmpegDownloadEvent(stage, done, total)
+                if (evt.percent, stage) != last:  # throttle to percent/stage changes
+                    last = (evt.percent, stage)
+                    self.emit(evt)
+
+            self.emit(LogEvent(f"Downloading FFmpeg from {DOWNLOAD_URL}"))
+            try:
+                installed = download_ffmpeg(progress=on_progress)
+                paths = locate(custom)  # re-probe honoring search priority
+            except FPSPatcherError as exc:
+                self.emit(LogEvent(f"FFmpeg download failed: {exc}", "ERROR"))
+                self.emit(FFmpegDownloadEvent("error", error=str(exc)))
+                return
+            except Exception as exc:  # never let the worker die silently
+                log.exception("Unexpected FFmpeg download failure")
+                self.emit(LogEvent(f"FFmpeg download failed: {exc}", "ERROR"))
+                self.emit(FFmpegDownloadEvent("error", error=str(exc)))
+                return
+            self.emit(LogEvent(f"FFmpeg installed: {installed.ffmpeg}", "OK"))
+            self.emit(FFmpegDownloadEvent("done", paths=paths))
+
+        self._ff_download = threading.Thread(target=job, daemon=True)
+        self._ff_download.start()
 
     # ---------- multi-file queue (append, never replace) ----------
     def add_files(self, paths: list[Path], select: bool = True) -> AddResult:

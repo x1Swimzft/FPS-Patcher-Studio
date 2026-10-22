@@ -28,6 +28,8 @@ exe = EXE(  # noqa: F821
     exclude_binaries=True,
     name="FPSPatcherStudio",
     console=False,
+    upx=False,  # UPX-packed binaries trigger AV heuristics
     icon=str(ROOT / "build" / "app.ico"),
+    version=str(ROOT / "build" / "version_info.txt"),
 )
-coll = COLLECT(exe, a.binaries, a.datas, name="FPSPatcherStudio")  # noqa: F821
+coll = COLLECT(exe, a.binaries, a.datas, upx=False, name="FPSPatcherStudio")  # noqa: F821

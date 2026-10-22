@@ -7,7 +7,7 @@
 ## 1. Project Overview & Identity
 - **Repository**: `fps-patcher-studio`
 - **Root Path**: `E:\Project\fps-patcher-studio`
-- **Current Version**: `0.3.0`
+- **Current Version**: `0.3.5`
 - **Python Target**: Python 3.11+
 - **Primary Domain**: High-precision ISO-BMFF (MP4/MOV) container timing patcher. It modifies video timescales, sample duration tables (`stts`), composition offsets (`ctts`), track/movie headers (`mvhd`, `tkhd`, `mdhd`), and edit lists (`edts`/`elst`) losslessly at the binary atom level **without re-encoding video frames**.
 - **User Interface**: CustomTkinter 6.0+ styled with Apple HIG desktop aesthetic, WCAG AA obsidian dark theme, Windows Acrylic/Mica backdrop support, drag-and-drop (`tkinterdnd2`), and localized bilingual support (English & Thai).

@@ -15,12 +15,20 @@ from .ffmpeg_locator import CREATE_NO_WINDOW
 LineCallback = Callable[[str], None]
 
 
+def _checked_exe(path: Path) -> str:
+    """Return the executable path as str, rejecting anything that is not an existing file."""
+    if not path.is_file():
+        raise ProbeError(f"Executable not found: {path}")
+    return str(path)
+
+
 def run_json(ffprobe: Path, args: Sequence[str], timeout: float = 30) -> dict[str, Any]:
     """Run ffprobe with JSON output and return parsed dict."""
-    cmd = [str(ffprobe), "-v", "error", "-print_format", "json", *args]
+    cmd = [_checked_exe(ffprobe), "-v", "error", "-print_format", "json", *args]
     try:
         proc = subprocess.run(
             cmd,
+            shell=False,
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -55,9 +63,10 @@ def run_streaming(
     cancel_event: threading.Event | None = None,
 ) -> int:
     """Run ffmpeg, streaming stdout/stderr lines to callbacks. Returns exit code."""
-    cmd = [str(ffmpeg), *args]
+    cmd = [_checked_exe(ffmpeg), *args]
     proc = subprocess.Popen(
         cmd,
+        shell=False,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
