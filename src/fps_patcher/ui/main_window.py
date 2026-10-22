@@ -22,6 +22,7 @@ from ..app.queue_model import InputQueue
 from ..config import Settings, app_data_dir
 from ..core.models import (
     Event,
+    FFmpegDownloadEvent,
     LogEvent,
     PatchDoneEvent,
     ProbeDoneEvent,
@@ -386,6 +387,7 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
 
         # 1. FFmpeg status pill (click/right-click to pick folder; checking / ready / not found)
         self._ff_state = "checking"
+        self._ff_download_text = ""
         self.ff_badge = ctk.CTkButton(
             right_frame,
             text=t("checking_ffmpeg", lang),
@@ -397,7 +399,7 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
             hover_color=tokens.surface_hover,
             text_color=STATUS_MUTED_TEXT,
             border_width=0,
-            command=self._pick_ffmpeg,
+            command=self._on_ff_badge_click,
         )
         self.ff_badge.pack(side="left", padx=(0, 6))
         self.ff_badge.bind("<Button-3>", self._show_ffmpeg_menu)
@@ -524,11 +526,23 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
         )
         menu.post(event.x_root, event.y_root)
 
+    def _on_ff_badge_click(self) -> None:
+        if self._ff_state == "downloading":
+            return
+        if self._ff_state == "not_found":
+            self.controller.start_ffmpeg_download()
+            return
+        self._pick_ffmpeg()
+
     def _show_ffmpeg_menu(self, event: Any) -> None:
         from tkinter import Menu
 
         lang = self.settings.language
         menu = Menu(self, tearoff=0)
+        menu.add_command(
+            label=t("ffmpeg_download_btn", lang),
+            command=self.controller.start_ffmpeg_download,
+        )
         menu.add_command(
             label=t("ffmpeg_folder_btn", lang),
             command=self._pick_ffmpeg,
@@ -548,10 +562,18 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
             )
         elif self._ff_state == "not_found":
             self.ff_badge.configure(
-                text=t("ffmpeg_not_found", lang),
+                text=f"{t('ffmpeg_not_found', lang)} · {t('ffmpeg_download_btn', lang)}",
                 fg_color=STATUS_DANGER_BG,
                 hover_color=tokens.surface_hover,
                 text_color=STATUS_DANGER_TEXT,
+                font=font_badge(fsize),
+            )
+        elif self._ff_state == "downloading":
+            self.ff_badge.configure(
+                text=self._ff_download_text or t("ffmpeg_downloading", lang, percent=0),
+                fg_color=STATUS_MUTED_BG,
+                hover_color=tokens.surface_hover,
+                text_color=STATUS_MUTED_TEXT,
                 font=font_badge(fsize),
             )
         else:
@@ -699,7 +721,10 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
 
     # ---------- ffmpeg ----------
     def _init_ffmpeg(self) -> None:
+        if self._ff_state == "downloading":
+            return
         self._ff_state = "checking"
+        self._ff_download_text = ""
         self._apply_ff_badge_style(self._theme_mgr.tokens)
         paths = self.controller.init_ffmpeg()
         self._ff_state = "ready" if paths else "not_found"
@@ -932,6 +957,32 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
         elif isinstance(event, QueueChangedEvent):
             self.input_list.render()
             self._sync_info_panel()
+        elif isinstance(event, FFmpegDownloadEvent):
+            if event.stage == "downloading":
+                self._ff_state = "downloading"
+                self._ff_download_text = t(
+                    "ffmpeg_downloading", self.settings.language, percent=event.percent
+                )
+                self._apply_ff_badge_style(self._theme_mgr.tokens)
+            elif event.stage in ("extracting", "verifying"):
+                self._ff_state = "downloading"
+                self._ff_download_text = t("ffmpeg_extracting", self.settings.language)
+                self._apply_ff_badge_style(self._theme_mgr.tokens)
+            elif event.stage == "done":
+                self._ff_state = "ready"
+                self._ff_download_text = ""
+                self._apply_ff_badge_style(self._theme_mgr.tokens)
+                self._refresh_state()
+                self._probe_pending_queue_items()
+                self.console.append(t("ffmpeg_installed", self.settings.language), "OK")
+            elif event.stage == "error":
+                self._ff_state = "not_found"
+                self._ff_download_text = ""
+                self._apply_ff_badge_style(self._theme_mgr.tokens)
+
+            if self._settings_win is not None and self._settings_win.winfo_exists():
+                with contextlib.suppress(Exception):
+                    self._settings_win.tab_ffmpeg.on_download_event(event)
         elif isinstance(event, ProbeDoneEvent):
             self.input_list.render()
             self._sync_info_panel()

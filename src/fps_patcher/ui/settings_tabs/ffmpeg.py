@@ -11,6 +11,7 @@ import customtkinter as ctk
 
 from ...config import Settings
 from ...core.ffmpeg_locator import locate
+from ...core.models import FFmpegDownloadEvent
 from ..theme import (
     MacSwitch,
     attach_focus_ring,
@@ -107,6 +108,52 @@ class FFmpegTab:
         )
         self.ff_test_res.pack(side="left")
 
+        # Auto-download row
+        dl_row = ctk.CTkFrame(self.frame, fg_color="transparent")
+        dl_row.pack(fill="x", pady=(0, 12))
+
+        self.download_btn = ctk.CTkButton(
+            dl_row,
+            text=self._tr("ffmpeg_auto_download_btn"),
+            height=28,
+            font=font_caption(),
+            command=self._start_download,
+            fg_color=tokens.surface_raised,
+            hover_color=tokens.surface_hover,
+            border_width=1,
+            border_color=tokens.border,
+            text_color=tokens.text,
+        )
+        self.download_btn.pack(side="left", padx=(0, 10))
+
+        self.download_progress = ctk.CTkProgressBar(
+            dl_row,
+            height=10,
+            width=150,
+            fg_color=tokens.surface_raised,
+            progress_color=tokens.accent,
+        )
+        self.download_progress.set(0)
+
+        self.download_status = ctk.CTkLabel(
+            dl_row,
+            text="",
+            font=font_caption(),
+            text_color=tokens.muted,
+        )
+        self.download_status.pack(side="left")
+
+        controller = self._get_controller()
+        if controller and getattr(controller, "ffmpeg_downloading", False):
+            self.download_btn.configure(state="disabled")
+            self.download_status.pack_forget()
+            self.download_progress.pack(side="left", padx=(0, 10))
+            self.download_status.pack(side="left")
+            self.download_status.configure(
+                text=self._tr("ffmpeg_downloading", percent=0),
+                text_color=tokens.muted,
+            )
+
         # Switches
         self.check_on_start_switch = MacSwitch(
             self.frame,
@@ -198,6 +245,76 @@ class FFmpegTab:
         else:
             self.ff_test_res.configure(
                 text="✖ Executable not found", text_color=self.dialog._theme_mgr.tokens.danger
+            )
+
+    def _get_controller(self) -> Any:
+        return getattr(self.dialog, "controller", None) or getattr(
+            getattr(self.dialog, "master", None), "controller", None
+        )
+
+    def _start_download(self) -> None:
+        controller = self._get_controller()
+        if controller:
+            self.download_btn.configure(state="disabled")
+            self.download_progress.set(0)
+            if not self.download_progress.winfo_ismapped():
+                self.download_status.pack_forget()
+                self.download_progress.pack(side="left", padx=(0, 10))
+                self.download_status.pack(side="left")
+            self.download_status.configure(
+                text=self._tr("ffmpeg_downloading", percent=0),
+                text_color=self.dialog._theme_mgr.tokens.muted,
+            )
+            controller.start_ffmpeg_download()
+
+    def on_download_event(self, event: FFmpegDownloadEvent) -> None:
+        if not hasattr(self, "download_btn") or not self.frame.winfo_exists():
+            return
+        tokens = self.dialog._theme_mgr.tokens
+        if event.stage == "downloading":
+            self.download_btn.configure(state="disabled")
+            if not self.download_progress.winfo_ismapped():
+                self.download_status.pack_forget()
+                self.download_progress.pack(side="left", padx=(0, 10))
+                self.download_status.pack(side="left")
+            self.download_progress.set(event.percent / 100.0)
+            self.download_status.configure(
+                text=self._tr("ffmpeg_downloading", percent=event.percent),
+                text_color=tokens.muted,
+            )
+        elif event.stage in ("extracting", "verifying"):
+            self.download_btn.configure(state="disabled")
+            self.download_status.configure(
+                text=self._tr("ffmpeg_extracting"),
+                text_color=tokens.muted,
+            )
+        elif event.stage == "done":
+            self.download_progress.set(1.0)
+            self.download_status.configure(
+                text=self._tr("ffmpeg_installed"),
+                text_color=tokens.success,
+            )
+            self.download_btn.configure(state="normal")
+            if event.paths and event.paths.ffmpeg:
+                self.ff_dir_entry.delete(0, "end")
+                self.ff_dir_entry.insert(0, str(event.paths.ffmpeg.parent))
+                first = (
+                    event.paths.version.splitlines()[0]
+                    if event.paths.version
+                    else "FFmpeg OK"
+                )
+                self.ff_test_res.configure(
+                    text=f"✔ {first[:35]}",
+                    text_color=tokens.success,
+                )
+            else:
+                self._autodetect_ffmpeg()
+        elif event.stage == "error":
+            self.download_btn.configure(state="normal")
+            err_msg = event.error or self._tr("ffmpeg_download_failed")
+            self.download_status.configure(
+                text=f"✖ {err_msg}",
+                text_color=tokens.danger,
             )
 
     def harvest(self, draft: Settings) -> None:
