@@ -1,4 +1,4 @@
-# AI Codebase Summary — FPS Patcher Studio (v0.2.3+)
+# AI Codebase Summary — FPS Patcher Studio (v0.4.0)
 
 > **Purpose**: Master architecture, codebase map, state lifecycle, and operational guide for autonomous AI agents and engineers working on **FPS Patcher Studio**.
 
@@ -7,7 +7,7 @@
 ## 1. Project Overview & Identity
 - **Repository**: `fps-patcher-studio`
 - **Root Path**: `E:\Project\fps-patcher-studio`
-- **Current Version**: `0.3.5`
+- **Current Version**: `0.4.0`
 - **Python Target**: Python 3.11+
 - **Primary Domain**: High-precision ISO-BMFF (MP4/MOV) container timing patcher. It modifies video timescales, sample duration tables (`stts`), composition offsets (`ctts`), track/movie headers (`mvhd`, `tkhd`, `mdhd`), and edit lists (`edts`/`elst`) losslessly at the binary atom level **without re-encoding video frames**.
 - **User Interface**: CustomTkinter 6.0+ styled with Apple HIG desktop aesthetic, WCAG AA obsidian dark theme, Windows Acrylic/Mica backdrop support, drag-and-drop (`tkinterdnd2`), and localized bilingual support (English & Thai).
@@ -26,7 +26,7 @@ E:\Project\fps-patcher-studio\
 │   └── FPSPatcherStudio.exe        # Portable binary
 ├── release\                        # Packaged release archives (.zip & .exe installers + sha256)
 ├── src\fps_patcher\                # Source root
-│   ├── __init__.py                 # Version (__version__ = "0.2.3")
+│   ├── __init__.py                 # Version (__version__ = "0.4.0")
 │   ├── __main__.py                 # Entry point: runs logging setup, config load, and MainWindow
 │   ├── config.py                   # User settings persistence (%APPDATA%\FPSPatcherStudio\settings.json)
 │   ├── logging_setup.py            # Central logging initialization with rotating file handler

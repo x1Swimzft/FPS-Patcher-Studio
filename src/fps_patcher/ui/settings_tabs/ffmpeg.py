@@ -143,12 +143,11 @@ class FFmpegTab:
         )
         self.download_status.pack(side="left")
 
+        self._progress_visible = False
         controller = self._get_controller()
         if controller and getattr(controller, "ffmpeg_downloading", False):
             self.download_btn.configure(state="disabled")
-            self.download_status.pack_forget()
-            self.download_progress.pack(side="left", padx=(0, 10))
-            self.download_status.pack(side="left")
+            self._show_progress()
             self.download_status.configure(
                 text=self._tr("ffmpeg_downloading", percent=0),
                 text_color=tokens.muted,
@@ -252,15 +251,19 @@ class FFmpegTab:
             getattr(self.dialog, "master", None), "controller", None
         )
 
+    def _show_progress(self) -> None:
+        if not self._progress_visible:
+            self.download_status.pack_forget()
+            self.download_progress.pack(side="left", padx=(0, 10))
+            self.download_status.pack(side="left")
+            self._progress_visible = True
+
     def _start_download(self) -> None:
         controller = self._get_controller()
         if controller:
             self.download_btn.configure(state="disabled")
             self.download_progress.set(0)
-            if not self.download_progress.winfo_ismapped():
-                self.download_status.pack_forget()
-                self.download_progress.pack(side="left", padx=(0, 10))
-                self.download_status.pack(side="left")
+            self._show_progress()
             self.download_status.configure(
                 text=self._tr("ffmpeg_downloading", percent=0),
                 text_color=self.dialog._theme_mgr.tokens.muted,
@@ -273,10 +276,7 @@ class FFmpegTab:
         tokens = self.dialog._theme_mgr.tokens
         if event.stage == "downloading":
             self.download_btn.configure(state="disabled")
-            if not self.download_progress.winfo_ismapped():
-                self.download_status.pack_forget()
-                self.download_progress.pack(side="left", padx=(0, 10))
-                self.download_status.pack(side="left")
+            self._show_progress()
             self.download_progress.set(event.percent / 100.0)
             self.download_status.configure(
                 text=self._tr("ffmpeg_downloading", percent=event.percent),

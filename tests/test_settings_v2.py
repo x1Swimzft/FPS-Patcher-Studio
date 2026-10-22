@@ -136,6 +136,20 @@ def test_localization_strings() -> None:
     # Fallback to English if key missing in Thai
     assert t("only_in_en_fallback", "th") == "only_in_en_fallback"
 
+    # FFmpeg auto-download strings
+    assert t("ffmpeg_download_btn", "en") == "Download FFmpeg"
+    assert t("ffmpeg_download_btn", "th") == "ดาวน์โหลด FFmpeg"
+    assert t("ffmpeg_auto_download_btn", "en") == "Auto-Download FFmpeg"
+    assert t("ffmpeg_auto_download_btn", "th") == "ดาวน์โหลด FFmpeg อัตโนมัติ"
+    assert t("ffmpeg_downloading", "en", percent=50) == "Downloading FFmpeg (50%)..."
+    assert t("ffmpeg_downloading", "th", percent=50) == "กำลังดาวน์โหลด FFmpeg (50%)..."
+    assert t("ffmpeg_extracting", "en") == "Extracting FFmpeg..."
+    assert t("ffmpeg_extracting", "th") == "กำลังแตกไฟล์ FFmpeg..."
+    assert t("ffmpeg_installed", "en") == "FFmpeg installed successfully"
+    assert t("ffmpeg_installed", "th") == "ติดตั้ง FFmpeg สำเร็จพร้อมใช้งาน"
+    assert t("ffmpeg_download_failed", "en") == "FFmpeg download failed"
+    assert t("ffmpeg_download_failed", "th") == "ดาวน์โหลด FFmpeg ไม่สำเร็จ"
+
 
 def _luminance(hex_color: str) -> float:
     hex_color = hex_color.lstrip("#")

@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-v0.3.5-blue.svg)
+![Version](https://img.shields.io/badge/version-v0.4.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.11+-3776AB.svg?logo=python&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-Windows%2064--bit-0078D6.svg?logo=windows&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
@@ -11,7 +11,7 @@
 **High-precision MP4/MOV container timing patcher with modern macOS HIG aesthetic and Windows DWM Acrylic/Mica backdrop.**  
 *Direct ISO-BMFF atom rewriting • Bit-exact sample preservation • Sub-second processing • X1T Engine*
 
-[📥 Downloads](#-downloads-v035) • [✨ Key Features](#-key-features) • [⚙️ Presets](#️-patching-presets-x1t-engine) • [🔍 Forensic Inspector](#-mp4-forensic-inspector) • [🚀 Getting Started](#-getting-started)
+[📥 Downloads](#-downloads-v040) • [✨ Key Features](#-key-features) • [⚙️ Presets](#️-patching-presets-x1t-engine) • [🔍 Forensic Inspector](#-mp4-forensic-inspector) • [🚀 Getting Started](#-getting-started)
 
 </div>
 
@@ -30,12 +30,12 @@ Unlike traditional video converters or FFmpeg stream copying, FPS Patcher Studio
 
 ---
 
-## 📥 Downloads (v0.3.5)
+## 📥 Downloads (v0.4.0)
 
 | Distribution | File | Architecture | Description |
 |---|---|---|---|
-| **Installer** | [FPSPatcherStudio-v0.3.5-Setup.exe](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases/download/v0.3.5/FPSPatcherStudio-v0.3.5-Setup.exe) | Windows x64 | Standard Inno Setup installer with desktop shortcut & uninstaller |
-| **Portable** | [FPSPatcherStudio-v0.3.5-win64.zip](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases/download/v0.3.5/FPSPatcherStudio-v0.3.5-win64.zip) | Windows x64 | Standalone zip — extract and run `FPSPatcherStudio.exe` |
+| **Installer** | [FPSPatcherStudio-v0.4.0-Setup.exe](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases/download/v0.4.0/FPSPatcherStudio-v0.4.0-Setup.exe) | Windows x64 | Standard Inno Setup installer with desktop shortcut & uninstaller |
+| **Portable** | [FPSPatcherStudio-v0.4.0-win64.zip](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases/download/v0.4.0/FPSPatcherStudio-v0.4.0-win64.zip) | Windows x64 | Standalone zip — extract and run `FPSPatcherStudio.exe` |
 
 ---
 
@@ -94,7 +94,7 @@ Open the **Forensic** window to inspect deep container metadata before and after
 ## 🚀 Getting Started
 
 ### Method 1: Using Prebuilt Binary
-1. Download `FPSPatcherStudio-v0.3.5-Setup.exe` or portable `.zip` from [Releases](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases).
+1. Download `FPSPatcherStudio-v0.4.0-Setup.exe` or portable `.zip` from [Releases](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases).
 2. Launch `FPSPatcherStudio.exe`.
 3. Drag & drop `.mp4` or `.mov` clips into the drop zone.
 4. Select desired Target Preset (default: **X1T For Mobile**) or specify a custom timescale.
@@ -121,7 +121,7 @@ uv run fps-patcher-studio
 
 Run quality gates:
 ```powershell
-# Run unit & integration test suite (187 tests)
+# Run unit & integration test suite (202+ tests)
 uv run pytest -q
 
 # Run static type checking
@@ -137,8 +137,8 @@ To compile PyInstaller one-folder portable package and Inno Setup installer:
 powershell -ExecutionPolicy Bypass -File build\release.ps1
 ```
 Build artifacts will be placed in `release/`:
-- `FPSPatcherStudio-v0.3.5-Setup.exe`
-- `FPSPatcherStudio-v0.3.5-win64.zip`
+- `FPSPatcherStudio-v0.4.0-Setup.exe`
+- `FPSPatcherStudio-v0.4.0-win64.zip`
 
 ---
 

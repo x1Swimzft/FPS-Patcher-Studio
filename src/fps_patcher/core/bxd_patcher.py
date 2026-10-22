@@ -379,7 +379,7 @@ class MethodBXDDirectPatch:
         top_atoms = _parse_atoms(raw_bytes)
 
         if any(a.typ == b"moof" for a in top_atoms):
-            raise PatchError("Fragmented MP4 (moof) not supported by BXD method.")
+            raise PatchError("Fragmented MP4 (moof) not supported by X1T method.")
 
         ftyp = next((a for a in top_atoms if a.typ == b"ftyp"), None)
         moov = next((a for a in top_atoms if a.typ == b"moov"), None)
@@ -1531,7 +1531,7 @@ def repair_for_mobile(
         )
 
     if total_ghost_removed > 0:
-        emit(f"[REPAIR] Removed {total_ghost_removed:,} BXD ghost sample entries from stbl")
+        emit(f"[REPAIR] Removed {total_ghost_removed:,} X1T ghost sample entries from stbl")
     if reconstructed_video_edts:
         emit("[REPAIR] Reconstructed video edts/elst from ctts start composition offset")
     if audio_edts_missing_note:

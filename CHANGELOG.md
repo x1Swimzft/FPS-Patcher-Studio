@@ -2,6 +2,31 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
+## [0.4.0] - 2026-10-22
+
+### Major Features & Unification
+- **X1T Preset Engine & Unified TikTok Bypass**:
+  - Unified the TikTok transcoder bypass mechanism across all presets (`X1T For PC`, `X1T For Mobile`, `X1T Hybrid`, and `X1T Clean`) utilizing indeterminate `mvhd.duration` (`0xFFFFFFFFFFFFFFFF`), ensuring bit-exact lossless passthrough on TikTok ingest while keeping `mdat` 100% byte-identical.
+  - Full rebranding to `X1T` across all UI labels in English and Thai (`X1T For PC`, `X1T For Mobile`, `X1T Hybrid`, `X1T Clean`, `X1T Repair`, toolbar button `Forensic / X1T`), preserving full backward compatibility for saved `settings.json` and queue item overrides.
+  - Automatic QuickTime `.mov` to `.mp4` container normalization (`mp42`/`isom` branding) with output `.mp4` extension to prevent TikTok mobile upload re-compression.
+
+### Built-in FFmpeg & FFprobe Auto-Downloader
+- **One-Click In-App Tooling (`ffmpeg_downloader.py`)**:
+  - Direct download and extraction of official static builds into `%LOCALAPPDATA%\FPSPatcherStudio\bin`.
+  - Comprehensive Zip-Slip path traversal protection validating all extracted member destinations.
+  - Real-time download progress in top toolbar badge and dedicated Settings > FFmpeg tab with live percentage updates and auto-refresh.
+
+### Authenticode Code Signing & Distribution Pipeline
+- **Production Code Signing (`build\sign_binaries.ps1`)**:
+  - Embedded Windows PE Authenticode digital signatures via Microsoft `signtool.exe` with SHA-256 digest and RFC3161 timestamping.
+  - Native Windows resource file (`build\version_info.txt`) embedding `FileVersion` and `ProductVersion` 0.4.0.0 metadata.
+  - Signed portable binaries (`FPSPatcherStudio.exe`) and Inno Setup installer (`FPSPatcherStudio-v0.4.0-Setup.exe`).
+  - Automated release script (`build\release.ps1`) generating per-file and combined SHA-256 manifests.
+
+### Security Hardening & Robustness
+- **Process Security**: Enforced `shell=False` across all subprocess invocations (`ffmpeg_runner.py`, `diagnostic_logger.py`, `prober.py`).
+- **DoS Mitigation**: Added hard cap limits on `stts` sample counts and timescale delta bounds to prevent malicious atom bomb memory exhaustion.
+
 ## [0.3.5] - 2026-10-21
 
 ### Features & Enhancements

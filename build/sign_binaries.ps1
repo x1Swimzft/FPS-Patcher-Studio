@@ -24,6 +24,10 @@ $root = Split-Path -Parent $PSScriptRoot
 function Find-SignTool {
     $cmd = Get-Command signtool.exe -ErrorAction SilentlyContinue
     if ($cmd) { return $cmd.Source }
+    $localApps = "$env:LOCALAPPDATA\Microsoft\WindowsApps\signtool.exe"
+    if (Test-Path $localApps) { return $localApps }
+    $toolsPath = Join-Path $PSScriptRoot "tools\signtool\signtool.exe"
+    if (Test-Path $toolsPath) { return $toolsPath }
     $kits = "${env:ProgramFiles(x86)}\Windows Kits\10\bin"
     if (Test-Path $kits) {
         return Get-ChildItem $kits -Recurse -Filter signtool.exe -ErrorAction SilentlyContinue |
