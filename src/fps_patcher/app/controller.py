@@ -326,6 +326,7 @@ class AppController:
         overwrite: bool | None = None,
         auto_rename: bool | None = None,
         only_selected: bool = True,
+        only_paths: list[Path] | None = None,
     ) -> None:
         if self.busy:
             return
@@ -339,7 +340,14 @@ class AppController:
             )
             return
 
-        if self.items:
+        if only_paths is not None:
+            items = [p for p in only_paths if p.is_file()]
+            if not items:
+                self.emit(LogEvent("Watch folder: no readable files to patch.", "WARN"))
+                return
+            self.items.reset_for_run(items)
+            self.emit(QueueChangedEvent("reset"))
+        elif self.items:
             items = [i.path for i in self.items.snapshot_for_run(only_selected)]
             if not items:
                 msg = (
@@ -409,6 +417,8 @@ class AppController:
                         bxd_max_tail_ms=self.settings.bxd_max_tail_ms,
                         auto_normalize_audio=self.settings.auto_normalize_audio,
                         auto_cap_bitrate=self.settings.auto_cap_bitrate,
+                        fix_color_tag=self.settings.fix_color_tag,
+                        scrub_metadata=self.settings.scrub_metadata,
                     )
 
                     self.emit(LogEvent(f"[{idx}/{total_files}] Starting patch for {src.name}"))

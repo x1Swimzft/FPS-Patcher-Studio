@@ -67,6 +67,8 @@ class PatchRequest:
     bxd_max_tail_ms: int = 50
     auto_normalize_audio: bool = False
     auto_cap_bitrate: bool = False
+    fix_color_tag: bool = False
+    scrub_metadata: bool = False
 
 
 @dataclass(frozen=True)

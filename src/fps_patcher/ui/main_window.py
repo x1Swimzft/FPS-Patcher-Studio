@@ -6,8 +6,10 @@ import contextlib
 import ctypes
 import logging
 import os
+import queue
 import subprocess
 import sys
+import threading
 from pathlib import Path
 from tkinter import filedialog, messagebox
 from typing import Any
@@ -17,8 +19,11 @@ from PIL import Image, ImageTk
 from tkinterdnd2 import TkinterDnD
 
 from .. import APP_NAME, APP_USER_MODEL_ID, __version__
+from ..app import shell_integration
 from ..app.controller import AppController
 from ..app.queue_model import InputQueue
+from ..app.quick_patch import QUICK_PATCH_TIMESCALE
+from ..app.watcher import FolderWatcher
 from ..config import Settings, app_data_dir
 from ..core.models import (
     Event,
@@ -32,6 +37,7 @@ from ..core.models import (
     UpdateAvailableEvent,
     UpdateDownloadEvent,
 )
+from ..core.notify import toast
 from ..core.strategies import strategy_requires_ffmpeg
 from .control_panel import ControlPanel
 from .icons import get_asset_path, get_icon
@@ -76,6 +82,9 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
         self.settings = settings
         self.controller = AppController(settings)
         self._last_output: Path | None = None
+        self._watcher: FolderWatcher | None = None
+        self._watch_inbox: queue.Queue[Path] = queue.Queue()
+        self._watch_batch_active: bool = False
         self._forensic_win: Any = None
         self._settings_win: Any = None
         self._applied_ui_scale: int = 100
@@ -250,6 +259,8 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
         self._update_info: Any = None
         self._configure_debounce_timer: Any = None
         self._init_ffmpeg()
+        self._sync_watcher()
+        self._sync_explorer_menu()
         self.controller.check_for_updates_background(__version__)
         self.after(POLL_MS, self._poll)
 
@@ -849,6 +860,59 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
             bg_color=win_bg,
         )
         self._init_ffmpeg()
+        self._sync_watcher()
+        self._sync_explorer_menu()
+
+    def _sync_watcher(self) -> None:
+        if self._watcher is not None:
+            self._watcher.stop()
+            self._watcher = None
+        if not self.settings.watch_folder_enabled:
+            return
+        folder = Path(self.settings.watch_folder) if self.settings.watch_folder else None
+        if folder is None or not folder.is_dir():
+            self.console.append("Watch folder is not configured or missing.", "WARN")
+            return
+        self._watcher = FolderWatcher(folder, self._watch_inbox.put)
+        self._watcher.start()
+        self.console.append(f"Watching folder: {folder}", "INFO")
+
+    def _sync_explorer_menu(self) -> None:
+        try:
+            if self.settings.explorer_menu:
+                shell_integration.install()
+            else:
+                shell_integration.uninstall()
+        except Exception as exc:
+            self.console.append(f"Explorer context menu update failed: {exc}", "ERROR")
+
+    def _drain_watch_inbox(self) -> None:
+        """Queue completed exports and patch only those paths, never the selection."""
+        if self.controller.busy or self._watch_inbox.empty():
+            return
+        paths: list[Path] = []
+        while True:
+            try:
+                paths.append(self._watch_inbox.get_nowait())
+            except queue.Empty:
+                break
+        if not paths:
+            return
+        self.controller.add_files(paths, select=False)
+        self.input_list.render()
+        self.console.append(f"Watch folder: patching {len(paths)} file(s)", "INFO")
+        self._watch_batch_active = True
+        self.controller.start_patch(
+            QUICK_PATCH_TIMESCALE,
+            self.settings.strategy,
+            only_selected=False,
+            only_paths=paths,
+        )
+        if not self.controller.busy:
+            self._watch_batch_active = False
+
+    def _notify_watch_done(self, message: str) -> None:
+        threading.Thread(target=toast, args=(message,), daemon=True).start()
 
     def _open_forensic(self) -> None:
         from .forensic_window import ForensicWindow
@@ -1090,6 +1154,7 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
     def _poll(self) -> None:
         has_events = False
         try:
+            self._drain_watch_inbox()
             events: list[Event] = []
             self.controller.drain(events.append)
             if events:
@@ -1151,6 +1216,18 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
             elif isinstance(event, PatchDoneEvent):
                 queue_dirty = True
                 info_panel_dirty = True
+                if self._watch_batch_active:
+                    self._watch_batch_active = False
+                    if event.cancelled:
+                        self._notify_watch_done("Watch folder: patch cancelled")
+                    elif event.failed:
+                        self._notify_watch_done(
+                            f"Watch folder: {len(event.failed)} file(s) failed"
+                        )
+                    else:
+                        self._notify_watch_done(
+                            f"Watch folder: {len(event.batch_results)} file(s) patched"
+                        )
                 if event.cancelled:
                     self.controls.set_batch_progress(0, 0, "Cancelled", "Batch cancelled")
                     log_entries.append((f"Operation cancelled: {event.error}", "WARN"))
@@ -1346,6 +1423,9 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
                 self._settings_win.tab_ffmpeg.on_download_event(event)
 
     def _on_close(self) -> None:
+        if self._watcher is not None:
+            self._watcher.stop()
+            self._watcher = None
         if self._focus_debounce_timer is not None:
             with contextlib.suppress(Exception):
                 self.after_cancel(self._focus_debounce_timer)

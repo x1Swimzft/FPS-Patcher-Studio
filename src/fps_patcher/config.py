@@ -140,6 +140,13 @@ class Settings:
     notify_done: str = "none"
     language: str = "en"
 
+    # Phase 2: watch folder, Explorer verb, lossless color/metadata guard
+    watch_folder_enabled: bool = False
+    watch_folder: str = ""
+    explorer_menu: bool = False
+    fix_color_tag: bool = False
+    scrub_metadata: bool = False
+
     # Transient runtime notice (not persisted)
     migrated_strategy_from: str | None = field(default=None, init=False, repr=False, compare=False)
 
@@ -222,6 +229,14 @@ class Settings:
 
         if not self.filename_template:
             self.filename_template = "{name}_{fps}fps"
+
+        self.watch_folder = str(getattr(self, "watch_folder", "") or "").strip()
+        for name in ("watch_folder_enabled", "explorer_menu", "fix_color_tag", "scrub_metadata"):
+            raw = getattr(self, name, False)
+            if raw in (False, None, 0, "", "0", "false", "False"):
+                setattr(self, name, False)
+            else:
+                setattr(self, name, bool(raw))
 
     def save(self, path: Path | None = None, async_write: bool = False) -> None:
         self._clamp()

@@ -11,6 +11,7 @@ from pathlib import Path
 
 from .atom_patcher import patch_video_track_timescale
 from .bxd_patcher import MethodBXDDirectPatch
+from .colr import ColrError, sanitize
 from .errors import FFmpegNotFoundError, OutputFileExistsError, PatchError, VerifyError
 from .ffmpeg_locator import FFmpegPaths
 from .ffmpeg_runner import run_streaming
@@ -247,6 +248,22 @@ def patch(
             code = run_streaming(paths.ffmpeg, args, on_stdout, on_stderr, cancel_event)
             if code != 0:
                 raise PatchError(f"ffmpeg exited with code {code}", list(stderr_tail))
+
+        if req.fix_color_tag or req.scrub_metadata:
+            try:
+                colr = sanitize(
+                    tmp,
+                    fix_color=req.fix_color_tag,
+                    scrub_metadata=req.scrub_metadata,
+                )
+            except ColrError as exc:
+                raise PatchError(f"color/metadata rewrite failed: {exc}") from exc
+            emit(
+                LogEvent(
+                    f"[COLOR] {colr.status}: {colr.reason}",
+                    "WARN" if colr.status == "skipped" else "OK",
+                )
+            )
 
         after = probe(tmp, ffprobe_bin)
         dur_tol: float | None = None

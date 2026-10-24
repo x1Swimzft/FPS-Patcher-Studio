@@ -116,6 +116,15 @@ STRINGS: dict[str, dict[str, str]] = {
         "template_help": "Tokens: {name}, {fps}, {timescale}, {date}",
         "open_when_done": "Open output folder when batch completed",
         "preserve_mtime": "Preserve original file modification timestamps",
+        "watch_folder_section": "Watch Folder & Explorer",
+        "watch_folder_hint": (
+            "Auto-patch finished exports. Own outputs (_ts…, .preflight, .colr) are ignored."
+        ),
+        "watch_folder_enable": "Watch a folder and auto-patch completed exports",
+        "watch_folder_dir": "Watch folder",
+        "explorer_menu_enable": (
+            'Add "Quick Patch with X1T" to the Explorer right-click menu (current user)'
+        ),
         # Patching Tab
         "default_target_preset": "Default Target FPS",
         "default_timescale": "Default Timescale",
@@ -136,6 +145,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "preflight_section": "Smart Pre-Flight",
         "auto_normalize_audio": "Auto-convert audio to AAC 48 kHz stereo before patching",
         "auto_cap_bitrate": "Auto-cap bitrate for mobile (<18 Mbps) when source is over 25 Mbps",
+        "color_metadata_section": "Color & Metadata Guard",
+        "fix_color_tag": "Write a lossless Rec.709 color tag (colr nclx)",
+        "scrub_metadata": "Remove editor metadata (udta/meta) from the output",
         # FFmpeg Tab
         "ffmpeg_dir": "FFmpeg Directory",
         "auto_detect": "Auto-detect",
@@ -352,6 +364,15 @@ STRINGS: dict[str, dict[str, str]] = {
         "template_help": "ตัวแปรที่ใช้ได้: {name}, {fps}, {timescale}, {date}",
         "open_when_done": "เปิดโฟลเดอร์ปลายทางเมื่อเสร็จสิ้นทั้งหมด",
         "preserve_mtime": "คงเวลาแก้ไขไฟล์เดิมไว้ (Preserve Timestamp)",
+        "watch_folder_section": "โฟลเดอร์เฝ้าดูและเมนู Explorer",
+        "watch_folder_hint": (
+            "แพตช์ไฟล์ที่เรนเดอร์เสร็จอัตโนมัติ (ข้ามไฟล์ผลลัพธ์ของโปรแกรม เช่น _ts…, .preflight, .colr)"
+        ),
+        "watch_folder_enable": "เฝ้าโฟลเดอร์และแพตช์ไฟล์ที่เรนเดอร์เสร็จอัตโนมัติ",
+        "watch_folder_dir": "โฟลเดอร์ที่เฝ้าดู",
+        "explorer_menu_enable": (
+            'เพิ่ม "Quick Patch with X1T" ในเมนูคลิกขวาของ Explorer (เฉพาะผู้ใช้ปัจจุบัน)'
+        ),
         # Patching Tab
         "default_target_preset": "FPS เริ่มต้น",
         "default_timescale": "Timescale เริ่มต้น",
@@ -372,6 +393,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "preflight_section": "ตรวจและซ่อมไฟล์อัตโนมัติก่อนแพตช์",
         "auto_normalize_audio": "แปลงเสียงเป็น AAC 48 kHz สเตอริโอให้อัตโนมัติก่อนแพตช์",
         "auto_cap_bitrate": "จำกัด Bitrate สำหรับมือถือ (<18 Mbps) เมื่อไฟล์ต้นฉบับเกิน 25 Mbps",
+        "color_metadata_section": "การป้องกันสีและ Metadata",
+        "fix_color_tag": "ใส่แท็กสี Rec.709 แบบไม่สูญเสียคุณภาพ (colr nclx)",
+        "scrub_metadata": "ลบ Metadata ของโปรแกรมตัดต่อ (udta/meta) ออกจากไฟล์ผลลัพธ์",
         # FFmpeg Tab
         "ffmpeg_dir": "ตำแหน่งโฟลเดอร์ FFmpeg",
         "auto_detect": "ค้นหาอัตโนมัติ",

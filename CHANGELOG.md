@@ -2,6 +2,22 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
+## [0.7.0] - 2026-10-24
+
+### Added: Phase 2 — Watch Folder, Explorer Quick Patch, Color Guard
+- **Watch Folder**: stdlib polling intake (`app/watcher.py`) with settle scans, minimum age, locked-file hold-back, and own-output filtering. Finished exports are patched in the background without touching the manual queue selection.
+- **Explorer Quick Patch**: per-user `HKCU\Software\Classes\SystemFileAssociations\.mp4|.mov\shell\FPSPatcherStudio` verb. Runs `--quick-patch <file>` headlessly (no Tk import) and shows a native Windows toast.
+- **Lossless Rec.709 `colr`**: adds or replaces `colr`/`nclx` (primaries=1, transfer=1, matrix=1) in every video sample entry without re-encoding. HDR/BT.2020 and explicit HDR boxes are left untouched.
+- **Metadata scrubber**: removes `udta`/`meta` boxes from `moov`, including editor history.
+- **Faststart-safe**: when `moov` precedes `mdat`, `stco`/`co64` chunk offsets are shifted by the exact `moov` byte delta. `mdat` payload bytes are copied verbatim; the file is replaced atomically.
+- **Settings**: Output tab gains watch-folder and Explorer-menu controls; Patching tab gains `fix_color_tag` and `scrub_metadata` toggles (EN/TH).
+- **Patch pipeline**: color/metadata guard now runs inside `core.patcher` before verification, so manual, watch-folder, and quick-patch runs all honor it.
+
+### Notes
+- Fragmented MP4 (`moof`/`sidx`) is skipped for color/metadata rewriting rather than guessed at.
+- Untagged HDR is indistinguishable from SDR; the guard only protects explicit HDR signaling.
+- The toast is best-effort and may be suppressed when the AUMID has no Start Menu shortcut.
+
 ## [0.6.4] - 2026-10-24
 
 ### Fixed: 3–5s freeze after closing the preset dropdown

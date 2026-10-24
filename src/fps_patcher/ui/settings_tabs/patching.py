@@ -211,6 +211,33 @@ class PatchingTab:
             self.cap_bitrate_switch.select()
         self.cap_bitrate_switch.pack(anchor="w", pady=2)
 
+        ctk.CTkLabel(
+            self.frame,
+            text=self._tr("color_metadata_section"),
+            font=font_section(),
+            text_color=tokens.text,
+        ).pack(anchor="w", pady=(12, 4))
+
+        self.fix_color_switch = MacSwitch(
+            self.frame,
+            text=self._tr("fix_color_tag"),
+            font=font_caption(),
+            text_color=tokens.text,
+        )
+        if draft.fix_color_tag:
+            self.fix_color_switch.select()
+        self.fix_color_switch.pack(anchor="w", pady=2)
+
+        self.scrub_meta_switch = MacSwitch(
+            self.frame,
+            text=self._tr("scrub_metadata"),
+            font=font_caption(),
+            text_color=tokens.text,
+        )
+        if draft.scrub_metadata:
+            self.scrub_meta_switch.select()
+        self.scrub_meta_switch.pack(anchor="w", pady=2)
+
     def harvest(self, draft: Settings) -> None:
         import contextlib
 
@@ -231,4 +258,6 @@ class PatchingTab:
         draft.stop_on_error = bool(self.stop_err_switch.get())
         draft.auto_normalize_audio = bool(self.norm_audio_switch.get())
         draft.auto_cap_bitrate = bool(self.cap_bitrate_switch.get())
+        draft.fix_color_tag = bool(self.fix_color_switch.get())
+        draft.scrub_metadata = bool(self.scrub_meta_switch.get())
 

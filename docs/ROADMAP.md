@@ -87,6 +87,8 @@ When minimizing, restoring, maximizing, or Alt-Tabbing back to `FPS Patcher Stud
 ---
 
 ### Phase 2: `v0.7.0` — Zero-Click Creator Automation & Color Guard
+**สถานะ**: ✅ ส่งมอบแล้ว — ดูรายละเอียดและข้อควรระวังที่ [`docs/handoff/phase2.md`](handoff/phase2.md)
+
 **เป้าหมาย**: ลดขั้นตอนการลากไฟล์เข้าโปรแกรมให้เหลือ 0 คลิก และแก้ปัญหาสีคลิปดรอป/มืดลงเวลาลง TikTok
 
 - **2.1 Watch Folder Mode (`src/fps_patcher/app/watcher.py`)**:
