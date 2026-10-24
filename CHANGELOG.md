@@ -2,6 +2,12 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
+## [0.6.3] - 2026-10-24
+
+### Fixed: preset pill jittered when clicked rapidly
+- The Target FPS segmented control restarted its 200ms slide on every click, so spam left the pill chasing a moving target; a click landing mid-slide now settles instantly, while a single click still slides
+- Segment text colour now follows the selected value instead of the in-flight position (no more labels flickering between active/inactive while sliding), and is repainted only when the selection changes
+
 ## [0.6.2] - 2026-10-24
 
 ### Fixed: Click stutter still present in 0.6.1

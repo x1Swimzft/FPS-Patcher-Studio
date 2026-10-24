@@ -304,6 +304,37 @@ def test_mac_segmented_control_variable_sync(tk_root: ctk.CTk) -> None:
     seg.destroy()
 
 
+def test_mac_segmented_control_spam_click_snaps_without_jitter(tk_root: ctk.CTk) -> None:
+    from fps_patcher.ui.animation import is_animating
+
+    seg = MacSegmentedControl(
+        tk_root, values=["60", "120", "Custom"], width=300, height=34, reduce_motion=False
+    )
+    seg.pack()
+    tk_root.update()
+
+    seg.set("120")
+    assert is_animating(seg, "mac_seg_thumb") is True
+
+    # A click landing mid-slide must settle instantly instead of restarting the slide
+    seg.set("Custom")
+    assert is_animating(seg, "mac_seg_thumb") is False
+    assert seg._anim_pos == 2.0
+
+    xs = seg._canvas.coords(seg._thumb_tag)[0::2]
+    seg_w = (seg._current_width - 2 * seg._pad_x) / 3
+    expected = seg._apply_widget_scaling(seg._pad_x + 2.5 * seg_w)
+    assert (min(xs) + max(xs)) / 2 == pytest.approx(expected, abs=0.5)
+
+    # Text colour follows the selection, never the in-flight position
+    act = seg._apply_appearance_mode(seg._active_text_color)
+    fills = [seg._canvas.itemcget(tag, "fill") for tag in seg._text_tags]
+    assert fills.index(act) == 2
+    assert fills.count(act) == 1
+
+    seg.destroy()
+
+
 def test_mac_segmented_control_styling_constants() -> None:
     # Verify macOS HIG color specs
     assert DEFAULT_TRACK_COLOR == ("#E5E5EA", "#1C1C1E")

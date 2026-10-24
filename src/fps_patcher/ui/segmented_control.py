@@ -11,7 +11,7 @@ from typing import Any
 
 import customtkinter as ctk
 
-from .animation import animate, cancel_animation
+from .animation import animate, cancel_animation, is_animating
 from .theme import get_theme_manager
 
 # macOS HIG Segmented Control Color Tokens
@@ -120,6 +120,7 @@ class MacSegmentedControl(ctk.CTkFrame):
         self._thumb_tag = f"mac_seg_thumb_{id(self)}"
         self._text_tag_prefix = f"mac_seg_txt_{id(self)}"
         self._text_tags: list[str] = []
+        self._painted_active_idx: int = -1
 
         # Variable synchronization
         self._variable = variable
@@ -255,6 +256,7 @@ class MacSegmentedControl(ctk.CTkFrame):
             for tag in self._text_tags:
                 self._canvas.delete(tag)
             self._text_tags = [f"{self._text_tag_prefix}_{i}" for i in range(n)]
+            self._painted_active_idx = -1
 
         target_idx = (
             self._values.index(self._current_value) if self._current_value in self._values else -1
@@ -267,11 +269,7 @@ class MacSegmentedControl(ctk.CTkFrame):
             scx = self._apply_widget_scaling(cx)
             scy = self._apply_widget_scaling(cy)
 
-            if abs(self._anim_pos - target_idx) < 0.2:
-                is_active = i == target_idx
-            else:
-                is_active = abs(self._anim_pos - i) < 0.5
-            color = act_col if is_active else inact_col
+            color = act_col if i == target_idx else inact_col
 
             items = self._canvas.find_withtag(tag)
             if not items:
@@ -288,6 +286,9 @@ class MacSegmentedControl(ctk.CTkFrame):
                 self._canvas.coords(tag, scx, scy)
                 if not no_color_updates:
                     self._canvas.itemconfig(tag, text=val, fill=color, font=self._font)
+
+        if not no_color_updates:
+            self._painted_active_idx = target_idx
 
         # Ensure correct layer stacking: thumb above background, text above thumb
         self._canvas.tag_raise(self._thumb_tag)
@@ -332,25 +333,25 @@ class MacSegmentedControl(ctk.CTkFrame):
 
         thumb_pts = _round_rect_points(sx1, sy1, sx2, sy2, sr)
         self._canvas.coords(self._thumb_tag, *thumb_pts)
+        self._paint_text_colors()
 
-        # Color updates during sliding
+    def _paint_text_colors(self) -> None:
+        """Colour labels from the selected segment, so sliding never flickers text."""
+        target_idx = (
+            self._values.index(self._current_value) if self._current_value in self._values else -1
+        )
+        if target_idx == self._painted_active_idx:
+            return
+        self._painted_active_idx = target_idx
         is_disabled = self._state == "disabled"
-        act_col = (
-            self._apply_appearance_mode(DISABLED_ACTIVE_TEXT)
-            if is_disabled
-            else self._apply_appearance_mode(self._active_text_color)
+        act_col = self._apply_appearance_mode(
+            DISABLED_ACTIVE_TEXT if is_disabled else self._active_text_color
         )
-        inact_col = (
-            self._apply_appearance_mode(DISABLED_INACTIVE_TEXT)
-            if is_disabled
-            else self._apply_appearance_mode(self._inactive_text_color)
+        inact_col = self._apply_appearance_mode(
+            DISABLED_INACTIVE_TEXT if is_disabled else self._inactive_text_color
         )
-
-        for i in range(min(n, len(self._text_tags))):
-            tag = self._text_tags[i]
-            is_active = abs(self._anim_pos - i) < 0.5
-            color = act_col if is_active else inact_col
-            self._canvas.itemconfig(tag, fill=color)
+        for i, tag in enumerate(self._text_tags):
+            self._canvas.itemconfig(tag, fill=act_col if i == target_idx else inact_col)
 
     def set(
         self,
@@ -373,9 +374,11 @@ class MacSegmentedControl(ctk.CTkFrame):
             finally:
                 self._variable_callback_blocked = False
 
-        # Snap immediately if not mapped or reduce motion is active
+        # Snap when sliding is pointless: reduce motion, hidden control, or a click landing
+        # mid-slide. Restarting the 200ms slide on every click is what made spam jitter.
         is_mapped = bool(self.winfo_ismapped()) if hasattr(self, "winfo_ismapped") else True
-        if self._is_reduce_motion() or not is_mapped:
+        if self._is_reduce_motion() or not is_mapped or is_animating(self, "mac_seg_thumb"):
+            cancel_animation(self, "mac_seg_thumb")
             self._anim_pos = float(target_idx)
             self._redraw_segments()
         else:
