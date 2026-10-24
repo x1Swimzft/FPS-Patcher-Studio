@@ -1,0 +1,63 @@
+name: Security Audit & Quality Gates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit-and-verify:
+    name: Code Quality, Test Suite & Dependency Audit
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python 3.11
+        run: uv python install 3.11
+
+      - name: Sync Dependencies from Lockfile
+        run: uv sync --all-groups --frozen
+
+      - name: Verify Lockfile Integrity
+        run: uv lock --check
+
+      - name: Linter & Code Style (Ruff)
+        run: uv run ruff check src tests tools
+
+      - name: Static Type Checking (Mypy Strict)
+        run: uv run mypy src tests tools
+
+      - name: Automated Test Suite (Pytest)
+        run: uv run pytest -q
+
+      - name: Generate CycloneDX 1.5 SBOM & Audit Report
+        run: uv run python tools/generate_sbom.py
+
+      - name: Dependency Vulnerability Audit (pip-audit)
+        run: |
+          uv export --all-groups --no-emit-project -o requirements-audit.txt
+          uvx pip-audit --progress-spinner off --disable-pip --no-deps -r requirements-audit.txt
+          Remove-Item requirements-audit.txt
+
+      - name: Upload Security & SBOM Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-audit-artifacts
+          path: |
+            release/*.cdx.json
+            docs/DEPENDENCY_AUDIT_REPORT.md
+          if-no-files-found: error

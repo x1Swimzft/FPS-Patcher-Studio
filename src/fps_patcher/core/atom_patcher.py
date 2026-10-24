@@ -253,6 +253,28 @@ def _patch_elst(
         pos += entry_size
 
 
+def _shift_moov_chunk_offsets(data: bytearray, moov: Box, shift: int) -> None:
+    """Shift all stco and co64 chunk offsets in all tracks within moov by shift."""
+    for trak in _find_children(data, moov, b"trak"):
+        for trak_mdia in _find_children(data, trak, b"mdia"):
+            for minf in _find_children(data, trak_mdia, b"minf"):
+                for stbl in _find_children(data, minf, b"stbl"):
+                    for stco in _find_children(data, stbl, b"stco"):
+                        count = struct.unpack_from(">I", data, stco.payload_start + 4)[0]
+                        pos = stco.payload_start + 8
+                        for _ in range(count):
+                            off = struct.unpack_from(">I", data, pos)[0]
+                            struct.pack_into(">I", data, pos, off + shift)
+                            pos += 4
+                    for co64 in _find_children(data, stbl, b"co64"):
+                        count = struct.unpack_from(">I", data, co64.payload_start + 4)[0]
+                        pos = co64.payload_start + 8
+                        for _ in range(count):
+                            off = struct.unpack_from(">Q", data, pos)[0]
+                            struct.pack_into(">Q", data, pos, off + shift)
+                            pos += 8
+
+
 def patch_video_track_timescale(
     src: Path,
     out: Path,
@@ -334,6 +356,17 @@ def patch_video_track_timescale(
         _patch_stts(data, stts, scale)
     for ctts in _find_children(data, stbl, b"ctts"):
         _patch_ctts(data, ctts, scale)
+
+    # Faststart reorganization: place moov before mdat (ftyp -> moov -> mdat)
+    mdat = next((box for box in top if box.typ == b"mdat"), None)
+    if mdat is not None and moov.start > mdat.start:
+        shift = moov.size
+        _shift_moov_chunk_offsets(data, moov, shift)
+        pre_mdat = bytes(data[: mdat.start])
+        moov_bytes = bytes(data[moov.start : moov.end])
+        inter_bytes = bytes(data[mdat.start : moov.start])
+        post_moov = bytes(data[moov.end :])
+        data = bytearray(pre_mdat + moov_bytes + inter_bytes + post_moov)
 
     if cancel_event is not None and cancel_event.is_set():
         raise PatchCancelledError("Patch cancelled by user.")

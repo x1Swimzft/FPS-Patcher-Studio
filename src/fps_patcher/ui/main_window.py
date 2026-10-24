@@ -24,6 +24,7 @@ from ..core.models import (
     Event,
     FFmpegDownloadEvent,
     LogEvent,
+    LogLevel,
     PatchDoneEvent,
     ProbeDoneEvent,
     ProgressEvent,
@@ -932,7 +933,10 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
     # ---------- event loop ----------
     def _poll(self) -> None:
         try:
-            self.controller.drain(self._handle)
+            events: list[Event] = []
+            self.controller.drain(events.append)
+            if events:
+                self._handle_batch(events)
             self._refresh_state()
         except Exception:
             log.exception("Unhandled error in UI poll loop")
@@ -940,142 +944,160 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
             self.after(POLL_MS, self._poll)
 
     def _handle(self, event: Event) -> None:
-        if isinstance(event, LogEvent):
-            self.console.append(event.message, event.level)
-        elif isinstance(event, ProgressEvent):
-            file_name = event.current_file.name if event.current_file else "File"
-            file_pct = int(event.file_fraction * 100)
-            overall_pct = int(event.fraction * 100)
-            file_text = f"[{event.file_index}/{event.total_files}] {file_name}: {file_pct}%"
-            batch_text = f"Batch progress ({event.file_index}/{event.total_files}): {overall_pct}%"
+        self._handle_batch([event])
+
+    def _handle_batch(self, events: list[Event]) -> None:
+        log_entries: list[tuple[str, LogLevel | str]] = []
+        latest_progress: ProgressEvent | None = None
+        queue_dirty = False
+        info_panel_dirty = False
+
+        for event in events:
+            if isinstance(event, LogEvent):
+                log_entries.append((event.message, event.level))
+            elif isinstance(event, ProgressEvent):
+                latest_progress = event
+            elif isinstance(event, QueueChangedEvent):
+                queue_dirty = True
+                info_panel_dirty = True
+            elif isinstance(event, FFmpegDownloadEvent):
+                self._handle_ffmpeg_event(event)
+            elif isinstance(event, ProbeDoneEvent):
+                queue_dirty = True
+                info_panel_dirty = True
+                if self.controller.queue:
+                    self.console.set_context_files(target=self.controller.queue[-1])
+                if event.info:
+                    if event.queue_count > 1:
+                        msg = (
+                            f"Batch queued ({event.queue_count} files). "
+                            f"1st clip: {event.info.fps:.3f} FPS"
+                        )
+                        log_entries.append((msg, "OK"))
+                    else:
+                        log_entries.append((f"Detected {event.info.fps:.3f} FPS", "OK"))
+                elif event.error:
+                    log_entries.append((f"Probe failed: {event.error}", "ERROR"))
+            elif isinstance(event, PatchDoneEvent):
+                queue_dirty = True
+                info_panel_dirty = True
+                if event.cancelled:
+                    self.controls.set_batch_progress(0, 0, "Cancelled", "Batch cancelled")
+                    log_entries.append((f"Operation cancelled: {event.error}", "WARN"))
+                    self._refresh_state()
+                elif event.batch_results:
+                    self._last_output = event.batch_results[-1].output
+                    src_p = self.controller.queue[-1] if self.controller.queue else None
+                    self.console.set_context_files(target=self._last_output, source=src_p)
+                    self.open_btn.configure(state="normal")
+                    done_count = len(event.batch_results)
+                    n_exp = sum(1 for r in event.batch_results if r.experimental)
+                    n_ok = done_count - n_exp
+                    suffix = f" ({n_exp} experimental)" if n_exp else ""
+                    self.controls.set_batch_progress(
+                        1.0,
+                        1.0,
+                        f"Done{suffix}: {done_count}/{event.total_files} files",
+                        f"Completed{suffix}: {done_count}/{event.total_files} files",
+                    )
+                    done_msg = (
+                        f"Batch finished: {done_count}/{event.total_files} files patched{suffix}."
+                    )
+                    log_entries.append((done_msg, "WARN" if n_exp else "OK"))
+                    self._refresh_state()
+                    # Batch summary dialog at end
+                    if event.total_files > 1 or event.failed or n_exp:
+                        summary_msg = t(
+                            "batch_summary_msg",
+                            self.settings.language,
+                            ok=n_ok,
+                            failed=len(event.failed),
+                            total=event.total_files,
+                        )
+                        if n_exp:
+                            summary_msg += "\n" + t(
+                                "batch_summary_experimental",
+                                self.settings.language,
+                                experimental=n_exp,
+                            )
+                        messagebox.showinfo(
+                            t("batch_summary_title", self.settings.language),
+                            summary_msg,
+                            parent=self,
+                        )
+                    if self.settings.open_when_done and self._last_output:
+                        self._open_output()
+                elif event.result:
+                    self._last_output = event.result.output
+                    src_p = self.controller.queue[-1] if self.controller.queue else None
+                    self.console.set_context_files(target=self._last_output, source=src_p)
+                    self.open_btn.configure(state="normal")
+                    self.controls.set_batch_progress(1.0, 1.0, "Done: 100%", "Batch completed")
+                    self._refresh_state()
+                    if self.settings.open_when_done and self._last_output:
+                        self._open_output()
+                else:
+                    self.controls.set_batch_progress(0, 0, "Failed", "Batch failed")
+                    log_entries.append((f"Patch failed: {event.error}", "ERROR"))
+                    for line in event.stderr_tail:
+                        log_entries.append((line, "WARN"))
+                    self._refresh_state()
+
+        if log_entries:
+            self.console.append_batch(log_entries)
+
+        if latest_progress is not None:
+            file_name = (
+                latest_progress.current_file.name if latest_progress.current_file else "File"
+            )
+            file_pct = int(latest_progress.file_fraction * 100)
+            overall_pct = int(latest_progress.fraction * 100)
+            file_text = (
+                f"[{latest_progress.file_index}/{latest_progress.total_files}] "
+                f"{file_name}: {file_pct}%"
+            )
+            batch_text = (
+                f"Batch progress ({latest_progress.file_index}/{latest_progress.total_files}): "
+                f"{overall_pct}%"
+            )
             self.controls.set_batch_progress(
-                event.file_fraction,
-                event.fraction,
+                latest_progress.file_fraction,
+                latest_progress.fraction,
                 file_text,
                 batch_text,
             )
-        elif isinstance(event, QueueChangedEvent):
-            self.input_list.render()
-            self._sync_info_panel()
-        elif isinstance(event, FFmpegDownloadEvent):
-            if event.stage == "downloading":
-                self._ff_state = "downloading"
-                self._ff_download_text = t(
-                    "ffmpeg_downloading", self.settings.language, percent=event.percent
-                )
-                self._apply_ff_badge_style(self._theme_mgr.tokens)
-            elif event.stage in ("extracting", "verifying"):
-                self._ff_state = "downloading"
-                self._ff_download_text = t("ffmpeg_extracting", self.settings.language)
-                self._apply_ff_badge_style(self._theme_mgr.tokens)
-            elif event.stage == "done":
-                self._ff_state = "ready"
-                self._ff_download_text = ""
-                self._apply_ff_badge_style(self._theme_mgr.tokens)
-                self._refresh_state()
-                self._probe_pending_queue_items()
-                self.console.append(t("ffmpeg_installed", self.settings.language), "OK")
-            elif event.stage == "error":
-                self._ff_state = "not_found"
-                self._ff_download_text = ""
-                self._apply_ff_badge_style(self._theme_mgr.tokens)
 
-            if self._settings_win is not None and self._settings_win.winfo_exists():
-                with contextlib.suppress(Exception):
-                    self._settings_win.tab_ffmpeg.on_download_event(event)
-        elif isinstance(event, ProbeDoneEvent):
+        if queue_dirty:
             self.input_list.render()
+        if info_panel_dirty:
             self._sync_info_panel()
-            if self.controller.queue:
-                self.console.set_context_files(target=self.controller.queue[-1])
-            if event.info:
-                if event.queue_count > 1:
-                    msg = (
-                        f"Batch queued ({event.queue_count} files). "
-                        f"1st clip: {event.info.fps:.3f} FPS"
-                    )
-                    self.console.append(msg, "OK")
-                else:
-                    self.console.append(f"Detected {event.info.fps:.3f} FPS", "OK")
-            elif event.error:
-                self.console.append(f"Probe failed: {event.error}", "ERROR")
-        elif isinstance(event, PatchDoneEvent):
-            self.input_list.render()
-            self._sync_info_panel()
-            if event.cancelled:
-                self.controls.set_batch_progress(0, 0, "Cancelled", "Batch cancelled")
-                self.console.append(f"Operation cancelled: {event.error}", "WARN")
-                self._refresh_state()
-            elif event.batch_results:
-                self._last_output = event.batch_results[-1].output
-                src_p = self.controller.queue[-1] if self.controller.queue else None
-                self.console.set_context_files(target=self._last_output, source=src_p)
-                self.open_btn.configure(state="normal")
-                done_count = len(event.batch_results)
-                n_exp = sum(1 for r in event.batch_results if r.experimental)
-                n_ok = done_count - n_exp
-                suffix = f" ({n_exp} experimental)" if n_exp else ""
-                self.controls.set_batch_progress(
-                    1.0,
-                    1.0,
-                    f"Done{suffix}: {done_count}/{event.total_files} files",
-                    f"Completed{suffix}: {done_count}/{event.total_files} files",
-                )
-                self.console.append(
-                    f"Batch finished: {done_count}/{event.total_files} files patched{suffix}.",
-                    "WARN" if n_exp else "OK",
-                )
-                self._refresh_state()
-                # F7: Batch summary dialog at end
-                if event.total_files > 1 or event.failed or n_exp:
-                    summary_msg = t(
-                        "batch_summary_msg",
-                        self.settings.language,
-                        ok=n_ok,
-                        failed=len(event.failed),
-                        total=event.total_files,
-                    )
-                    if n_exp:
-                        summary_msg += "\n" + t(
-                            "batch_summary_experimental",
-                            self.settings.language,
-                            experimental=n_exp,
-                        )
-                    messagebox.showinfo(
-                        t("batch_summary_title", self.settings.language),
-                        summary_msg,
-                        parent=self,
-                    )
-                if self.settings.open_when_done and self._last_output:
-                    self._open_output()
-            elif event.result:
-                self._last_output = event.result.output
-                src_p = self.controller.queue[-1] if self.controller.queue else None
-                self.console.set_context_files(target=self._last_output, source=src_p)
-                self.open_btn.configure(state="normal")
-                self.controls.set_batch_progress(1.0, 1.0, "Done: 100%", "Batch completed")
-                self._refresh_state()
-                if self.settings.open_when_done and self._last_output:
-                    self._open_output()
-            else:
-                self.controls.set_batch_progress(0, 0, "Failed", "Batch failed")
-                self.console.append(f"Patch failed: {event.error}", "ERROR")
-                for line in event.stderr_tail:
-                    self.console.append(line, "WARN")
-                self._refresh_state()
-                if event.total_files > 1 or event.failed:
-                    summary_msg = t(
-                        "batch_summary_msg",
-                        self.settings.language,
-                        ok=len(event.batch_results),
-                        failed=len(event.failed),
-                        total=event.total_files,
-                    )
-                    messagebox.showerror(
-                        t("batch_summary_title", self.settings.language),
-                        summary_msg,
-                        parent=self,
-                    )
+
+    def _handle_ffmpeg_event(self, event: FFmpegDownloadEvent) -> None:
+        if event.stage == "downloading":
+            self._ff_state = "downloading"
+            self._ff_download_text = t(
+                "ffmpeg_downloading", self.settings.language, percent=event.percent
+            )
+            self._apply_ff_badge_style(self._theme_mgr.tokens)
+        elif event.stage in ("extracting", "verifying"):
+            self._ff_state = "downloading"
+            self._ff_download_text = t("ffmpeg_extracting", self.settings.language)
+            self._apply_ff_badge_style(self._theme_mgr.tokens)
+        elif event.stage == "done":
+            self._ff_state = "ready"
+            self._ff_download_text = ""
+            self._apply_ff_badge_style(self._theme_mgr.tokens)
+            self._refresh_state()
+            self._probe_pending_queue_items()
+            self.console.append(t("ffmpeg_installed", self.settings.language), "OK")
+        elif event.stage == "error":
+            self._ff_state = "not_found"
+            self._ff_download_text = ""
+            self._apply_ff_badge_style(self._theme_mgr.tokens)
+
+        if self._settings_win is not None and self._settings_win.winfo_exists():
+            with contextlib.suppress(Exception):
+                self._settings_win.tab_ffmpeg.on_download_event(event)
 
     def _on_close(self) -> None:
         if self._focus_debounce_timer is not None:

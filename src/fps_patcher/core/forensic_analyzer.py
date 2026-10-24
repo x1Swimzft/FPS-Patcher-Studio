@@ -795,12 +795,22 @@ def compare_mp4_files(orig_path: Path, patched_path: Path) -> ForensicDiffResult
     orig_report = orig_analyzer.parse()
     patch_report = patch_analyzer.parse()
 
-    # 1. Byte diff comparison
+    # 1. Byte diff comparison (block-accelerated)
     byte_diffs: list[ByteDiffSpan] = []
     min_len = min(len(orig_bytes), len(patch_bytes))
     idx = 0
+    BLOCK_SZ = 65536
 
     while idx < min_len:
+        while (
+            idx + BLOCK_SZ <= min_len
+            and orig_bytes[idx : idx + BLOCK_SZ] == patch_bytes[idx : idx + BLOCK_SZ]
+        ):
+            idx += BLOCK_SZ
+
+        if idx >= min_len:
+            break
+
         if orig_bytes[idx] != patch_bytes[idx]:
             start_diff = idx
             while idx < min_len and orig_bytes[idx] != patch_bytes[idx]:

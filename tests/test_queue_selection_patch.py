@@ -204,8 +204,10 @@ def test_strings_clear_all() -> None:
 
 
 def test_clear_all_button_ui_and_state(tmp_path: Path) -> None:
+    import tkinter as tk
     from unittest.mock import PropertyMock, patch
 
+    from fps_patcher.ui.icons import clear_icon_cache
     from fps_patcher.ui.input_list import (
         MAC_ACCENT_BLUE,
         MAC_UNFOCUSED_BORDER,
@@ -215,6 +217,9 @@ def test_clear_all_button_ui_and_state(tmp_path: Path) -> None:
     )
     from fps_patcher.ui.main_window import MainWindow
 
+    old_root = getattr(tk, "_default_root", None)
+    tk._default_root = None  # type: ignore[attr-defined]
+    clear_icon_cache()
     with patch("fps_patcher.ui.main_window.app_data_dir", return_value=tmp_path):
         w = MainWindow(Settings(output_dir=str(tmp_path)))
         w.withdraw()
@@ -315,6 +320,8 @@ def test_clear_all_button_ui_and_state(tmp_path: Path) -> None:
             assert w.input_list.preview_name_lbl.cget("text") == "—"
         finally:
             w.destroy()
+            clear_icon_cache()
+            tk._default_root = old_root  # type: ignore[attr-defined]
 
 
 

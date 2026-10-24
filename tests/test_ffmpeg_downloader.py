@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import io
 import threading
 import zipfile
@@ -261,6 +262,29 @@ def test_download_ffmpeg_truncated(
     assert not (dest_dir / ".staging").exists()
 
 
+def test_download_ffmpeg_sha256_verification_success(
+    tmp_path: Path, mock_urlopen: bytes
+) -> None:
+    dest_dir = tmp_path / "bin"
+    expected = hashlib.sha256(mock_urlopen).hexdigest()
+    paths = download_ffmpeg(dest_dir=dest_dir, expected_sha256=expected)
+    assert paths.ffmpeg.exists()
+    assert paths.ffprobe.exists()
+
+
+def test_download_ffmpeg_sha256_mismatch(
+    tmp_path: Path, mock_urlopen: bytes
+) -> None:
+    dest_dir = tmp_path / "bin"
+    wrong_hash = "0" * 64
+    with pytest.raises(FFmpegDownloadError, match="Archive SHA-256 mismatch"):
+        download_ffmpeg(dest_dir=dest_dir, expected_sha256=wrong_hash)
+    assert not (dest_dir / "ffmpeg.exe").exists()
+    assert not (dest_dir / "ffprobe.exe").exists()
+    assert not (dest_dir / ".ffmpeg-download.zip").exists()
+    assert not (dest_dir / ".staging").exists()
+
+
 def test_ffmpeg_download_event_percent() -> None:
     assert FFmpegDownloadEvent("downloading", downloaded=0, total=0).percent == 0
     assert FFmpegDownloadEvent("downloading", downloaded=10, total=-5).percent == 0
@@ -393,7 +417,7 @@ def test_controller_ffmpeg_download_error(
     assert ctrl.ffmpeg is None
 
 
-def test_ffmpeg_tab_ui_download_event_lifecycle() -> None:
+def test_ffmpeg_tab_ui_download_event_lifecycle(tk_root: object) -> None:
     from unittest.mock import MagicMock
 
     import customtkinter as ctk
@@ -401,8 +425,7 @@ def test_ffmpeg_tab_ui_download_event_lifecycle() -> None:
     from fps_patcher.ui.settings_tabs.ffmpeg import FFmpegTab
     from fps_patcher.ui.theme import get_theme_manager
 
-    root = ctk.CTk()
-    root.withdraw()
+    parent = ctk.CTkFrame(tk_root)
     try:
         dialog = MagicMock()
         ctrl = MagicMock()
@@ -412,7 +435,6 @@ def test_ffmpeg_tab_ui_download_event_lifecycle() -> None:
         dialog._theme_mgr = get_theme_manager(dialog._draft)
         dialog._tr = lambda key, **kwargs: f"{key}_{kwargs}" if kwargs else key
 
-        parent = ctk.CTkFrame(root)
         tab = FFmpegTab(parent, dialog)
 
         # 1. Initial state: progress bar not mapped, button normal
@@ -460,7 +482,7 @@ def test_ffmpeg_tab_ui_download_event_lifecycle() -> None:
         assert tab.download_btn.cget("state") == "normal"
         assert "Network error" in tab.download_status.cget("text")
     finally:
-        root.destroy()
+        parent.destroy()
 
 
 def test_main_window_ffmpeg_badge_click_and_events(monkeypatch: pytest.MonkeyPatch) -> None:

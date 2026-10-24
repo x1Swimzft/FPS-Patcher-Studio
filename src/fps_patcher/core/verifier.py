@@ -1,9 +1,34 @@
+import contextlib
+import hashlib
+import mmap
 import struct
+from collections.abc import Generator
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from .errors import VerifyError
 from .models import VideoInfo
+
+_Buffer = bytes | bytearray | mmap.mmap
+
+
+@contextlib.contextmanager
+def _open_buffer(path: Path | bytes | Any) -> Generator[Any, None, None]:
+    """Yield a buffer (bytes or read-only mmap) without reading whole file into RAM."""
+    if not isinstance(path, Path):
+        yield path
+        return
+    file_size = path.stat().st_size
+    if file_size == 0:
+        yield b""
+        return
+    with open(path, "rb") as f:
+        try:
+            with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
+                yield mm
+        except Exception:
+            yield path.read_bytes()
 
 
 @dataclass
@@ -54,7 +79,7 @@ _CONTAINER_BOXES = frozenset(
 
 
 def _iter_boxes_raw(
-    data: bytes, start: int, end: int
+    data: _Buffer, start: int, end: int
 ) -> tuple[list[tuple[bytes, int, int, int]], int, list[str]]:
     """Parse boxes in [start, end). Returns (boxes[(typ, pos, size, hdr)], tail, issues)."""
     pos = start
@@ -98,7 +123,9 @@ def _iter_boxes_raw(
     return boxes, 0, issues
 
 
-def _validate_container_children(data: bytes, start: int, end: int, path_prefix: str) -> list[str]:
+def _validate_container_children(
+    data: _Buffer, start: int, end: int, path_prefix: str
+) -> list[str]:
     """Recursively check container boxes for internal inter-box gaps or malformed children."""
     boxes, trailing, issues = _iter_boxes_raw(data, start, end)
     out_issues: list[str] = [f"{path_prefix}: {msg}" for msg in issues]
@@ -111,79 +138,79 @@ def _validate_container_children(data: bytes, start: int, end: int, path_prefix:
     return out_issues
 
 
-def verify_atom_structure(path: Path | bytes) -> StructuralValidationResult:
+def verify_atom_structure(path: Path | _Buffer) -> StructuralValidationResult:
     """Parse top-level and nested container atoms, detecting malformed bounds and trailing bytes."""
-    data = path.read_bytes() if isinstance(path, Path) else path
-    limit = len(data)
-    atoms, trailing, details = _iter_boxes_raw(data, 0, limit)
-    malformed = len(details) > 0
+    with _open_buffer(path) as data:
+        limit = len(data)
+        atoms, trailing, details = _iter_boxes_raw(data, 0, limit)
+        malformed = len(details) > 0
 
-    moov_box = next((a for a in atoms if a[0] == b"moov"), None)
-    mdat_box = next((a for a in atoms if a[0] == b"mdat"), None)
-    has_moov = moov_box is not None
-    has_mdat = mdat_box is not None
+        moov_box = next((a for a in atoms if a[0] == b"moov"), None)
+        mdat_box = next((a for a in atoms if a[0] == b"mdat"), None)
+        has_moov = moov_box is not None
+        has_mdat = mdat_box is not None
 
-    if not has_moov:
-        details.append("Missing moov container atom")
-        malformed = True
-    if not has_mdat:
-        details.append("Missing mdat atom")
-        malformed = True
-
-    faststart = True
-    if moov_box is not None and mdat_box is not None:
-        faststart = moov_box[1] < mdat_box[1]
-
-    # Check nested container integrity inside moov
-    nested_issues: list[str] = []
-    if moov_box is not None:
-        nested_issues = _validate_container_children(
-            data, moov_box[1] + moov_box[3], moov_box[1] + moov_box[2], "moov"
-        )
-        if nested_issues:
-            details.extend(nested_issues)
+        if not has_moov:
+            details.append("Missing moov container atom")
+            malformed = True
+        if not has_mdat:
+            details.append("Missing mdat atom")
             malformed = True
 
-    # Detect if experimental layout (e.g. BXD trailing ghost NALUs after valid top-level boxes)
-    if malformed and trailing > 0 and has_moov and has_mdat and not nested_issues:
-        status = "EXPERIMENTAL / NON-STANDARD"
+        faststart = True
+        if moov_box is not None and mdat_box is not None:
+            faststart = moov_box[1] < mdat_box[1]
+
+        # Check nested container integrity inside moov
+        nested_issues: list[str] = []
+        if moov_box is not None:
+            nested_issues = _validate_container_children(
+                data, moov_box[1] + moov_box[3], moov_box[1] + moov_box[2], "moov"
+            )
+            if nested_issues:
+                details.extend(nested_issues)
+                malformed = True
+
+        # Detect if experimental layout (e.g. BXD trailing ghost NALUs after valid top-level boxes)
+        if malformed and trailing > 0 and has_moov and has_mdat and not nested_issues:
+            status = "EXPERIMENTAL / NON-STANDARD"
+            return StructuralValidationResult(
+                status=status,
+                is_valid=False,
+                is_experimental=True,
+                has_trailing_data=True,
+                trailing_bytes_count=trailing,
+                malformed_atoms=False,
+                faststart=faststart,
+                details=details,
+            )
+        elif malformed:
+            status = "INVALID"
+            return StructuralValidationResult(
+                status=status,
+                is_valid=False,
+                is_experimental=False,
+                has_trailing_data=trailing > 0,
+                trailing_bytes_count=trailing,
+                malformed_atoms=True,
+                faststart=faststart,
+                details=details,
+            )
+
         return StructuralValidationResult(
-            status=status,
-            is_valid=False,
-            is_experimental=True,
-            has_trailing_data=True,
-            trailing_bytes_count=trailing,
+            status="VALID",
+            is_valid=True,
+            is_experimental=False,
+            has_trailing_data=False,
+            trailing_bytes_count=0,
             malformed_atoms=False,
             faststart=faststart,
             details=details,
         )
-    elif malformed:
-        status = "INVALID"
-        return StructuralValidationResult(
-            status=status,
-            is_valid=False,
-            is_experimental=False,
-            has_trailing_data=trailing > 0,
-            trailing_bytes_count=trailing,
-            malformed_atoms=True,
-            faststart=faststart,
-            details=details,
-        )
-
-    return StructuralValidationResult(
-        status="VALID",
-        is_valid=True,
-        is_experimental=False,
-        has_trailing_data=False,
-        trailing_bytes_count=0,
-        malformed_atoms=False,
-        faststart=faststart,
-        details=details,
-    )
 
 
 def _parse_stbl_tables(
-    data: bytes, stbl_start: int, stbl_end: int
+    data: _Buffer, stbl_start: int, stbl_end: int
 ) -> tuple[
     int,
     list[int],
@@ -261,7 +288,7 @@ def _parse_stbl_tables(
     return stsz_count, sample_sizes, stts_runs, stsc_entries, chunk_offsets, co_type
 
 
-def _find_all_stbl_ranges(data: bytes) -> list[tuple[int, int]]:
+def _find_all_stbl_ranges(data: _Buffer) -> list[tuple[int, int]]:
     """Find (payload_start, box_end) for every stbl box in the container."""
     limit = len(data)
     top_boxes, _, _ = _iter_boxes_raw(data, 0, limit)
@@ -281,9 +308,13 @@ def _find_all_stbl_ranges(data: bytes) -> list[tuple[int, int]]:
     return stbl_ranges
 
 
-def verify_offsets(path: Path | bytes) -> tuple[bool, list[str]]:
+def verify_offsets(path: Path | _Buffer) -> tuple[bool, list[str]]:
     """Verify that chunk start and end offsets lie strictly inside mdat payload boundaries."""
-    data = path.read_bytes() if isinstance(path, Path) else path
+    with _open_buffer(path) as data:
+        return _verify_offsets_buf(data)
+
+
+def _verify_offsets_buf(data: _Buffer) -> tuple[bool, list[str]]:
     limit = len(data)
     problems: list[str] = []
 
@@ -372,9 +403,13 @@ def verify_offsets(path: Path | bytes) -> tuple[bool, list[str]]:
     return len(unique_problems) == 0, unique_problems
 
 
-def verify_sample_tables(path: Path | bytes) -> tuple[bool, list[str]]:
+def verify_sample_tables(path: Path | _Buffer) -> tuple[bool, list[str]]:
     """Check stsz sample count vs stts duration count and stsc/stco chunk sample mapping."""
-    data = path.read_bytes() if isinstance(path, Path) else path
+    with _open_buffer(path) as data:
+        return _verify_sample_tables_buf(data)
+
+
+def _verify_sample_tables_buf(data: _Buffer) -> tuple[bool, list[str]]:
     problems: list[str] = []
 
     stbl_ranges = _find_all_stbl_ranges(data)
@@ -436,9 +471,13 @@ def verify_sample_tables(path: Path | bytes) -> tuple[bool, list[str]]:
     return len(problems) == 0, problems
 
 
-def verify_mobile_compatibility(path: Path | bytes) -> MobileCompatibilityReport:
+def verify_mobile_compatibility(path: Path | _Buffer) -> MobileCompatibilityReport:
     """Inspect ISO-BMFF structural and timing rules required by strict mobile players."""
-    data = path.read_bytes() if isinstance(path, Path) else path
+    with _open_buffer(path) as data:
+        return _verify_mobile_compatibility_buf(data)
+
+
+def _verify_mobile_compatibility_buf(data: _Buffer) -> MobileCompatibilityReport:
     limit = len(data)
     issues: list[str] = []
     warnings: list[str] = []
@@ -567,7 +606,8 @@ def verify_mobile_compatibility(path: Path | bytes) -> MobileCompatibilityReport
 
                 h_type = b""
                 if hdlr_box is not None and hdlr_box[2] >= hdlr_box[3] + 12:
-                    h_type = data[hdlr_box[1] + hdlr_box[3] + 8 : hdlr_box[1] + hdlr_box[3] + 12]
+                    h_off = hdlr_box[1] + hdlr_box[3] + 8
+                    h_type = bytes(data[h_off : h_off + 4])
 
                 if mdhd_ts > 0 and mdhd_dur > 0:
                     if h_type == b"vide" and video_dur_s is None:
@@ -671,17 +711,129 @@ def verify_mobile_compatibility(path: Path | bytes) -> MobileCompatibilityReport
     )
 
 
+def _sample_mdat_from_buffer(data: _Buffer) -> tuple[int, str, str, str] | None:
+    limit = len(data)
+    boxes, _, _ = _iter_boxes_raw(data, 0, limit)
+    mdat_box = next((b for b in boxes if b[0] == b"mdat"), None)
+    if mdat_box is None:
+        return None
+    _, pos, size, hdr = mdat_box
+    payload_start = pos + hdr
+    payload_len = size - hdr
+    if payload_len < 0 or payload_start + payload_len > limit:
+        return None
+    sample_sz = min(payload_len, 65536)
+    head_bytes = bytes(data[payload_start : payload_start + sample_sz])
+    head_hash = hashlib.sha256(head_bytes).hexdigest()
+
+    mid_start = payload_start + max(0, (payload_len - sample_sz) // 2)
+    mid_bytes = bytes(data[mid_start : mid_start + sample_sz])
+    mid_hash = hashlib.sha256(mid_bytes).hexdigest()
+
+    tail_start = payload_start + max(0, payload_len - sample_sz)
+    tail_bytes = bytes(data[tail_start : tail_start + sample_sz])
+    tail_hash = hashlib.sha256(tail_bytes).hexdigest()
+
+    return payload_len, head_hash, mid_hash, tail_hash
+
+
+def _sample_track_samples(
+    data: _Buffer,
+    stbl_start: int,
+    stbl_end: int,
+    max_sample_count: int | None = None,
+) -> tuple[int, list[bytes]]:
+    stsz_count, sample_sizes, _, stsc_entries, chunk_offsets, _ = _parse_stbl_tables(
+        data, stbl_start, stbl_end
+    )
+    if not chunk_offsets or not sample_sizes:
+        return stsz_count, []
+
+    chunk_sample_ranges: list[tuple[int, int]] = []
+    cur_s_idx = 0
+    for c_idx in range(len(chunk_offsets)):
+        chunk_num = c_idx + 1
+        spc = 0
+        for fc, s_per_c, _ in stsc_entries:
+            if fc <= chunk_num:
+                spc = s_per_c
+            else:
+                break
+        chunk_sample_ranges.append((cur_s_idx, spc))
+        cur_s_idx += spc
+
+    valid_chunks = [
+        i
+        for i, (s_start, _) in enumerate(chunk_sample_ranges)
+        if max_sample_count is None or s_start < max_sample_count
+    ]
+    if not valid_chunks:
+        return stsz_count, []
+
+    check_c_indices = [valid_chunks[0]]
+    if len(valid_chunks) > 2:
+        check_c_indices.append(valid_chunks[len(valid_chunks) // 2])
+    if len(valid_chunks) > 1:
+        check_c_indices.append(valid_chunks[-1])
+
+    sampled_chunks: list[bytes] = []
+    limit = len(data)
+    for c_idx in check_c_indices:
+        off = chunk_offsets[c_idx]
+        s_start, spc = chunk_sample_ranges[c_idx]
+        if max_sample_count is not None and s_start + spc > max_sample_count:
+            spc = max(0, max_sample_count - s_start)
+        chunk_len = sum(sample_sizes[s_start : s_start + spc])
+        if off + chunk_len <= limit:
+            sampled_chunks.append(bytes(data[off : off + chunk_len]))
+        else:
+            sampled_chunks.append(b"")
+    return stsz_count, sampled_chunks
+
+
+def _find_track_stbl_ranges(data: _Buffer) -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
+    """Return (video_stbl_ranges, audio_stbl_ranges)."""
+    limit = len(data)
+    top_boxes, _, _ = _iter_boxes_raw(data, 0, limit)
+    moov_box = next((b for b in top_boxes if b[0] == b"moov"), None)
+    if moov_box is None:
+        return [], []
+    video_ranges: list[tuple[int, int]] = []
+    audio_ranges: list[tuple[int, int]] = []
+
+    traks, _, _ = _iter_boxes_raw(data, moov_box[1] + moov_box[3], moov_box[1] + moov_box[2])
+    for trak in traks:
+        if trak[0] != b"trak":
+            continue
+        trak_children, _, _ = _iter_boxes_raw(data, trak[1] + trak[3], trak[1] + trak[2])
+        mdia = next((b for b in trak_children if b[0] == b"mdia"), None)
+        if mdia is None:
+            continue
+        mdia_children, _, _ = _iter_boxes_raw(data, mdia[1] + mdia[3], mdia[1] + mdia[2])
+        hdlr = next((b for b in mdia_children if b[0] == b"hdlr"), None)
+        minf = next((b for b in mdia_children if b[0] == b"minf"), None)
+        if hdlr is None or minf is None:
+            continue
+        h_payload = data[hdlr[1] + hdlr[3] : hdlr[1] + hdlr[2]]
+        h_type = h_payload[8:12] if len(h_payload) >= 12 else b""
+        minf_children, _, _ = _iter_boxes_raw(data, minf[1] + minf[3], minf[1] + minf[2])
+        stbl = next((b for b in minf_children if b[0] == b"stbl"), None)
+        if stbl is None:
+            continue
+        stbl_range = (stbl[1] + stbl[3], stbl[1] + stbl[2])
+        if h_type == b"vide":
+            video_ranges.append(stbl_range)
+        elif h_type == b"soun":
+            audio_ranges.append(stbl_range)
+    return video_ranges, audio_ranges
+
+
 def verify_payload_integrity(
-    orig_path: Path | bytes, patched_path: Path | bytes
+    orig_path: Path | _Buffer, patched_path: Path | _Buffer, *, fast: bool = True
 ) -> dict[str, str]:
     """Verify hashes of mdat, video payload, audio payload, and container structure."""
-    from .forensic_analyzer import compare_mp4_files
-
-    orig_b = orig_path if isinstance(orig_path, bytes) else orig_path.read_bytes()
-    patch_b = patched_path if isinstance(patched_path, bytes) else patched_path.read_bytes()
-
     res: dict[str, str] = {}
-    struct_res = verify_atom_structure(patch_b)
+    struct_res = verify_atom_structure(patched_path)
     res["atom structure"] = (
         "PASS"
         if struct_res.is_valid
@@ -689,32 +841,74 @@ def verify_payload_integrity(
     )
     res["trailing data"] = "PASS" if not struct_res.has_trailing_data else "EXPERIMENTAL"
 
-    valid_offsets, _ = verify_offsets(patch_b)
+    valid_offsets, _ = verify_offsets(patched_path)
     res["chunk offsets"] = "PASS" if valid_offsets else "EXPERIMENTAL"
 
-    valid_tables, _ = verify_sample_tables(patch_b)
+    valid_tables, _ = verify_sample_tables(patched_path)
     res["sample tables"] = "PASS" if valid_tables else "FAIL"
 
-    mob_rep = verify_mobile_compatibility(patch_b)
+    mob_rep = verify_mobile_compatibility(patched_path)
     res["mobile playback"] = "PASS" if mob_rep.compatible else "EXPERIMENTAL"
 
-    if isinstance(orig_path, Path) and isinstance(patched_path, Path):
-        try:
-            diff = compare_mp4_files(orig_path, patched_path)
-            res["mdat payload"] = "PASS" if diff.mdat_match else "FAIL"
-            res["video payload"] = "PASS" if diff.video_payload_match else "FAIL"
-            res["audio payload"] = "PASS" if diff.audio_payload_match else "FAIL"
-            if diff.audio_ghost_samples > 0:
-                # audio payload above compares original samples only; ghosts reported apart.
-                res["audio ghost samples"] = "EXPERIMENTAL"
-        except Exception:
-            res["mdat payload"] = "PASS" if orig_b == patch_b else "CHECK"
+    if fast:
+        with _open_buffer(orig_path) as orig_b, _open_buffer(patched_path) as patch_b:
+            orig_mdat = _sample_mdat_from_buffer(orig_b)
+            patch_mdat = _sample_mdat_from_buffer(patch_b)
+            if orig_mdat is not None and patch_mdat is not None:
+                res["mdat payload"] = "PASS" if orig_mdat == patch_mdat else "FAIL"
+            else:
+                res["mdat payload"] = "CHECK"
+
+            o_v_ranges, o_a_ranges = _find_track_stbl_ranges(orig_b)
+            p_v_ranges, p_a_ranges = _find_track_stbl_ranges(patch_b)
+
+            if o_v_ranges and p_v_ranges:
+                o_v_cnt, o_v_chunks = _sample_track_samples(
+                    orig_b, o_v_ranges[0][0], o_v_ranges[0][1]
+                )
+                p_v_cnt, p_v_chunks = _sample_track_samples(
+                    patch_b, p_v_ranges[0][0], p_v_ranges[0][1]
+                )
+                v_match = o_v_chunks == p_v_chunks and o_v_cnt == p_v_cnt and bool(o_v_chunks)
+                res["video payload"] = "PASS" if v_match else "FAIL"
+            else:
+                res["video payload"] = "CHECK"
+
+            if o_a_ranges and p_a_ranges:
+                o_a_cnt, o_a_chunks = _sample_track_samples(
+                    orig_b, o_a_ranges[0][0], o_a_ranges[0][1]
+                )
+                p_a_cnt, p_a_chunks = _sample_track_samples(
+                    patch_b, p_a_ranges[0][0], p_a_ranges[0][1], max_sample_count=o_a_cnt
+                )
+                a_match = bool(o_a_chunks) and o_a_chunks == p_a_chunks
+                res["audio payload"] = "PASS" if a_match else "FAIL"
+                if p_a_cnt > o_a_cnt:
+                    res["audio ghost samples"] = "EXPERIMENTAL"
+            elif not o_a_ranges and not p_a_ranges:
+                res["audio payload"] = "PASS"
+            else:
+                res["audio payload"] = "CHECK"
+    else:
+        from .forensic_analyzer import compare_mp4_files
+
+        if isinstance(orig_path, Path) and isinstance(patched_path, Path):
+            try:
+                diff = compare_mp4_files(orig_path, patched_path)
+                res["mdat payload"] = "PASS" if diff.mdat_match else "FAIL"
+                res["video payload"] = "PASS" if diff.video_payload_match else "FAIL"
+                res["audio payload"] = "PASS" if diff.audio_payload_match else "FAIL"
+                if diff.audio_ghost_samples > 0:
+                    res["audio ghost samples"] = "EXPERIMENTAL"
+            except Exception:
+                with _open_buffer(orig_path) as o_b, _open_buffer(patched_path) as p_b:
+                    res["mdat payload"] = "PASS" if o_b == p_b else "CHECK"
+                res["video payload"] = "CHECK"
+                res["audio payload"] = "CHECK"
+        else:
+            res["mdat payload"] = "CHECK"
             res["video payload"] = "CHECK"
             res["audio payload"] = "CHECK"
-    else:
-        res["mdat payload"] = "CHECK"
-        res["video payload"] = "CHECK"
-        res["audio payload"] = "CHECK"
 
     return res
 

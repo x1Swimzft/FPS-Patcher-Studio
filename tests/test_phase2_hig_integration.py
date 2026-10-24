@@ -8,7 +8,6 @@ Validates:
 
 from __future__ import annotations
 
-import contextlib
 import tkinter as tk
 from collections.abc import Generator
 from pathlib import Path
@@ -38,15 +37,7 @@ def clean_icons() -> Generator[None, None, None]:
     clear_icon_cache()
 
 
-@pytest.fixture(scope="module")
-def tk_root() -> Generator[ctk.CTk, None, None]:
-    clear_icon_cache()
-    root = ctk.CTk()
-    root.geometry("800x600")
-    yield root
-    with contextlib.suppress(Exception):
-        root.destroy()
-    clear_icon_cache()
+
 
 
 # ============================================================================

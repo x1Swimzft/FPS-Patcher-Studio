@@ -1,11 +1,12 @@
 [project]
 name = "fps-patcher-studio"
-version = "0.4.0"
+version = "0.5.0"
 description = "High-precision MP4/MOV container timing patcher (X1T PC, Mobile, Hybrid, Clean & Mobile Repair)"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "customtkinter>=6.0.0",
+    "pillow>=13.0.0",
     "pywinstyles>=1.8",
     "tkinterdnd2>=0.6.3",
 ]
@@ -14,7 +15,7 @@ dependencies = [
 fps-patcher-studio = "fps_patcher.__main__:main"
 
 [build-system]
-requires = ["uv_build>=0.12.13,<0.13.0"]
+requires = ["uv_build>=0.12.13,<0.14.0"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
@@ -24,7 +25,6 @@ module-name = "fps_patcher"
 dev = [
     "cairosvg>=2.9.1",
     "mypy>=2.4.0",
-    "pillow>=12.3.0",
     "pytest>=9.1.1",
     "pytest-mock>=3.16.0",
     "ruff>=0.16.10",

@@ -6,7 +6,9 @@ import contextlib
 import os
 import subprocess
 import sys
+from collections.abc import Generator
 from pathlib import Path
+from typing import Any
 
 if sys.platform == "win32":
     with contextlib.suppress(Exception):
@@ -21,9 +23,20 @@ from fps_patcher.core.ffmpeg_locator import FFmpegPaths, locate
 # uv-managed CPython may not locate its bundled Tcl/Tk scripts (init.tcl); point at them.
 _TCL_VARS = (("TCL_LIBRARY", "tcl8.6", "init.tcl"), ("TK_LIBRARY", "tk8.6", "tk.tcl"))
 for _var, _name, _probe in _TCL_VARS:
-    _dir = Path(sys.base_prefix) / "tcl" / _name
-    if _var not in os.environ and (_dir / _probe).is_file():
+    _dir = (Path(sys.base_prefix) / "tcl" / _name).resolve()
+    if not os.environ.get(_var) and (_dir / _probe).is_file():
         os.environ[_var] = str(_dir)
+
+
+@pytest.fixture(scope="session")
+def tk_root() -> Generator[Any, None, None]:
+    import customtkinter as ctk
+
+    root = ctk.CTk()
+    root.geometry("800x600")
+    yield root
+    with contextlib.suppress(Exception):
+        root.destroy()
 
 
 @pytest.fixture(scope="session")

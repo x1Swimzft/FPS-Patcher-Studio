@@ -41,9 +41,18 @@ STRINGS: dict[str, dict[str, str]] = {
         "target_fps": "Target FPS",
         "timescale_lbl": "Timescale",
         "strategy_lbl": "Preset",
+        "warn_high_bitrate": (
+            "High bitrate detected ({mbps:.1f} Mbps > 25 Mbps). Bypassed videos stream "
+            "at source quality on TikTok; bitrates >20 Mbps may cause buffering for "
+            "mobile viewers. Recommended: 12-18 Mbps for 1080p."
+        ),
+        "warn_non_aac_audio": (
+            "Non-AAC audio codec detected ('{codec}'). TikTok may mute non-AAC audio "
+            "when bypass is active. Recommended: AAC 48kHz."
+        ),
         "bxd_pc_warn": (
-            "⚠ PC-oriented non-standard container. It will likely fail on mobile players. "
-            "Use X1T For Mobile or X1T Clean for phones."
+            "⚠ PC preset adds trailing ghost bytes. May cause buffering or audio mute on "
+            "mobile viewers; recommend X1T For Mobile for mobile streaming."
         ),
         "output_lbl": "Output",
         "same_as_source": "Same folder as source",
@@ -253,9 +262,18 @@ STRINGS: dict[str, dict[str, str]] = {
         "target_fps": "เป้าหมาย FPS",
         "timescale_lbl": "Timescale",
         "strategy_lbl": "พรีเซ็ต (Preset)",
+        "warn_high_bitrate": (
+            "ตรวจพบบิตเรตสูง ({mbps:.1f} Mbps > 25 Mbps) วิดีโอที่ใช้ bypass "
+            "จะเล่นด้วยบิตเรตต้นฉบับบน TikTok หากเกิน 20 Mbps อาจทำให้ผู้ชมบนมือถือหมุนค้าง "
+            "แนะนำ: 12-18 Mbps สำหรับ 1080p"
+        ),
+        "warn_non_aac_audio": (
+            "ตรวจพบเสียงที่ไม่ใช่ AAC ('{codec}') TikTok อาจปิดเสียงวิดีโอเมื่อใช้ bypass "
+            "แนะนำให้แปลงเป็น AAC 48kHz"
+        ),
         "bxd_pc_warn": (
-            "⚠ โครงสร้างพิเศษสำหรับ PC — มักเปิดในมือถือไม่ได้ "
-            "(แนะนำใช้ X1T For Mobile หรือ X1T Clean สำหรับมือถือ)"
+            "⚠ พรีเซ็ต PC มีการแทรก ghost bytes ท้ายไฟล์ อาจทำให้ผู้ชมบนมือถือหมุนค้างหรือเสียงไม่ดัง "
+            "แนะนำให้ใช้ X1T For Mobile สำหรับการรับชมบนมือถือ"
         ),
         "output_lbl": "ปลายทาง",
         "same_as_source": "โฟลเดอร์เดียวกับต้นฉบับ",

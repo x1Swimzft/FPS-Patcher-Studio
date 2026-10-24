@@ -31,6 +31,8 @@ class VideoInfo:
     nb_frames: int | None
     has_audio: bool
     stream_count: int
+    audio_codec: str | None = None
+    bit_rate: int | None = None
 
     @property
     def fps(self) -> float:

@@ -320,6 +320,61 @@ def _check_disk_space(target_path: Path, required_bytes: int) -> None:
         pass
 
 
+def _sample_mdat_hash_stream(
+    f: Any, start_pos: int, payload_len: int
+) -> tuple[int, str, str, str]:
+    sample_sz = min(payload_len, 65536)
+    f.seek(start_pos)
+    h_bytes = f.read(sample_sz)
+    h_sha = hashlib.sha256(h_bytes).hexdigest()
+
+    mid_pos = start_pos + max(0, (payload_len - sample_sz) // 2)
+    f.seek(mid_pos)
+    m_bytes = f.read(sample_sz)
+    m_sha = hashlib.sha256(m_bytes).hexdigest()
+
+    tail_pos = start_pos + max(0, payload_len - sample_sz)
+    f.seek(tail_pos)
+    t_bytes = f.read(sample_sz)
+    t_sha = hashlib.sha256(t_bytes).hexdigest()
+
+    return payload_len, h_sha, m_sha, t_sha
+
+
+def _iter_boxes_from_stream(
+    f: Any, file_sz: int
+) -> tuple[list[tuple[bytes, int, int, int]], int, list[str]]:
+    boxes: list[tuple[bytes, int, int, int]] = []
+    issues: list[str] = []
+    pos = 0
+    while pos < file_sz:
+        if pos + 8 > file_sz:
+            return boxes, file_sz - pos, issues
+        f.seek(pos)
+        hdr8 = f.read(8)
+        if len(hdr8) < 8:
+            break
+        s32, typ = struct.unpack(">I4s", hdr8)
+        hdr = 8
+        if s32 == 1:
+            hdr16 = f.read(8)
+            if len(hdr16) < 8:
+                break
+            size = struct.unpack(">Q", hdr16)[0]
+            hdr = 16
+        elif s32 == 0:
+            size = file_sz - pos
+        else:
+            size = s32
+        if size < hdr or pos + size > file_sz:
+            return boxes, file_sz - pos, issues
+        boxes.append((typ, pos, size, hdr))
+        pos += size
+        if s32 == 0:
+            break
+    return boxes, 0, issues
+
+
 class MethodBXDDirectPatch:
     """BXD Container Engine supporting PC-oriented BXD and Mobile-safe ISO-BMFF presets."""
 
@@ -397,8 +452,11 @@ class MethodBXDDirectPatch:
             ftyp_bytes = _build_box(b"ftyp", b"mp42\x00\x00\x02\x00isomiso2mp41mp42")
         else:
             ftyp_bytes = ftyp.data
-        orig_mdat_payload = raw_bytes[mdat.start + mdat.header_size : mdat.start + mdat.size]
-        orig_mdat_sha256 = hashlib.sha256(orig_mdat_payload).hexdigest()
+        orig_mdat_payload_len = mdat.size - mdat.header_size
+        with open(self.src, "rb") as f_src_init:
+            orig_mdat_sample = _sample_mdat_hash_stream(
+                f_src_init, mdat.start + mdat.header_size, orig_mdat_payload_len
+            )
 
         if self.cancel_event and self.cancel_event.is_set():
             raise PatchCancelledError("Patch cancelled by user.")
@@ -483,10 +541,17 @@ class MethodBXDDirectPatch:
 
         if self.inflate_audio_table:
             if has_audio and audio_trak:
+                MAX_GHOST_SAMPLES = 50_000
+                raw_pad_count = audio_info.sample_count * (self.multiplier - 1)
+                audio_pad_count = min(raw_pad_count, MAX_GHOST_SAMPLES)
                 self.emit(
-                    f"[INFLATE] Audio track {self.multiplier}x ghost sample inflation (PC mode)"
+                    f"[INFLATE] Audio track {self.multiplier}x ghost sample inflation "
+                    f"(PC mode: {audio_pad_count:,} ghost samples)"
                 )
-                audio_pad_count = audio_info.sample_count * (self.multiplier - 1)
+                self.emit(
+                    "[WARN] PC preset adds trailing ghost bytes. May cause buffering or "
+                    "audio mute on mobile viewers; recommend X1T For Mobile for mobile streaming."
+                )
                 ghost_nal_block = PADDING_NAL * audio_pad_count if audio_pad_count > 0 else b""
             else:
                 self.emit("[INFLATE] Video-only container (no audio ghost table inflation)")
@@ -494,7 +559,7 @@ class MethodBXDDirectPatch:
             pad_len = (
                 self.padding_bytes
                 if self.padding_bytes > 0
-                else (default_pad_count * PADDING_SIZE)
+                else min(default_pad_count * PADDING_SIZE, 4096)
             )
             pad_len = min(pad_len, MAX_PADDING_BYTES)
             free_box_bytes = _build_free_box(pad_len)
@@ -584,19 +649,40 @@ class MethodBXDDirectPatch:
         expected_size = (
             len(ftyp_bytes)
             + len(final_moov)
-            + len(mdat.data)
+            + mdat.size
             + len(free_box_bytes)
             + len(ghost_nal_block)
         )
         _check_disk_space(self.out, expected_size)
 
         self.emit(f"[WRITE] Writing {mode_title} container...")
-        final_output = ftyp_bytes + final_moov + mdat.data + free_box_bytes + ghost_nal_block
-        self.out.write_bytes(final_output)
+        CHUNK_SIZE = 8 * 1024 * 1024  # 8 MB streaming buffer
+        with open(self.out, "wb") as f_out, open(self.src, "rb") as f_src:
+            f_out.write(ftyp_bytes)
+            f_out.write(final_moov)
+            # Write mdat header
+            f_src.seek(mdat.start)
+            mdat_hdr = f_src.read(mdat.header_size)
+            f_out.write(mdat_hdr)
+            # Stream mdat payload
+            f_src.seek(mdat.start + mdat.header_size)
+            remaining = orig_mdat_payload_len
+            while remaining > 0:
+                if self.cancel_event and self.cancel_event.is_set():
+                    raise PatchCancelledError("Patch cancelled by user.")
+                chunk = f_src.read(min(remaining, CHUNK_SIZE))
+                if not chunk:
+                    break
+                f_out.write(chunk)
+                remaining -= len(chunk)
+            if free_box_bytes:
+                f_out.write(free_box_bytes)
+            if ghost_nal_block:
+                f_out.write(ghost_nal_block)
 
         # Explicit Structural and Payload Validation
         self.emit("[VERIFY] atom structure")
-        struct_res = verify_atom_structure(final_output)
+        struct_res = verify_atom_structure(self.out)
         if struct_res.malformed_atoms:
             self.out.unlink(missing_ok=True)
             details_str = "; ".join(struct_res.details)
@@ -609,33 +695,34 @@ class MethodBXDDirectPatch:
             self.emit(f"[REPORT] Structure status: {struct_res.status}")
 
         self.emit("[VERIFY] chunk offsets")
-        valid_offsets, offset_issues = verify_offsets(final_output)
+        valid_offsets, offset_issues = verify_offsets(self.out)
         if not valid_offsets:
             msg = f"[REPORT] Chunk offsets status: EXPERIMENTAL ({len(offset_issues)} offsets)"
             self.emit(msg)
 
         self.emit("[VERIFY] sample tables")
-        valid_tables, table_issues = verify_sample_tables(final_output)
+        valid_tables, table_issues = verify_sample_tables(self.out)
         if not valid_tables:
             self.out.unlink(missing_ok=True)
             issues_str = "; ".join(table_issues)
             raise VerifyError(f"CRITICAL: Sample table validation failed: {issues_str}")
 
         self.emit("[VERIFY] mdat payload")
-        verify_top = _parse_atoms(final_output)
-        verify_mdat = next((a for a in verify_top if a.typ == b"mdat"), None)
-        if not verify_mdat:
-            self.out.unlink(missing_ok=True)
-            raise VerifyError("Verification failed: output missing mdat atom.")
+        out_sz = self.out.stat().st_size
+        with open(self.out, "rb") as f_out:
+            out_boxes, _, _ = _iter_boxes_from_stream(f_out, out_sz)
+            verify_mdat = next((a for a in out_boxes if a[0] == b"mdat"), None)
+            if not verify_mdat:
+                self.out.unlink(missing_ok=True)
+                raise VerifyError("Verification failed: output missing mdat atom.")
+            _, m_pos, m_sz, m_hdr = verify_mdat
+            out_sample = _sample_mdat_hash_stream(f_out, m_pos + m_hdr, m_sz - m_hdr)
 
-        verify_payload = final_output[
-            verify_mdat.start + verify_mdat.header_size : verify_mdat.start + verify_mdat.size
-        ]
-        if hashlib.sha256(verify_payload).hexdigest() != orig_mdat_sha256:
+        if out_sample != orig_mdat_sample:
             self.out.unlink(missing_ok=True)
             raise VerifyError("CRITICAL: mdat payload modified during patch.")
 
-        mob_rep = verify_mobile_compatibility(final_output)
+        mob_rep = verify_mobile_compatibility(self.out)
         self.emit(f"[VERIFY] mobile compatibility: {mob_rep.status}")
         if not mob_rep.compatible:
             for iss in mob_rep.issues[:3]:

@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-v0.4.0-blue.svg)
+![Version](https://img.shields.io/badge/version-v0.5.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.11+-3776AB.svg?logo=python&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-Windows%2064--bit-0078D6.svg?logo=windows&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
@@ -11,7 +11,7 @@
 **High-precision MP4/MOV container timing patcher with modern macOS HIG aesthetic and Windows DWM Acrylic/Mica backdrop.**  
 *Direct ISO-BMFF atom rewriting • Bit-exact sample preservation • Sub-second processing • X1T Engine*
 
-[📥 Downloads](#-downloads-v040) • [✨ Key Features](#-key-features) • [⚙️ Presets](#️-patching-presets-x1t-engine) • [🔍 Forensic Inspector](#-mp4-forensic-inspector) • [🚀 Getting Started](#-getting-started)
+[📥 Downloads](#-downloads-v050) • [🛡️ Security & Integrity](#️-security-provenance--virustotal-transparency) • [✨ Key Features](#-key-features) • [⚙️ Presets](#️-patching-presets-x1t-engine) • [🔍 Forensic Inspector](#-mp4-forensic-inspector) • [🚀 Getting Started](#-getting-started)
 
 </div>
 
@@ -24,18 +24,54 @@
 Unlike traditional video converters or FFmpeg stream copying, FPS Patcher Studio:
 - **Zero Re-encoding**: Never touches the underlying H.264/HEVC video bitstream or AAC audio stream.
 - **100% Lossless Quality**: Preserves the original `mdat` payload bit-for-bit with zero compression artifacts or generation loss.
-- **Blazing Fast**: Patches multi-gigabyte video files in milliseconds by rewriting header atoms (`moov`, `mvhd`, `tkhd`, `mdhd`, `stts`, `ctts`, `edts/elst`) directly on disk.
-- **X1T Engine & Platform Bypass**: Powered by the **X1T Engine**, enabling TikTok bypass via indeterminate `mvhd` container headers while preserving exact sample tables and track durations for mobile players (iOS AVPlayer, Android MediaCodec).
+- **Faststart Across All Engines**: Enforces progressive streaming layout (`ftyp` → `moov` → `mdat`) across both Direct Atom and X1T engines with recalculated `stco`/`co64` offsets.
+- **Blazing Fast**: Patches multi-gigabyte video files in milliseconds by rewriting header atoms directly on disk.
+- **X1T Engine & Platform Bypass**: Powered by the **X1T Engine**, enabling TikTok bypass via indeterminate `mvhd` container headers while preserving exact sample tables and track durations for mobile players (iOS AVPlayer, Android ExoPlayer).
+- **Mobile Buffering Guard**: Proactively audits source video bitrates (>25 Mbps) and non-AAC audio codecs (e.g. PCM) to prevent infinite buffering spinners and missing audio after TikTok upload.
 - **Container Normalization**: Automatically converts QuickTime `.mov` containers to compliant `.mp4` with synthetic ISO-BMFF `ftyp` atoms (`mp42`/`isom`).
 
 ---
 
-## 📥 Downloads (v0.4.0)
+## 📥 Downloads (v0.5.0)
 
-| Distribution | File | Architecture | Description |
-|---|---|---|---|
-| **Installer** | [FPSPatcherStudio-v0.4.0-Setup.exe](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases/download/v0.4.0/FPSPatcherStudio-v0.4.0-Setup.exe) | Windows x64 | Standard Inno Setup installer with desktop shortcut & uninstaller |
-| **Portable** | [FPSPatcherStudio-v0.4.0-win64.zip](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases/download/v0.4.0/FPSPatcherStudio-v0.4.0-win64.zip) | Windows x64 | Standalone zip — extract and run `FPSPatcherStudio.exe` |
+| Distribution | File | Architecture | SHA-256 Checksum | Description |
+|---|---|---|---|---|
+| **Installer** | [FPSPatcherStudio-v0.5.0-Setup.exe](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases/download/v0.5.0/FPSPatcherStudio-v0.5.0-Setup.exe) | Windows x64 | `bc28d1f78f108daef35c149d3d5119132113a953900505d5f35e9345c0a3f463` | Inno Setup installer with desktop shortcut & uninstaller |
+| **Portable** | [FPSPatcherStudio-v0.5.0-win64.zip](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases/download/v0.5.0/FPSPatcherStudio-v0.5.0-win64.zip) | Windows x64 | `ddf0575cde4a1c188e9966e778f3500fc57ac37378bf64e9f0db75ae3f8cb83b` | Standalone portable archive — extract and run `FPSPatcherStudio.exe` |
+
+---
+
+## 🛡️ Security, Provenance & VirusTotal Transparency
+
+FPS Patcher Studio is 100% open-source software built reproducibly from source. We believe in total security transparency and publish multi-engine scan results for every release.
+
+### VirusTotal Inspection Matrix
+
+| Artifact | SHA-256 Hash | VirusTotal Detection | Major Vendors (66+ Clean) | Heuristic Flags |
+|---|---|---|---|---|
+| **Portable ZIP**<br>`FPSPatcherStudio-v0.4.0-win64.zip` | `1b81d59476568b6ab78d1da55a2b1b526127eb7f493607279048d3e2196b2834` | [**2 / 67**](https://www.virustotal.com/gui/file/1b81d59476568b6ab78d1da55a2b1b526127eb7f493607279048d3e2196b2834) | ✅ **Clean** (Microsoft, Kaspersky, BitDefender, ESET, Avast, Sophos, CrowdStrike) | Bkav Pro (`W32.Malware.CA8C2AC3`)<br>VBA32 (`Trojan.Wacatac`) |
+| **Installer**<br>`FPSPatcherStudio-v0.4.0-Setup.exe` | `f72fb20504fbf75af01c5f3c14052b1cfc460821990519ff17be042cdc0ca844` | [**1 / 68**](https://www.virustotal.com/gui/file/f72fb20504fbf75af01c5f3c14052b1cfc460821990519ff17be042cdc0ca844) | ✅ **Clean** (All tier-1 enterprise and consumer antivirus engines) | VBA32 (`Trojan.Wacatac`)<br>*(Tag `invalid-signature`)* |
+
+### Understanding False Positives & Code Signing
+- **Heuristic False Positives**: PyInstaller packages Python applications by embedding a compressed archive inside a PE wrapper. Automated machine-learning heuristics (such as VBA32's generic `Wacatac` rule or Bkav Pro's entropy clustering) occasionally misclassify new, unrated PyInstaller binaries. Over 66 tier-1 vendors report 0 detections.
+- **The `invalid-signature` Tag**: The installer is signed via Authenticode using a self-signed project certificate (`CN=FPS Patcher Studio (Dev)`). While mathematically valid with an RFC 3161 timestamp, it is not issued by a commercial CA, prompting VirusTotal to label the certificate chain as `invalid-signature`.
+- **Formal Dispute Dossier**: Active vendor whitelisting disputes and templates are documented in [docs/FALSE_POSITIVE_DISPUTES.md](docs/FALSE_POSITIVE_DISPUTES.md).
+
+### How to Verify Downloaded Binaries
+Open PowerShell and verify the SHA-256 hash before running:
+```powershell
+# For the Setup Installer:
+Get-FileHash -Path "FPSPatcherStudio-v0.4.0-Setup.exe" -Algorithm SHA256
+
+# For the Portable ZIP:
+Get-FileHash -Path "FPSPatcherStudio-v0.4.0-win64.zip" -Algorithm SHA256
+```
+
+### Security & Compliance Resources
+- 🔒 **[SECURITY.md](SECURITY.md)**: Vulnerability disclosure policy, response SLA, and safe harbor.
+- 🏗️ **[BUILDING.md](BUILDING.md)**: Reproducible step-by-step build instructions from source.
+- 📜 **[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)**: Licenses for bundled components, Inter font, and FFmpeg LGPL/GPL compliance.
+- 📑 **[docs/FALSE_POSITIVE_DISPUTES.md](docs/FALSE_POSITIVE_DISPUTES.md)**: Complete vendor dispute dossier and email templates.
 
 ---
 
@@ -94,7 +130,7 @@ Open the **Forensic** window to inspect deep container metadata before and after
 ## 🚀 Getting Started
 
 ### Method 1: Using Prebuilt Binary
-1. Download `FPSPatcherStudio-v0.4.0-Setup.exe` or portable `.zip` from [Releases](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases).
+1. Download `FPSPatcherStudio-v0.4.5-Setup.exe` or portable `.zip` from [Releases](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases).
 2. Launch `FPSPatcherStudio.exe`.
 3. Drag & drop `.mp4` or `.mov` clips into the drop zone.
 4. Select desired Target Preset (default: **X1T For Mobile**) or specify a custom timescale.
@@ -121,7 +157,7 @@ uv run fps-patcher-studio
 
 Run quality gates:
 ```powershell
-# Run unit & integration test suite (202+ tests)
+# Run unit & integration test suite (208+ tests)
 uv run pytest -q
 
 # Run static type checking
@@ -137,8 +173,8 @@ To compile PyInstaller one-folder portable package and Inno Setup installer:
 powershell -ExecutionPolicy Bypass -File build\release.ps1
 ```
 Build artifacts will be placed in `release/`:
-- `FPSPatcherStudio-v0.4.0-Setup.exe`
-- `FPSPatcherStudio-v0.4.0-win64.zip`
+- `FPSPatcherStudio-v0.4.5-Setup.exe`
+- `FPSPatcherStudio-v0.4.5-win64.zip`
 
 ---
 

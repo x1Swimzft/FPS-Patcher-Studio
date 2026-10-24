@@ -48,6 +48,19 @@ def parse_probe(path: Path, data: dict[str, Any]) -> VideoInfo:
     nb_raw = video.get("nb_frames")
     nb_frames = int(nb_raw) if nb_raw and str(nb_raw).isdigit() else None
 
+    audio = next((s for s in streams if s.get("codec_type") == "audio"), None)
+    audio_codec = str(audio.get("codec_name")) if audio and audio.get("codec_name") else None
+
+    raw_br = video.get("bit_rate") or fmt.get("bit_rate")
+    bit_rate: int | None = None
+    if raw_br and str(raw_br).isdigit():
+        bit_rate = int(raw_br)
+    elif duration > 0 and path.is_file():
+        try:
+            bit_rate = int((path.stat().st_size * 8) / duration)
+        except OSError:
+            bit_rate = None
+
     return VideoInfo(
         path=path,
         codec=str(video.get("codec_name", "unknown")),
@@ -60,6 +73,8 @@ def parse_probe(path: Path, data: dict[str, Any]) -> VideoInfo:
         nb_frames=nb_frames,
         has_audio=any(s.get("codec_type") == "audio" for s in streams),
         stream_count=len(streams),
+        audio_codec=audio_codec,
+        bit_rate=bit_rate,
     )
 
 
@@ -153,6 +168,7 @@ def probe_direct(path: Path) -> VideoInfo:
 
     video_info: dict[str, Any] = {}
     has_audio = False
+    audio_codec: str | None = None
     stream_count = len(traks)
 
     for trak_start, trak_len in traks:
@@ -168,6 +184,30 @@ def probe_direct(path: Path) -> VideoInfo:
 
         if handler_type == b"soun":
             has_audio = True
+            if audio_codec is None:
+                minf_a = find_child(mdia_data, b"minf")
+                if minf_a:
+                    minf_data_a = mdia_data[minf_a[0] : minf_a[0] + minf_a[1]]
+                    stbl_a = find_child(minf_data_a, b"stbl")
+                    if stbl_a:
+                        stbl_data_a = minf_data_a[stbl_a[0] : stbl_a[0] + stbl_a[1]]
+                        stsd_a = find_child(stbl_data_a, b"stsd")
+                        if stsd_a and stsd_a[1] >= 16:
+                            stsd_data_a = stbl_data_a[stsd_a[0] : stsd_a[0] + stsd_a[1]]
+                            raw_entry = stsd_data_a[12:16].decode("latin1", errors="replace")
+                            raw_ac = raw_entry.strip().lower()
+                            audio_codec = {
+                                "mp4a": "aac",
+                                "alac": "alac",
+                                "sowt": "pcm",
+                                "twos": "pcm",
+                                "in24": "pcm",
+                                "in32": "pcm",
+                                "fl32": "pcm",
+                                "ac-3": "ac3",
+                                "ec-3": "eac3",
+                                "opus": "opus",
+                            }.get(raw_ac, raw_ac)
         elif handler_type == b"vide" and not video_info:
             mdhd = find_child(mdia_data, b"mdhd")
             tkhd = find_child(trak_data, b"tkhd")
@@ -254,6 +294,10 @@ def probe_direct(path: Path) -> VideoInfo:
     if not video_info:
         raise ProbeError("No video stream found in MP4/MOV container.")
 
+    bit_rate: int | None = None
+    if video_info["duration_s"] > 0:
+        bit_rate = int((len(data) * 8) / video_info["duration_s"])
+
     return VideoInfo(
         path=path,
         codec=video_info["codec"],
@@ -266,6 +310,8 @@ def probe_direct(path: Path) -> VideoInfo:
         nb_frames=video_info["nb_frames"],
         has_audio=has_audio,
         stream_count=stream_count,
+        audio_codec=audio_codec,
+        bit_rate=bit_rate,
     )
 
 

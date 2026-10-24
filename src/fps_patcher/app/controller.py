@@ -179,7 +179,32 @@ class AppController:
                     continue
                 self.items.set_status(path, "probing")
                 try:
-                    self.items.set_info(path, probe(path, ffprobe_path))
+                    info = probe(path, ffprobe_path)
+                    self.items.set_info(path, info)
+                    if info.bit_rate is not None and info.bit_rate > 25_000_000:
+                        mbps = info.bit_rate / 1_000_000
+                        self.emit(
+                            LogEvent(
+                                f"High bitrate detected ({mbps:.1f} Mbps > 25 Mbps) for "
+                                f"{path.name}. Bypassed videos stream at source quality on "
+                                "TikTok; bitrates >20 Mbps may cause buffering for mobile "
+                                "viewers. Recommended: 12-18 Mbps for 1080p.",
+                                "WARN",
+                            )
+                        )
+                    if (
+                        info.has_audio
+                        and info.audio_codec
+                        and info.audio_codec.lower() not in ("aac", "mp4a")
+                    ):
+                        self.emit(
+                            LogEvent(
+                                f"Non-AAC audio codec detected ('{info.audio_codec}') for "
+                                f"{path.name}. TikTok may mute non-AAC audio when bypass is "
+                                "active. Recommended: AAC 48kHz.",
+                                "WARN",
+                            )
+                        )
                 except FPSPatcherError as exc:
                     self.items.set_info(path, None, str(exc))
                     self.emit(LogEvent(f"Probe failed {path.name}: {exc}", "ERROR"))
@@ -248,6 +273,30 @@ class AppController:
             first_path = valid_paths[0]
             try:
                 info = probe(first_path, ffprobe_path)
+                if info.bit_rate is not None and info.bit_rate > 25_000_000:
+                    mbps = info.bit_rate / 1_000_000
+                    self.emit(
+                        LogEvent(
+                            f"High bitrate detected ({mbps:.1f} Mbps > 25 Mbps) for "
+                            f"{first_path.name}. Bypassed videos stream at source quality on "
+                            "TikTok; bitrates >20 Mbps may cause buffering for mobile "
+                            "viewers. Recommended: 12-18 Mbps for 1080p.",
+                            "WARN",
+                        )
+                    )
+                if (
+                    info.has_audio
+                    and info.audio_codec
+                    and info.audio_codec.lower() not in ("aac", "mp4a")
+                ):
+                    self.emit(
+                        LogEvent(
+                            f"Non-AAC audio codec detected ('{info.audio_codec}') for "
+                            f"{first_path.name}. TikTok may mute non-AAC audio when bypass "
+                            "is active. Recommended: AAC 48kHz.",
+                            "WARN",
+                        )
+                    )
                 self.emit(
                     ProbeDoneEvent(
                         info=info,

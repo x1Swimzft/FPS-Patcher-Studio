@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-import contextlib
-from collections.abc import Generator
-
 import customtkinter as ctk
-import pytest
 
 from fps_patcher.config import Settings
 from fps_patcher.ui.control_panel import ControlPanel
@@ -44,16 +40,6 @@ from fps_patcher.ui.theme import (
     style_mac_checkbox,
     style_mac_switch,
 )
-
-
-@pytest.fixture(scope="module")
-def tk_root() -> Generator[ctk.CTk, None, None]:
-    root = ctk.CTk()
-    root.geometry("800x600")
-    yield root
-    with contextlib.suppress(Exception):
-        root.destroy()
-
 
 # ============================================================================
 # 1. FOCUS RING HELPER TESTS

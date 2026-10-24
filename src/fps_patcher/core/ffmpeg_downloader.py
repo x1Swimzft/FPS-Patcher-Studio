@@ -9,6 +9,7 @@ into :func:`managed_bin_dir`.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import shutil
 import ssl
@@ -47,11 +48,13 @@ def _download(
     dest: Path,
     progress: ProgressCallback,
     cancel: threading.Event | None,
-) -> None:
+    expected_sha256: str | None = None,
+) -> str:
     if not url.lower().startswith("https://"):
         raise FFmpegDownloadError(f"Refusing non-HTTPS download URL: {url}")
     ctx = ssl.create_default_context()
     req = urllib.request.Request(url, headers={"User-Agent": "FPSPatcherStudio"})
+    hasher = hashlib.sha256()
     try:
         with urllib.request.urlopen(req, timeout=TIMEOUT_S, context=ctx) as resp:
             total = int(resp.headers.get("Content-Length") or 0)
@@ -64,12 +67,19 @@ def _download(
                     if not chunk:
                         break
                     fh.write(chunk)
+                    hasher.update(chunk)
                     done += len(chunk)
                     progress(done, total, "downloading")
     except OSError as exc:  # URLError, HTTPError, timeouts, disk errors
         raise FFmpegDownloadError(f"Download failed: {exc}") from exc
     if total and done != total:
         raise FFmpegDownloadError(f"Download incomplete ({done}/{total} bytes).")
+    digest = hasher.hexdigest().lower()
+    if expected_sha256 and digest != expected_sha256.lower().strip():
+        raise FFmpegDownloadError(
+            f"Archive SHA-256 mismatch: expected {expected_sha256.lower().strip()}, got {digest}"
+        )
+    return digest
 
 
 def extract_binaries(
@@ -114,6 +124,7 @@ def download_ffmpeg(
     progress: ProgressCallback | None = None,
     cancel: threading.Event | None = None,
     url: str = DOWNLOAD_URL,
+    expected_sha256: str | None = None,
 ) -> FFmpegPaths:
     """Download, extract, verify and install ffmpeg + ffprobe. Blocking."""
     dest_dir = dest_dir or managed_bin_dir()
@@ -123,7 +134,7 @@ def download_ffmpeg(
     try:
         dest_dir.mkdir(parents=True, exist_ok=True)
         shutil.rmtree(staging, ignore_errors=True)
-        _download(url, zip_path, report, cancel)
+        _download(url, zip_path, report, cancel, expected_sha256=expected_sha256)
 
         report(0, 0, "extracting")
         staged = extract_binaries(zip_path, staging, cancel)

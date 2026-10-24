@@ -101,6 +101,28 @@ def patch(
     )
     if before.is_vfr:
         emit(LogEvent("Variable frame rate detected; result may differ per player.", "WARN"))
+    if before.bit_rate is not None and before.bit_rate > 25_000_000:
+        mbps = before.bit_rate / 1_000_000
+        emit(
+            LogEvent(
+                f"High bitrate detected ({mbps:.1f} Mbps > 25 Mbps). Bypassed videos stream "
+                "at source quality on TikTok; bitrates >20 Mbps may cause buffering for "
+                "mobile viewers. Recommended: 12-18 Mbps for 1080p.",
+                "WARN",
+            )
+        )
+    if (
+        before.has_audio
+        and before.audio_codec
+        and before.audio_codec.lower() not in ("aac", "mp4a")
+    ):
+        emit(
+            LogEvent(
+                f"Non-AAC audio codec detected ('{before.audio_codec}'). TikTok may mute "
+                "non-AAC audio when bypass is active. Recommended: AAC 48kHz.",
+                "WARN",
+            )
+        )
 
     final = output_path_for(req)
     if final.resolve() == src.resolve():

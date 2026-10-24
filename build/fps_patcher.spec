@@ -19,6 +19,7 @@ a = Analysis(  # noqa: F821
     datas=datas,
     binaries=binaries,
     hiddenimports=["tkinterdnd2", "pywinstyles"],
+    excludes=["unittest", "test"],
 )
 pyz = PYZ(a.pure)  # noqa: F821
 exe = EXE(  # noqa: F821
@@ -31,5 +32,6 @@ exe = EXE(  # noqa: F821
     upx=False,  # UPX-packed binaries trigger AV heuristics
     icon=str(ROOT / "build" / "app.ico"),
     version=str(ROOT / "build" / "version_info.txt"),
+    manifest=str(ROOT / "build" / "fps_patcher.manifest"),
 )
 coll = COLLECT(exe, a.binaries, a.datas, upx=False, name="FPSPatcherStudio")  # noqa: F821

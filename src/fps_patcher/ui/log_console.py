@@ -615,11 +615,11 @@ class LogConsole(ctk.CTkFrame):
         file_lines_to_write: list[str] = []
         for ts, text, tag in batch:
             if ts:
-                txt.insert("end", f"[{ts}] ", "TIME")
+                txt.insert("end", f"[{ts}] ", "TIME", f"{text}\n", tag)
                 formatted = f"[{ts}] {text}"
             else:
+                txt.insert("end", f"{text}\n", tag)
                 formatted = text
-            txt.insert("end", f"{text}\n", tag)
             self._lines_history.append(formatted)
             file_lines_to_write.append(formatted)
             self._line_count += 1
@@ -659,13 +659,20 @@ class LogConsole(ctk.CTkFrame):
             self._line_count = len(self._lines_history)
 
     def _write_session_log(self, lines: list[str]) -> None:
-        with contextlib.suppress(OSError):
-            d = logs_dir()
-            d.mkdir(parents=True, exist_ok=True)
-            log_file = d / "console_session.log"
-            with log_file.open("a", encoding="utf-8") as fh:
-                for ln in lines:
-                    fh.write(ln + "\n")
+        if not lines:
+            return
+        to_write = list(lines)
+
+        def _do_write() -> None:
+            with contextlib.suppress(OSError):
+                d = logs_dir()
+                d.mkdir(parents=True, exist_ok=True)
+                log_file = d / "console_session.log"
+                with log_file.open("a", encoding="utf-8") as fh:
+                    for ln in to_write:
+                        fh.write(ln + "\n")
+
+        threading.Thread(target=_do_write, daemon=True).start()
 
     # ---------- public API ----------
     def set_context_files(

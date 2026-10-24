@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import tkinter as tk
 from collections.abc import Generator
 
@@ -34,16 +33,9 @@ from fps_patcher.ui.segmented_control import (
 )
 
 
-@pytest.fixture(scope="module")
-def tk_root() -> Generator[ctk.CTk, None, None]:
-    root = ctk.CTk()
-    yield root
-    with contextlib.suppress(Exception):
-        root.destroy()
-
-
 @pytest.fixture(autouse=True)
-def clean_icons() -> Generator[None, None, None]:
+def clean_icons(tk_root: ctk.CTk) -> Generator[None, None, None]:
+    tk._default_root = tk_root  # type: ignore[attr-defined]
     clear_icon_cache()
     yield
     clear_icon_cache()
