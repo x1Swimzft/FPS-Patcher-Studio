@@ -292,7 +292,7 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
         return getattr(self, "_window_has_focus", True)
 
     def _force_win32_repaint(self) -> None:
-        """Force recursive Win32 RedrawWindow and canvas repaint across all child widgets."""
+        """Invalidate the window and its children so Win32 repaints them from WM_PAINT."""
         if sys.platform != "win32":
             return
         # RDW_INVALIDATE (0x1) | RDW_ERASE (0x4) | RDW_ALLCHILDREN (0x80) |
@@ -302,21 +302,6 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
             hwnd = ctypes.windll.user32.GetParent(self.winfo_id()) or self.winfo_id()
             ctypes.windll.user32.RedrawWindow(hwnd, None, None, flags)
             ctypes.windll.user32.RedrawWindow(self.winfo_id(), None, None, flags)
-
-        def _redraw_node(w: Any) -> None:
-            with contextlib.suppress(Exception):
-                if hasattr(w, "winfo_id"):
-                    w_hwnd = w.winfo_id()
-                    if w_hwnd:
-                        ctypes.windll.user32.RedrawWindow(w_hwnd, None, None, flags)
-                if hasattr(w, "_draw"):
-                    w._draw(no_color_updates=False)
-            with contextlib.suppress(Exception):
-                for child in w.winfo_children():
-                    _redraw_node(child)
-
-        with contextlib.suppress(Exception):
-            _redraw_node(self)
 
     # ---------- window map / unmap & resize debouncing ----------
     @property

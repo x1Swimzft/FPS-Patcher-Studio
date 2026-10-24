@@ -450,6 +450,38 @@ def test_card_click_coalesces_repaint_and_focuses_last_card() -> None:
     lst._update_row_focus.assert_not_called()
 
 
+def test_force_repaint_does_not_walk_widget_tree(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Repaint must invalidate via Win32 only: walking 1000+ widgets cost seconds."""
+    from typing import Any
+
+    from fps_patcher.ui.main_window import MainWindow
+
+    calls: list[str] = []
+
+    class Child:
+        def winfo_id(self) -> int:
+            calls.append("child-hwnd")
+            return 0
+
+        def _draw(self, no_color_updates: bool = False) -> None:
+            calls.append("child-draw")
+
+        def winfo_children(self) -> list[Any]:
+            calls.append("child-children")
+            return []
+
+    class DummyWindow:
+        def winfo_id(self) -> int:
+            return 0
+
+        def winfo_children(self) -> list[Any]:
+            calls.append("root-children")
+            return [Child()]
+
+    MainWindow._force_win32_repaint(DummyWindow())  # type: ignore[arg-type]
+    assert calls == []
+
+
 def test_queue_item_caches_resolved_path() -> None:
     from fps_patcher.app.queue_model import QueueItem
 

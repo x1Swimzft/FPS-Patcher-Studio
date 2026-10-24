@@ -1,6 +1,6 @@
 """FPS Patcher Studio."""
 
-__version__ = "0.6.3"
+__version__ = "0.6.4"
 APP_NAME = "FPS Patcher Studio"
 APP_USER_MODEL_ID = f"fpspatcherstudio.app.{__version__}"
 

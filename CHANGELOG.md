@@ -2,6 +2,12 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
+## [0.6.4] - 2026-10-24
+
+### Fixed: 3–5s freeze after closing the preset dropdown
+- `_force_win32_repaint()` walked every widget in the window and called `_draw()` on each (1032 widgets with a 30-file queue). It runs twice on every `FocusIn`, which is what the dropdown hands back when it closes: 1.4s per call, so ~3s frozen. It now only invalidates the window and its children with Win32 `RedrawWindow`, which repaints every child window from `WM_PAINT` anyway (1.4s -> 113ms)
+- Tests: added a regression test asserting the repaint no longer walks the widget tree
+
 ## [0.6.3] - 2026-10-24
 
 ### Fixed: preset pill jittered when clicked rapidly
