@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 import time
 from fractions import Fraction
 from pathlib import Path
@@ -97,6 +98,22 @@ def test_controller_batch_cancel(clip30: Path, clip5994: Path, tmp_path: Path) -
     assert done.cancelled is True
     assert len(done.batch_results) == 1
     assert len(list(tmp_path.glob("*.part"))) == 0
+
+
+def test_shutdown_cancels_and_joins_the_worker() -> None:
+    ctrl = AppController(Settings())
+    started = threading.Event()
+
+    def job() -> None:
+        started.set()
+        ctrl._cancel.wait(5)
+
+    ctrl._start(job)
+    assert started.wait(2)
+
+    ctrl.shutdown(timeout=2)
+
+    assert not ctrl.busy
 
 
 def test_controller_batch_with_bad_file(clip30: Path, tmp_path: Path) -> None:

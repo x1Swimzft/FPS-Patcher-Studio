@@ -123,7 +123,7 @@ if (-not $proc.HasExited) {
 
 ```powershell
 New-Item -ItemType Directory -Force -Path "release"
-Compress-Archive -Path "dist\FPSPatcherStudio" -DestinationPath "release\FPSPatcherStudio-v0.4.0-win64.zip" -Force
+Compress-Archive -Path "dist\FPSPatcherStudio" -DestinationPath "release\FPSPatcherStudio-v0.7.0-win64.zip" -Force
 ```
 
 ### Step 5.4: Compile Inno Setup Installer
@@ -131,9 +131,9 @@ Compress-Archive -Path "dist\FPSPatcherStudio" -DestinationPath "release\FPSPatc
 Locate `ISCC.exe` (typically in `C:\Program Files\Inno Setup 7\ISCC.exe` or `C:\Program Files (x86)\Inno Setup 6\ISCC.exe`) and compile:
 
 ```powershell
-& "C:\Program Files\Inno Setup 7\ISCC.exe" /DAppVersion=0.4.0 "build\installer.iss"
+& "C:\Program Files\Inno Setup 7\ISCC.exe" /DAppVersion=0.7.0 "build\installer.iss"
 ```
-The installer will be produced at `release\FPSPatcherStudio-v0.4.0-Setup.exe`.
+The installer will be produced at `release\FPSPatcherStudio-v0.7.0-Setup.exe`.
 
 ---
 
@@ -164,14 +164,14 @@ powershell -ExecutionPolicy Bypass -File build\sign_binaries.ps1 -GenerateSelfSi
 Calculate SHA-256 hashes for all generated release artifacts and record them in the standard `sha256sum` format:
 
 ```powershell
-Get-ChildItem "release" -File | Where-Object { $_.Name -like "FPSPatcherStudio-v0.4.0-*" -and $_.Extension -ne ".sha256" } |
+Get-ChildItem "release" -File | Where-Object { $_.Name -like "FPSPatcherStudio-v0.7.0-*" -and $_.Extension -ne ".sha256" } |
     ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)" } |
-    Set-Content -Path "release\FPSPatcherStudio-v0.4.0.sha256" -Encoding ASCII
+    Set-Content -Path "release\FPSPatcherStudio-v0.7.0.sha256" -Encoding ASCII
 ```
 
 Verify output:
 ```powershell
-Get-Content "release\FPSPatcherStudio-v0.4.0.sha256"
+Get-Content "release\FPSPatcherStudio-v0.7.0.sha256"
 ```
 
 ---

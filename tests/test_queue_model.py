@@ -156,6 +156,35 @@ def test_reset_for_run(tmp_path: Path) -> None:
     assert item_b.output is None
 
 
+def test_set_info_does_not_downgrade_terminal_status(tmp_path: Path) -> None:
+    q = InputQueue()
+    a = _mk(tmp_path, "late.mp4")
+    q.add([a])
+    q.set_status(a, "done", output=tmp_path / "out.mp4")
+
+    q.set_info(
+        a,
+        VideoInfo(
+            path=a,
+            codec="h264",
+            width=1,
+            height=1,
+            avg_fps=Fraction(30),
+            r_fps=Fraction(30),
+            duration_s=1.0,
+            timescale=30000,
+            nb_frames=30,
+            has_audio=False,
+            stream_count=1,
+        ),
+    )
+
+    item = q.get(a)
+    assert item is not None
+    assert item.status == "done"  # a late probe result must not resurrect the row
+    assert item.info is not None
+
+
 def test_snapshot_for_run_allows_done_and_error_when_selected(tmp_path: Path) -> None:
     q = InputQueue()
     a, b = _mk(tmp_path, "a.mp4"), _mk(tmp_path, "b.mp4")

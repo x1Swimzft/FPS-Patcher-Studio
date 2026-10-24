@@ -138,8 +138,10 @@ class InputQueue:
         if item is None:
             return
         item.info = info
-        item.error = error
-        item.status = "ready" if info is not None else "failed"
+        # A late probe result must not resurrect an item that already finished.
+        if item.status in ("pending", "probing", "ready"):
+            item.error = error
+            item.status = "ready" if info is not None else "failed"
 
     def set_status(
         self,

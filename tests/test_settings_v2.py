@@ -97,6 +97,29 @@ def test_settings_v2_clamping_and_corrupt_recovery(tmp_path: Path) -> None:
     assert safe_loaded.theme_preset == "Obsidian"
 
 
+def test_concurrent_settings_saves_never_corrupt_the_file(tmp_path: Path) -> None:
+    import threading
+
+    target = tmp_path / "settings.json"
+    presets = ["Obsidian", "Light", "Graphite", "Midnight Violet"]
+
+    def save_one(preset: str) -> None:
+        Settings(theme_preset=preset).save(target)
+
+    threads = [
+        threading.Thread(target=save_one, args=(presets[i % len(presets)],))
+        for i in range(16)
+    ]
+    for worker in threads:
+        worker.start()
+    for worker in threads:
+        worker.join(timeout=5)
+
+    payload = json.loads(target.read_text(encoding="utf-8"))
+    assert payload["theme_preset"] in presets
+    assert not list(tmp_path.glob("*.tmp_*"))
+
+
 def test_theme_presets_and_theme_manager() -> None:
     assert len(PRESETS) == 7
     for name in [

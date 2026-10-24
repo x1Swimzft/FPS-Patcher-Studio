@@ -333,3 +333,50 @@ def test_patch_cancel_cleans_up(clip30: Path, ff: FFmpegPaths, tmp_path: Path) -
             PatchRequest(src=clip30, out_dir=tmp_path, timescale=60000), ff, lambda e: None, cancel
         )
     assert not list(tmp_path.glob("*.part"))
+
+
+def test_stale_temp_cleanup_is_name_scoped_and_age_gated(tmp_path: Path) -> None:
+    import os
+
+    from fps_patcher.core.patcher import _cleanup_stale_temps
+
+    final = tmp_path / "clip_ts60000.mp4"
+    stale = tmp_path / ".clip_ts60000.old.mp4.part"
+    fresh = tmp_path / ".clip_ts60000.new.mp4.part"
+    foreign = tmp_path / "user_notes.part"
+    for p in (stale, fresh, foreign):
+        p.write_bytes(b"x")
+    old = 1_700_000_000.0
+    os.utime(stale, (old, old))
+    os.utime(foreign, (old, old))
+
+    assert _cleanup_stale_temps(final) == 1
+    assert not stale.exists()
+    assert fresh.exists() and foreign.exists()
+
+
+def test_failed_patch_preserves_existing_output(
+    clip30: Path, ff: FFmpegPaths, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    final = tmp_path / f"{clip30.stem}_ts60000{clip30.suffix}"
+    final.write_bytes(b"PREVIOUS-OUTPUT")
+
+    def boom(*_args: object, **_kwargs: object) -> None:
+        raise VerifyError("forced verification failure")
+
+    monkeypatch.setattr("fps_patcher.core.patcher.verify", boom)
+    with pytest.raises(VerifyError):
+        patch(
+            PatchRequest(
+                src=clip30,
+                out_dir=tmp_path,
+                timescale=60000,
+                strategy="direct-atom",
+                overwrite=True,
+            ),
+            ff,
+            lambda _: None,
+        )
+
+    assert final.read_bytes() == b"PREVIOUS-OUTPUT"
+    assert not list(tmp_path.glob("*.part"))

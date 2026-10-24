@@ -25,7 +25,15 @@ def _cleanup() -> None:
 atexit.register(_cleanup)
 
 _MEM_CACHE: dict[str, Any] = {}
+_MAX_MEM_CACHE = 128  # ~7 MB of 160x90 thumbs; older entries are evicted oldest-first
 _LOCK = threading.Lock()
+
+
+def _remember(key: str, img: Any) -> None:
+    with _LOCK:
+        _MEM_CACHE[key] = img
+        while len(_MEM_CACHE) > _MAX_MEM_CACHE:
+            _MEM_CACHE.pop(next(iter(_MEM_CACHE)))
 
 
 def get_cache_key(path: Path) -> str:
@@ -90,8 +98,7 @@ def request_thumbnail(
             except Exception:
                 img = None
 
-        with _LOCK:
-            _MEM_CACHE[key] = img
+        _remember(key, img)
 
         callback(img)
 

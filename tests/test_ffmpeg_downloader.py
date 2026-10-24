@@ -5,9 +5,11 @@ from __future__ import annotations
 import hashlib
 import io
 import threading
+import time
 import zipfile
 from pathlib import Path
-from types import TracebackType
+from types import SimpleNamespace, TracebackType
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -569,3 +571,30 @@ def test_main_window_ffmpeg_badge_click_and_events(monkeypatch: pytest.MonkeyPat
         w._handle(evt_err)
         assert w._ff_state == "not_found"
         mock_settings_win.tab_ffmpeg.on_download_event.assert_called_with(evt_err)
+
+
+def test_init_ffmpeg_locates_off_the_ui_thread() -> None:
+    from fps_patcher.ui.main_window import MainWindow
+
+    gate = threading.Event()
+    stub = SimpleNamespace(
+        _ff_state="checking",
+        _ff_init_thread=None,
+        _ff_download_text="",
+        _theme_mgr=SimpleNamespace(tokens=None),
+        _apply_ff_badge_style=lambda *_args: None,
+        controller=MagicMock(),
+    )
+    stub._init_ffmpeg_worker = lambda: MainWindow._init_ffmpeg_worker(stub)  # type: ignore[arg-type]
+    stub.controller.init_ffmpeg.side_effect = lambda: (gate.wait(5), "paths")[1]
+
+    started = time.monotonic()
+    MainWindow._init_ffmpeg(stub)  # type: ignore[arg-type]
+    assert time.monotonic() - started < 0.5  # did not wait for locate()
+
+    gate.set()
+    assert stub._ff_init_thread is not None
+    stub._ff_init_thread.join(timeout=2)
+    event = stub.controller.emit.call_args.args[0]
+    assert isinstance(event, FFmpegDownloadEvent)
+    assert event.stage == "ready"

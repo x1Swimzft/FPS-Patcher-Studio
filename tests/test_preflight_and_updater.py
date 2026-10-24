@@ -201,6 +201,29 @@ def test_e2e_pcm_mov_is_normalised_before_x1t(ff: Any, tmp_path: Path) -> None:
     assert not list(tmp_path.glob("*.preflight*"))
 
 
+def test_preflight_cancel_leaves_no_partial_temp(
+    clip30: Path, ff: Any, tmp_path: Path
+) -> None:
+    import shutil
+    import threading
+
+    from fps_patcher.core.errors import PatchCancelledError
+    from fps_patcher.core.preflight import PreflightPlan, preflight_output_path, run_preflight
+
+    src = tmp_path / clip30.name
+    shutil.copy2(clip30, src)
+    cancel = threading.Event()
+    cancel.set()
+
+    with pytest.raises(PatchCancelledError):
+        run_preflight(
+            src, PreflightPlan(normalize_audio=True, cap_bitrate=False), ff,
+            lambda _evt: None, cancel,
+        )
+
+    assert not preflight_output_path(src).exists()
+
+
 def test_controller_check_for_updates_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
     from unittest.mock import MagicMock
 

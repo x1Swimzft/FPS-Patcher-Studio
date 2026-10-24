@@ -116,6 +116,82 @@ def _first_stco_offset(data: bytes) -> int:
     return int(struct.unpack_from(">I", payload, 8)[0])
 
 
+def _chunk_offsets(data: bytes) -> list[int]:
+    moov_start, moov_end = _top(data)[b"moov"]
+    for typ, fmt, step in ((b"co64", ">Q", 8), (b"stco", ">I", 4)):
+        pos = data.find(typ, moov_start, moov_end)
+        if pos < 0:
+            continue
+        box_start = pos - 4
+        size = struct.unpack_from(">I", data, box_start)[0]
+        payload = data[box_start + 8 : box_start + size]
+        count = struct.unpack_from(">I", payload, 4)[0]
+        return [struct.unpack_from(fmt, payload, 8 + i * step)[0] for i in range(count)]
+    return []
+
+
+def _mdat_ranges(data: bytes) -> list[tuple[int, int]]:
+    ranges: list[tuple[int, int]] = []
+    pos = 0
+    while pos + 8 <= len(data):
+        size32, typ = struct.unpack_from(">I4s", data, pos)
+        if size32 == 1:
+            size = struct.unpack_from(">Q", data, pos + 8)[0]
+            header = 16
+        else:
+            size = size32 or len(data) - pos
+            header = 8
+        if typ == b"mdat":
+            ranges.append((pos + header, pos + size))
+        pos += size
+    return ranges
+
+
+def _mdat_payload_shas(data: bytes) -> list[str]:
+    return [hashlib.sha256(data[start:end]).hexdigest() for start, end in _mdat_ranges(data)]
+
+
+def _build_multi(
+    path: Path,
+    order: list[str],
+    *,
+    co64: bool = False,
+    metadata: bool = True,
+) -> tuple[Path, list[int]]:
+    """Build a file from ``order`` entries: ``ftyp``, ``moov``, ``mdat:a/b/c``."""
+    ftyp = _box(b"ftyp", b"isom\0\0\0\0isom")
+    media = {key: key.encode() * 300 for key in "abc"}
+    mdats = [k for k in order if k.startswith("mdat:")]
+    placeholder = _moov([0] * len(mdats), color=None, hdr_box=False, metadata=metadata, co64=co64)
+
+    starts: dict[str, int] = {}
+    pos = 0
+    for kind in order:
+        if kind == "moov":
+            starts["moov"] = pos
+            pos += len(placeholder)
+        elif kind == "ftyp":
+            pos += len(ftyp)
+        else:
+            starts[kind] = pos + 8  # mdat payload start
+            pos += 8 + len(media[kind.split(":", 1)[1]])
+
+    offsets = [starts[k] for k in mdats]
+    moov = _moov(offsets, color=None, hdr_box=False, metadata=metadata, co64=co64)
+    assert len(moov) == len(placeholder)
+
+    data = bytearray()
+    for kind in order:
+        if kind == "ftyp":
+            data += ftyp
+        elif kind == "moov":
+            data += moov
+        else:
+            data += _box(b"mdat", media[kind.split(":", 1)[1]])
+    path.write_bytes(bytes(data))
+    return path, offsets
+
+
 def test_adds_rec709_and_keeps_mdat_bit_exact(tmp_path: Path) -> None:
     path, media_hash = _build(tmp_path / "add.mp4", color=None, metadata=False)
     before = path.read_bytes()
@@ -187,6 +263,80 @@ def test_moov_after_mdat_does_not_shift_chunk_offsets(tmp_path: Path) -> None:
     assert result.bytes_delta < 0
     assert _first_stco_offset(after) == before_offset
     assert _mdat_payload_sha(after) == media_hash
+
+
+def test_mdat_on_both_sides_of_moov_shifts_only_late_offsets(tmp_path: Path) -> None:
+    path, offsets = _build_multi(tmp_path / "mixed.mp4", ["ftyp", "mdat:a", "moov", "mdat:b"])
+    before = path.read_bytes()
+
+    result = sanitize(path, fix_color=True, scrub_metadata=True)
+
+    after = path.read_bytes()
+    delta = len(after) - len(before)
+    assert result.bytes_delta == delta < 0  # udta scrubbing outweighs the added colr
+    assert _chunk_offsets(after) == [offsets[0], offsets[1] + delta]
+    assert _mdat_payload_shas(after) == _mdat_payload_shas(before)
+    for offset in _chunk_offsets(after):
+        assert any(start <= offset < end for start, end in _mdat_ranges(after))
+
+
+def test_two_mdats_after_moov_shift_together(tmp_path: Path) -> None:
+    path, offsets = _build_multi(tmp_path / "two.mp4", ["ftyp", "moov", "mdat:a", "mdat:b"])
+    before = path.read_bytes()
+
+    sanitize(path, fix_color=True, scrub_metadata=True)
+
+    after = path.read_bytes()
+    delta = len(after) - len(before)
+    assert delta != 0
+    assert _chunk_offsets(after) == [offset + delta for offset in offsets]
+    assert _mdat_payload_shas(after) == _mdat_payload_shas(before)
+
+
+def test_co64_offsets_are_shifted_per_entry(tmp_path: Path) -> None:
+    path, offsets = _build_multi(
+        tmp_path / "co64.mp4", ["ftyp", "mdat:a", "moov", "mdat:b"], co64=True
+    )
+    before = path.read_bytes()
+
+    result = sanitize(path, fix_color=True, scrub_metadata=True)
+
+    after = path.read_bytes()
+    delta = len(after) - len(before)
+    assert result.status == "patched"
+    assert b"co64" in after
+    assert _chunk_offsets(after) == [offsets[0], offsets[1] + delta]
+    assert _mdat_payload_shas(after) == _mdat_payload_shas(before)
+
+
+def test_chunk_offset_inside_moov_is_rejected(tmp_path: Path) -> None:
+    ftyp = _box(b"ftyp", b"isom\0\0\0\0isom")
+    moov_start = len(ftyp)
+    moov = _moov(moov_start + 4, color=None, hdr_box=False, metadata=True)
+    path = tmp_path / "inside.mp4"
+    path.write_bytes(ftyp + moov + _box(b"mdat", b"x" * 64))
+    before = path.read_bytes()
+
+    with pytest.raises(ColrError, match="inside moov"):
+        sanitize(path, fix_color=True, scrub_metadata=True)
+
+    assert path.read_bytes() == before  # refused before touching the file
+
+
+def test_chunk_offset_outside_every_mdat_is_rejected(tmp_path: Path) -> None:
+    ftyp = _box(b"ftyp", b"isom\0\0\0\0isom")
+    placeholder = _moov(0, color=None, hdr_box=False, metadata=True)
+    media = b"y" * 64
+    outside = len(ftyp) + len(placeholder) + 8 + len(media)
+    moov = _moov(outside, color=None, hdr_box=False, metadata=True)
+    path = tmp_path / "outside.mp4"
+    path.write_bytes(ftyp + moov + _box(b"mdat", media))
+    before = path.read_bytes()
+
+    with pytest.raises(ColrError, match="outside every mdat"):
+        sanitize(path, fix_color=True, scrub_metadata=True)
+
+    assert path.read_bytes() == before
 
 
 def test_rejects_non_video_extension(tmp_path: Path) -> None:

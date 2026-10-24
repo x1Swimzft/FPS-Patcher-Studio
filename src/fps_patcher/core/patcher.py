@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import tempfile
 import threading
 import time
 from collections import deque
@@ -59,6 +61,37 @@ def output_path_for(req: PatchRequest) -> Path:
         if not cand.exists():
             return cand
         n += 1
+
+
+def _temp_output(final: Path) -> Path:
+    """Unique temp beside ``final`` (same filesystem) so concurrent jobs never share one.
+
+    Keeps the media extension right before ``.part`` so format detection and the
+    colour guard still recognise it.
+    """
+    fd, name = tempfile.mkstemp(
+        prefix=f".{final.stem}.", suffix=f"{final.suffix}.part", dir=final.parent
+    )
+    os.close(fd)
+    return Path(name)
+
+
+def _cleanup_stale_temps(final: Path, max_age_s: float = 24 * 3600) -> int:
+    """Delete abandoned temp files that match this destination's own name pattern.
+
+    Age-gated so a concurrently running job's fresh temp is never touched, and
+    limited to ``.<stem>.*<ext>.part`` so no user file can match.
+    """
+    now = time.time()
+    removed = 0
+    for candidate in final.parent.glob(f".{final.stem}.*{final.suffix}.part"):
+        try:
+            if candidate.is_file() and now - candidate.stat().st_mtime > max_age_s:
+                candidate.unlink()
+                removed += 1
+        except OSError:
+            continue
+    return removed
 
 
 def _parse_progress(line: str, duration_s: float) -> float | None:
@@ -129,8 +162,8 @@ def patch(
     final = output_path_for(req)
     if final.resolve() == src.resolve():
         raise PatchError(f"Output path equals source file ('{src}'); refusing to overwrite source.")
-    tmp = final.with_name(final.name + ".part")
-    tmp.unlink(missing_ok=True)
+    _cleanup_stale_temps(final)
+    tmp = _temp_output(final)
 
     emit(LogEvent(f"Strategy: {strategy.label}"))
 
@@ -196,6 +229,7 @@ def patch(
             v4_patcher.execute()
             if req.v4_dry_run:
                 emit(LogEvent("Dry-run complete: no output file created.", "INFO"))
+                tmp.unlink(missing_ok=True)
                 return PatchResult(
                     src=src, output=src, before=before, after=before, elapsed_s=0.0
                 )
@@ -283,9 +317,9 @@ def patch(
             )
             emit(LogEvent(f"[VERIFY] {item:<18} {status}", level))
 
-        if final.exists():
-            final.unlink()
-        tmp.rename(final)
+        # os.replace is atomic on NTFS; unlink+rename left a window where a crash
+        # could destroy the previous output.
+        os.replace(tmp, final)
     except (PatchError, VerifyError) as exc:
         tmp.unlink(missing_ok=True)
         try:

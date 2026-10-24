@@ -612,6 +612,8 @@ class InputList(ctk.CTkFrame):
                 w.destroy()
             self._row_widgets.clear()
             self._row_sigs.clear()
+            self._ctk_images.clear()
+            self._thumb_requested.clear()
             self._last_order.clear()
             self._painted_focus_id = None
             self.drop_zone.pack(fill="both", expand=True, padx=4, pady=12)
@@ -629,6 +631,8 @@ class InputList(ctk.CTkFrame):
                 self._row_widgets[i_id].destroy()
                 del self._row_widgets[i_id]
                 self._row_sigs.pop(i_id, None)
+                self._ctk_images.pop(i_id, None)
+                self._thumb_requested.discard(i_id)
 
         # If FFmpeg became available after initial render, retry missing thumbnails
         missing_thumbs = len(self._ctk_images) < len(self._thumb_requested)

@@ -219,6 +219,8 @@ class AppController:
     def remove_selected(self) -> int:
         n = self.items.remove_selected(locked_path=self.current_patching_path)
         self.queue = self.items.paths()
+        if not self.items:
+            self.current = None
         self.emit(QueueChangedEvent("removed"))
         return n
 
@@ -640,6 +642,13 @@ class AppController:
         if self.busy:
             self._cancel.set()
             self.emit(LogEvent("Cancelling current operation...", "WARN"))
+
+    def shutdown(self, timeout: float = 5.0) -> None:
+        """Cancel and wait for the patch worker so its ffmpeg child is not orphaned."""
+        self.cancel()
+        worker = self._worker
+        if worker is not None and worker.is_alive():
+            worker.join(timeout=timeout)
 
     def _start(self, job: Callable[[], None]) -> None:
         self._worker = threading.Thread(target=job, daemon=True)

@@ -169,13 +169,17 @@ def run_preflight(
             _tail.append(line)
             del _tail[:-15]
 
-        code = run_streaming(
-            paths.ffmpeg,
-            build_preflight_args(src, dst, plan, encoder),
-            lambda _line: None,
-            on_stderr,
-            cancel_event,
-        )
+        try:
+            code = run_streaming(
+                paths.ffmpeg,
+                build_preflight_args(src, dst, plan, encoder),
+                lambda _line: None,
+                on_stderr,
+                cancel_event,
+            )
+        except Exception:
+            dst.unlink(missing_ok=True)  # cancel/error: never leave a partial preflight copy
+            raise
         if code == 0 and dst.is_file() and dst.stat().st_size > 0:
             return dst
         dst.unlink(missing_ok=True)

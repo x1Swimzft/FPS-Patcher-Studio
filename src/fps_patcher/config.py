@@ -3,14 +3,19 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sys
+import threading
 from dataclasses import dataclass, field, fields
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from .core.strategies import migrate_strategy_name
+
+log = logging.getLogger("fps_patcher")
+_SAVE_LOCK = threading.Lock()
 
 APP_DIR_NAME = "FPSPatcherStudio"
 MAX_BXD_PADDING_BYTES = 512 * 1024 * 1024  # 512 MB ceiling
@@ -246,15 +251,18 @@ class Settings:
         text = json.dumps(payload, indent=2)
 
         def _do_write() -> None:
-            tmp = path.with_suffix(f".tmp_{os.getpid()}")
-            try:
-                tmp.write_text(text, encoding="utf-8")
-                tmp.replace(path)
-            except Exception:
-                path.write_text(text, encoding="utf-8")
+            # Serialise writers: overlapping async saves used to share one temp
+            # file and could leave a half-written settings.json behind.
+            with _SAVE_LOCK:
+                tmp = path.with_suffix(f".tmp_{os.getpid()}_{threading.get_ident()}")
+                try:
+                    tmp.write_text(text, encoding="utf-8")
+                    tmp.replace(path)
+                except OSError:
+                    log.exception("Could not save settings to %s", path)
+                    tmp.unlink(missing_ok=True)
 
         if async_write:
-            import threading
             threading.Thread(target=_do_write, daemon=True, name="settings-save").start()
         else:
             _do_write()

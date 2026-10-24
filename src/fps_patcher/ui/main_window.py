@@ -85,6 +85,7 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
         self._watcher: FolderWatcher | None = None
         self._watch_inbox: queue.Queue[Path] = queue.Queue()
         self._watch_batch_active: bool = False
+        self._ff_init_thread: threading.Thread | None = None
         self._forensic_win: Any = None
         self._settings_win: Any = None
         self._applied_ui_scale: int = 100
@@ -926,14 +927,20 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
     def _init_ffmpeg(self) -> None:
         if self._ff_state == "downloading":
             return
+        if self._ff_init_thread is not None and self._ff_init_thread.is_alive():
+            return
         self._ff_state = "checking"
         self._ff_download_text = ""
         self._apply_ff_badge_style(self._theme_mgr.tokens)
+        # locate() runs ffmpeg/ffprobe -version (up to 10s each): never on the Tk thread.
+        self._ff_init_thread = threading.Thread(
+            target=self._init_ffmpeg_worker, daemon=True, name="fps-ffmpeg-init"
+        )
+        self._ff_init_thread.start()
+
+    def _init_ffmpeg_worker(self) -> None:
         paths = self.controller.init_ffmpeg()
-        self._ff_state = "ready" if paths else "not_found"
-        self._apply_ff_badge_style(self._theme_mgr.tokens)
-        self._refresh_state()
-        self._probe_pending_queue_items()
+        self.controller.emit(FFmpegDownloadEvent("ready" if paths else "missing", paths=paths))
 
     def _probe_pending_queue_items(self) -> None:
         """Probe any restored/pending queue items whose metadata has not been populated yet."""
@@ -1406,6 +1413,17 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
             self._ff_state = "downloading"
             self._ff_download_text = t("ffmpeg_extracting", self.settings.language)
             self._apply_ff_badge_style(self._theme_mgr.tokens)
+        elif event.stage == "ready":
+            self._ff_state = "ready"
+            self._ff_download_text = ""
+            self._apply_ff_badge_style(self._theme_mgr.tokens)
+            self._refresh_state()
+            self._probe_pending_queue_items()
+        elif event.stage == "missing":
+            self._ff_state = "not_found"
+            self._ff_download_text = ""
+            self._apply_ff_badge_style(self._theme_mgr.tokens)
+            self._refresh_state()
         elif event.stage == "done":
             self._ff_state = "ready"
             self._ff_download_text = ""
@@ -1430,7 +1448,7 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
             with contextlib.suppress(Exception):
                 self.after_cancel(self._focus_debounce_timer)
             self._focus_debounce_timer = None
-        self.controller.cancel()
+        self.controller.shutdown()
         try:
             if self.settings.remember_geometry:
                 self.settings.geometry = self.geometry()
