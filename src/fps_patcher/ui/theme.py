@@ -481,9 +481,6 @@ def font_mono(size: int = 12) -> ctk.CTkFont:
 DWMWA_USE_IMMERSIVE_DARK_MODE = 20
 DWMWA_USE_IMMERSIVE_DARK_MODE_FALLBACK = 19
 DWMWA_CAPTION_COLOR = 35
-DWMWA_SYSTEMBACKDROP_TYPE = 38
-BACKDROP_TYPE_MICA = 2
-BACKDROP_TYPE_ACRYLIC = 3
 
 
 def _hex_to_colorref(hex_color: str) -> int:
@@ -532,42 +529,49 @@ def apply_window_backdrop(
     window: Any,
     glass: bool = True,
     alpha: float = 0.96,
-    backdrop_mode: str = "Acrylic",
+    backdrop_mode: str = "Solid",
     tint_strength: int = 80,
+    bg_color: str | None = None,
 ) -> bool:
-    """Applies DWM backdrop while keeping main window surfaces 100% opaque."""
-    _ = (alpha, tint_strength)
+    """Applies solid dark surface and DWM dark titlebar.
+
+    Prevents black-screen repaint flicker on window restore/Alt-Tab.
+    """
+    _ = (glass, alpha, backdrop_mode, tint_strength)
     if os.name != "nt":
         return False
 
     is_dark = ctk.get_appearance_mode().lower() == "dark"
-    update_title_bar_theme(window, is_dark=is_dark)
 
-    # Always keep whole-window alpha at 1.0 so queue, inspector, and console never bleed through
+    # Auto-resolve window background if not passed
+    if bg_color is None:
+        with contextlib.suppress(Exception):
+            fg = getattr(window, "_fg_color", None)
+            if fg is None and hasattr(window, "cget"):
+                fg = window.cget("fg_color")
+            if isinstance(fg, (tuple, list)):
+                bg_color = fg[1] if is_dark else fg[0]
+            elif isinstance(fg, str) and fg.startswith("#"):
+                bg_color = fg
+
+    update_title_bar_theme(window, is_dark=is_dark, bg_color=bg_color)
+
+    # Always keep whole-window alpha at 1.0 and transparentcolor empty
+    # so Win32 GDI does not clear client area to #000000 on unmap/restore
     with contextlib.suppress(Exception):
         window.attributes("-alpha", 1.0)
         window.wm_attributes("-transparentcolor", "")
 
-    if not glass or backdrop_mode == "Solid":
-        return True
+    # Set underlying Win32 Tk window background to the theme background token
+    # so native WM_ERASEBKGND draws the dark surface rather than pure black #000000
+    if bg_color:
+        with contextlib.suppress(Exception):
+            if hasattr(window, "tk") and hasattr(window, "_w"):
+                window.tk.call(window._w, "configure", "-background", bg_color)
+            elif hasattr(window, "configure"):
+                window.configure(bg=bg_color)
 
-    applied = False
-    style_target = backdrop_mode.lower()  # acrylic, mica, aero
-
-    # Set DWM system backdrop attribute on frame without color-keying root window bg
-    with contextlib.suppress(Exception):
-        hwnd = ctypes.windll.user32.GetParent(window.winfo_id()) or window.winfo_id()
-        code = (
-            BACKDROP_TYPE_ACRYLIC if "acrylic" in style_target else BACKDROP_TYPE_MICA
-        )
-        backdrop = ctypes.c_int(code)
-        res = ctypes.windll.dwmapi.DwmSetWindowAttribute(
-            hwnd, DWMWA_SYSTEMBACKDROP_TYPE, ctypes.byref(backdrop), ctypes.sizeof(backdrop)
-        )
-        if res == 0:
-            applied = True
-
-    return applied
+    return True
 
 
 # ============================================================================
@@ -719,3 +723,15 @@ class MacCheckBox(ctk.CTkCheckBox):
         kwargs.setdefault("border_color", MAC_CHECKBOX_BORDER_COLOR)
         kwargs.setdefault("checkmark_color", MAC_CHECKBOX_CHECKMARK_COLOR)
         super().__init__(master, **kwargs)
+
+def configure_cached(widget: Any, **kwargs: Any) -> None:
+    """Only call widget.configure() if kwargs differ from cached values, avoiding redraws."""
+    cache = getattr(widget, "_cfg_cache", None)
+    if cache is None:
+        cache = {}
+        widget._cfg_cache = cache
+    changed = {k: v for k, v in kwargs.items() if cache.get(k) != v}
+    if changed:
+        cache.update(changed)
+        widget.configure(**changed)
+

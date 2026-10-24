@@ -31,6 +31,7 @@ from .theme import (
     MacCheckBox,
     ThemeTokens,
     attach_focus_ring,
+    configure_cached,
     font_body,
     font_caption,
     font_mono,
@@ -736,6 +737,15 @@ class ControlPanel(ctk.CTkFrame):
         self._refresh_override_ui()
 
     def set_focused_item(self, item: QueueItem | None) -> None:
+        cur = getattr(self, "_focused_item", None)
+        if cur is item or (
+            cur is not None
+            and item is not None
+            and cur.item_id == item.item_id
+            and cur.timescale == item.timescale
+            and cur.strategy == item.strategy
+        ):
+            return
         self._focused_item = item
         self._refresh_override_ui()
 
@@ -950,19 +960,24 @@ class ControlPanel(ctk.CTkFrame):
         self.settings.verify_after = bool(self.verify_cb.get())
 
     def _preset_changed(self, value: str) -> None:
+        if getattr(self, "_last_preset_val", None) == value:
+            return
+        self._last_preset_val = value
         tokens = self._theme_mgr.tokens
         self.timescale.configure(state="normal")
         self.timescale.delete(0, "end")
         if value == CUSTOM:
             self.timescale.insert(0, str(self.settings.custom_timescale))
-            self.timescale.configure(
+            configure_cached(
+                self.timescale,
                 state="normal",
                 fg_color=tokens.surface,
                 text_color=tokens.text,
             )
         else:
             self.timescale.insert(0, str(FPS_PRESETS[value]))
-            self.timescale.configure(
+            configure_cached(
+                self.timescale,
                 state="disabled",
                 fg_color=tokens.surface_raised,
                 text_color=tokens.muted,

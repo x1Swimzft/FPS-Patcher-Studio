@@ -1,4 +1,4 @@
-# AI Codebase Summary — FPS Patcher Studio (v0.4.0)
+# AI Codebase Summary — FPS Patcher Studio (v0.6.0)
 
 > **Purpose**: Master architecture, codebase map, state lifecycle, and operational guide for autonomous AI agents and engineers working on **FPS Patcher Studio**.
 
@@ -7,7 +7,7 @@
 ## 1. Project Overview & Identity
 - **Repository**: `fps-patcher-studio`
 - **Root Path**: `E:\Project\fps-patcher-studio`
-- **Current Version**: `0.4.0`
+- **Current Version**: `0.6.0`
 - **Python Target**: Python 3.11+
 - **Primary Domain**: High-precision ISO-BMFF (MP4/MOV) container timing patcher. It modifies video timescales, sample duration tables (`stts`), composition offsets (`ctts`), track/movie headers (`mvhd`, `tkhd`, `mdhd`), and edit lists (`edts`/`elst`) losslessly at the binary atom level **without re-encoding video frames**.
 - **User Interface**: CustomTkinter 6.0+ styled with Apple HIG desktop aesthetic, WCAG AA obsidian dark theme, Windows Acrylic/Mica backdrop support, drag-and-drop (`tkinterdnd2`), and localized bilingual support (English & Thai).
@@ -26,7 +26,7 @@ E:\Project\fps-patcher-studio\
 │   └── FPSPatcherStudio.exe        # Portable binary
 ├── release\                        # Packaged release archives (.zip & .exe installers + sha256)
 ├── src\fps_patcher\                # Source root
-│   ├── __init__.py                 # Version (__version__ = "0.4.0")
+│   ├── __init__.py                 # Version (__version__ = "0.6.0")
 │   ├── __main__.py                 # Entry point: runs logging setup, config load, and MainWindow
 │   ├── config.py                   # User settings persistence (%APPDATA%\FPSPatcherStudio\settings.json)
 │   ├── logging_setup.py            # Central logging initialization with rotating file handler
@@ -45,8 +45,10 @@ E:\Project\fps-patcher-studio\
 │   │   ├── forensic_analyzer.py    # Deep atom-tree, semantic field, byte-span & mdat hash diffing
 │   │   ├── models.py               # Core data structures (VideoInfo, PatchSettings, JobProgress, etc.)
 │   │   ├── patcher.py              # Strategy dispatcher facade
+│   │   ├── preflight.py            # Pre-flight audio normalizer (AAC 48kHz) & bitrate limiter (<18M)
 │   │   ├── prober.py               # Pure-Python zero-dependency MP4/MOV header metadata parser
 │   │   ├── strategies.py           # Enumeration & registry of patch algorithms
+│   │   ├── updater.py              # GitHub Releases update check, SHA-256 verification & installer launch
 │   │   ├── v4_patcher.py           # Strict ISO-BMFF V4 forensic patcher with memory-mapped buffer
 │   │   └── verifier.py             # Pre/post-patch verification suite (payload hash, chunk offsets)
 │   └── ui\                         # CustomTkinter User Interface (Apple HIG Layout)
@@ -133,6 +135,21 @@ Traditional video frame interpolation or re-encoding degrades picture quality an
 | `bxd-hybrid` | **BXD Hybrid** | Bounded last-sample extension + free box | Valid headers | Mixed desktop/mobile workflows |
 | `bxd-clean` | **BXD Clean** | Audio completely untouched | Strict | Direct video-only timescale updates |
 | `bxd-repair` | **Repair for Mobile** | 6-step normalization of broken containers | Validated | Fixing broken BXD files for playback |
+
+### 3.3. Pre-Flight Normalization & Auto-Updater Pipeline
+- **Smart Pre-Flight Normalizer (`core/preflight.py`)**:
+  - Automatically prepares media containers prior to binary atom patching when enabled in settings.
+  - **Audio Normalization**: If audio track is non-AAC or not 48 kHz stereo (e.g. PCM, ALAC, 44.1 kHz), automatically transcodes audio to AAC 48 kHz stereo 192 kbps while stream-copying video (`-c:v copy -c:a aac -ar 48000 -ac 2 -b:a 192k`).
+  - **Smart Bitrate Capping**: When source video bitrate exceeds 25 Mbps (`25_000_000 bps`), caps bitrate to target 16 Mbps / max 18 Mbps to guarantee stutter-free mobile playback and prevent TikTok cloud re-encoding. Tries hardware-accelerated encoders in sequence (`h264_nvenc` -> `h264_amf` -> `h264_qsv`) before falling back to `libx264`.
+- **In-App Auto-Updater (`core/updater.py`)**:
+  - Communicates directly with GitHub Releases API (`x1Swimzft/FPS-Patcher-Studio`) via standard library HTTPS.
+  - Compares semantic versioning (`is_newer(remote_tag, current_version)`).
+  - Selects Windows installer asset (`_pick_asset`), downloads asset and corresponding SHA-256 manifest (`<asset>.sha256`), verifies cryptographic hash before execution, and launches installer via `subprocess.Popen`.
+
+### 3.4. Key Configuration Settings (`config.py`)
+- `auto_normalize_audio` (bool, default `True`): Pre-flight check that auto-converts non-AAC or non-48kHz audio to compliant AAC 48kHz stereo before container timing manipulation.
+- `auto_cap_bitrate` (bool, default `False`): Pre-flight check that re-encodes source streams >25 Mbps down to <18 Mbps with hardware encoder fallback to prevent mobile playback stalls.
+- `check_updates_on_start` (bool, default `True`): Automatically checks GitHub Releases on startup in a background thread and prompts user if a new update is available.
 
 ---
 
@@ -238,5 +255,7 @@ powershell -ExecutionPolicy Bypass -File build\release.ps1
 | `src/fps_patcher/app/queue_model.py` | Queue data structures, snapshot generation, state reset |
 | `src/fps_patcher/core/bxd_patcher.py` | 5 BXD presets and lossless mobile repair engine |
 | `src/fps_patcher/core/atom_patcher.py` | Low-level binary box parser, unpacker, and writer |
+| `src/fps_patcher/core/preflight.py` | Smart pre-flight normalizer (audio AAC 48kHz, bitrate capping) |
 | `src/fps_patcher/core/prober.py` | Pure-Python header metadata parser |
+| `src/fps_patcher/core/updater.py` | GitHub Releases update checker, SHA-256 verifier, installer launcher |
 | `src/fps_patcher/core/verifier.py` | Pre- and post-patch payload and chunk offset validation |

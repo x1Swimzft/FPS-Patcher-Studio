@@ -11,6 +11,7 @@ import queue
 import threading
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from ..config import Settings
 from ..core.errors import (
@@ -34,6 +35,8 @@ from ..core.models import (
     ProbeDoneEvent,
     ProgressEvent,
     QueueChangedEvent,
+    UpdateAvailableEvent,
+    UpdateDownloadEvent,
     VideoInfo,
 )
 from ..core.patcher import patch
@@ -404,6 +407,8 @@ class AppController:
                         v4_dry_run=self.settings.v4_dry_run,
                         bxd_padding_bytes=self.settings.bxd_padding_bytes,
                         bxd_max_tail_ms=self.settings.bxd_max_tail_ms,
+                        auto_normalize_audio=self.settings.auto_normalize_audio,
+                        auto_cap_bitrate=self.settings.auto_cap_bitrate,
                     )
 
                     self.emit(LogEvent(f"[{idx}/{total_files}] Starting patch for {src.name}"))
@@ -575,6 +580,51 @@ class AppController:
                 mask_paths=self.settings.mask_diagnostic_paths,
             )
             return None
+
+
+    def check_for_updates_background(self, current_version: str) -> None:
+        """Run update check in background thread if enabled in settings."""
+        if not getattr(self.settings, "check_updates_on_start", True):
+            return
+        threading.Thread(
+            target=self._update_check_worker,
+            args=(current_version,),
+            daemon=True,
+            name="fps-updater-check",
+        ).start()
+
+    def _update_check_worker(self, current_version: str) -> None:
+        from ..core.updater import UpdateError, check_for_update
+
+        try:
+            info = check_for_update(current_version)
+            if info:
+                self.emit(UpdateAvailableEvent(info))
+        except (UpdateError, Exception) as exc:
+            log.debug("Silent update check failed: %s", exc)
+
+    def start_update_download(self, info: Any) -> None:
+        """Download update in background thread and emit progress/completion events."""
+        threading.Thread(
+            target=self._update_download_worker,
+            args=(info,),
+            daemon=True,
+            name="fps-updater-download",
+        ).start()
+
+    def _update_download_worker(self, info: Any) -> None:
+        from ..core.updater import default_download_dir, download_update
+
+        try:
+            dest = default_download_dir()
+
+            def _progress(done: int, total: int) -> None:
+                self.emit(UpdateDownloadEvent("downloading", done, total))
+
+            path = download_update(info, dest, progress=_progress)
+            self.emit(UpdateDownloadEvent("done", path=path))
+        except Exception as exc:
+            self.emit(UpdateDownloadEvent("error", error=str(exc)))
 
     def cancel(self) -> None:
         if self.busy:

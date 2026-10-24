@@ -133,6 +133,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "verify_after": "Verify output integrity after patching",
         "backup_original": "Backup original before in-place overwrite (.bak)",
         "stop_on_error": "Stop batch on first error",
+        "preflight_section": "Smart Pre-Flight",
+        "auto_normalize_audio": "Auto-convert audio to AAC 48 kHz stereo before patching",
+        "auto_cap_bitrate": "Auto-cap bitrate for mobile (<18 Mbps) when source is over 25 Mbps",
         # FFmpeg Tab
         "ffmpeg_dir": "FFmpeg Directory",
         "auto_detect": "Auto-detect",
@@ -223,6 +226,18 @@ STRINGS: dict[str, dict[str, str]] = {
         "status_done": "Done",
         "status_failed": "Error",
         "status_skipped": "Skipped",
+        "check_updates_on_start": "Check for updates on startup",
+        "update_available_btn": "Update v{version}",
+        "update_dialog_title": "Update Available",
+        "update_dialog_prompt": (
+            "A newer version of FPS Patcher Studio is available (v{version}).\n\n"
+            "Release notes:\n{notes}\n\n"
+            "Do you want to download and install this update now?"
+        ),
+        "update_downloading": "Downloading update ({percent}%)...",
+        "update_ready_launch": "Launching installer...",
+        "update_failed": "Update failed: {error}",
+        "update_sha256_failed": "Update package failed SHA-256 verification and was discarded.",
     },
     "th": {
         # App & Header
@@ -354,6 +369,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "verify_after": "ตรวจสอบความสมบูรณ์ไฟล์หลังแปลงเสร็จ",
         "backup_original": "สำรองไฟล์เดิมก่อนเขียนทับ (.bak)",
         "stop_on_error": "หยุดการทำงานทันทีหากพบข้อผิดพลาด",
+        "preflight_section": "ตรวจและซ่อมไฟล์อัตโนมัติก่อนแพตช์",
+        "auto_normalize_audio": "แปลงเสียงเป็น AAC 48 kHz สเตอริโอให้อัตโนมัติก่อนแพตช์",
+        "auto_cap_bitrate": "จำกัด Bitrate สำหรับมือถือ (<18 Mbps) เมื่อไฟล์ต้นฉบับเกิน 25 Mbps",
         # FFmpeg Tab
         "ffmpeg_dir": "ตำแหน่งโฟลเดอร์ FFmpeg",
         "auto_detect": "ค้นหาอัตโนมัติ",
@@ -438,6 +456,18 @@ STRINGS: dict[str, dict[str, str]] = {
         "status_done": "เสร็จสิ้น",
         "status_failed": "ข้อผิดพลาด",
         "status_skipped": "ข้าม",
+        "check_updates_on_start": "ตรวจสอบการอัปเดตเมื่อเปิดโปรแกรม",
+        "update_available_btn": "อัปเดต v{version}",
+        "update_dialog_title": "มีอัปเดตเวอร์ชันใหม่",
+        "update_dialog_prompt": (
+            "มี FPS Patcher Studio เวอร์ชันใหม่พร้อมให้อัปเดต (v{version})\n\n"
+            "บันทึกการอัปเดต:\n{notes}\n\n"
+            "ต้องการดาวน์โหลดและติดตั้งทันทีหรือไม่?"
+        ),
+        "update_downloading": "กำลังดาวน์โหลดอัปเดต ({percent}%)...",
+        "update_ready_launch": "กำลังเปิดตัวติดตั้ง...",
+        "update_failed": "การอัปเดตล้มเหลว: {error}",
+        "update_sha256_failed": "ไฟล์อัปเดตไม่ผ่านการตรวจสอบความถูกต้อง SHA-256 จึงถูกลบออก",
     },
 }
 

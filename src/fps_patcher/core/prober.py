@@ -29,6 +29,13 @@ def parse_fraction(value: str | None) -> Fraction:
         return Fraction(0)
 
 
+def _to_int(value: Any) -> int | None:
+    try:
+        return int(value) if value not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
+
+
 def parse_probe(path: Path, data: dict[str, Any]) -> VideoInfo:
     streams: list[dict[str, Any]] = data.get("streams", [])
     video = next((s for s in streams if s.get("codec_type") == "video"), None)
@@ -50,6 +57,9 @@ def parse_probe(path: Path, data: dict[str, Any]) -> VideoInfo:
 
     audio = next((s for s in streams if s.get("codec_type") == "audio"), None)
     audio_codec = str(audio.get("codec_name")) if audio and audio.get("codec_name") else None
+
+    audio_sample_rate = _to_int(audio.get("sample_rate")) if audio else None
+    audio_channels = _to_int(audio.get("channels")) if audio else None
 
     raw_br = video.get("bit_rate") or fmt.get("bit_rate")
     bit_rate: int | None = None
@@ -75,6 +85,8 @@ def parse_probe(path: Path, data: dict[str, Any]) -> VideoInfo:
         stream_count=len(streams),
         audio_codec=audio_codec,
         bit_rate=bit_rate,
+        audio_sample_rate=audio_sample_rate,
+        audio_channels=audio_channels,
     )
 
 

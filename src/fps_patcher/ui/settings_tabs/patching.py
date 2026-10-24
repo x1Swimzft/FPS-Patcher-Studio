@@ -184,6 +184,33 @@ class PatchingTab:
             self.stop_err_switch.select()
         self.stop_err_switch.pack(anchor="w", pady=2)
 
+        ctk.CTkLabel(
+            self.frame,
+            text=self._tr("preflight_section"),
+            font=font_section(),
+            text_color=tokens.text,
+        ).pack(anchor="w", pady=(12, 4))
+
+        self.norm_audio_switch = MacSwitch(
+            self.frame,
+            text=self._tr("auto_normalize_audio"),
+            font=font_caption(),
+            text_color=tokens.text,
+        )
+        if draft.auto_normalize_audio:
+            self.norm_audio_switch.select()
+        self.norm_audio_switch.pack(anchor="w", pady=2)
+
+        self.cap_bitrate_switch = MacSwitch(
+            self.frame,
+            text=self._tr("auto_cap_bitrate"),
+            font=font_caption(),
+            text_color=tokens.text,
+        )
+        if draft.auto_cap_bitrate:
+            self.cap_bitrate_switch.select()
+        self.cap_bitrate_switch.pack(anchor="w", pady=2)
+
     def harvest(self, draft: Settings) -> None:
         import contextlib
 
@@ -202,4 +229,6 @@ class PatchingTab:
         draft.verify_after = bool(self.verify_switch.get())
         draft.backup_original = bool(self.backup_switch.get())
         draft.stop_on_error = bool(self.stop_err_switch.get())
+        draft.auto_normalize_audio = bool(self.norm_audio_switch.get())
+        draft.auto_cap_bitrate = bool(self.cap_bitrate_switch.get())
 

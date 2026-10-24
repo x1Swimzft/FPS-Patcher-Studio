@@ -69,6 +69,16 @@ class BehaviorTab:
             self.confirm_overwrite_switch.select()
         self.confirm_overwrite_switch.pack(anchor="w", pady=4)
 
+        self.check_updates_switch = MacSwitch(
+            self.frame,
+            text=self._tr("check_updates_on_start"),
+            font=font_caption(),
+            text_color=tokens.text,
+        )
+        if draft.check_updates_on_start:
+            self.check_updates_switch.select()
+        self.check_updates_switch.pack(anchor="w", pady=4)
+
         # Notification mode
         ctk.CTkLabel(
             self.frame,
@@ -123,4 +133,5 @@ class BehaviorTab:
         draft.always_on_top = bool(self.ontop_switch.get())
         draft.confirm_cancel = bool(self.confirm_cancel_switch.get())
         draft.confirm_overwrite = bool(self.confirm_overwrite_switch.get())
+        draft.check_updates_on_start = bool(self.check_updates_switch.get())
         draft.notify_done = self.notify_menu.get()

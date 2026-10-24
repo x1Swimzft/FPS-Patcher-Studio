@@ -10,6 +10,7 @@ from ..core.models import VideoInfo
 from .strings import t
 from .theme import (
     ThemeTokens,
+    configure_cached,
     font_body,
     font_caption,
     font_section,
@@ -88,6 +89,7 @@ class InfoPanel(ctk.CTkFrame):
             row=row_idx, column=0, columnspan=2, sticky="w", padx=12, pady=(4, 6)
         )
 
+        self._last_info_sig: tuple[Any, ...] | None = None
         self._theme_mgr.subscribe(self.apply_theme)
 
     def _lang(self) -> str:
@@ -137,36 +139,44 @@ class InfoPanel(ctk.CTkFrame):
         self.files_count.configure(text_color=tokens.muted, font=font_caption(fsize))
 
     def clear(self) -> None:
+        self._last_info_sig = None
         lang = self._lang()
         fsize = self._fsize()
         tokens = self._theme_mgr.tokens
         empty = t("empty_val", lang)
         for val in self._values.values():
-            val.configure(text=empty, font=font_body(size_opt=fsize), text_color=tokens.text)
-        self.files_count.configure(text=t("files_queued", lang, count=0))
+            configure_cached(
+                val, text=empty, font=font_body(size_opt=fsize), text_color=tokens.text
+            )
+        configure_cached(self.files_count, text=t("files_queued", lang, count=0))
 
     def show_info(self, info: VideoInfo, queue_index: int = 1, queue_total: int = 1) -> None:
-        tokens = self._theme_mgr.tokens
         lang = self._lang()
         fsize = self._fsize()
+        sig = (id(info), queue_index, queue_total, lang, fsize)
+        if getattr(self, "_last_info_sig", None) == sig:
+            return
+        self._last_info_sig = sig
+
+        tokens = self._theme_mgr.tokens
         empty = t("empty_val", lang)
         v = self._values
         fps_text = f"{info.fps:.2f}".rstrip("0").rstrip(".") if info.fps else empty
-        v["FPS"].configure(
+        configure_cached(
+            v["FPS"],
             text=f"{fps_text} fps" if info.fps else empty,
             font=font_body(bold=True, size_opt=fsize),
             text_color=tokens.accent,
         )
 
-        if info.width and info.height:
-            v["Resolution"].configure(text=f"{info.width} × {info.height}")
-        else:
-            v["Resolution"].configure(text=empty)
-
-        v["Codec"].configure(text=info.codec or empty)
-        v["Duration"].configure(text=f"{info.duration_s:.2f} s" if info.duration_s else empty)
-        v["Timescale"].configure(text=str(info.timescale) if info.timescale else empty)
-        v["Audio"].configure(text="present" if info.has_audio else "none")
-        v["Queue"].configure(text=f"{queue_index} / {queue_total}")
-
-        self.files_count.configure(text=t("batch_files", lang, count=queue_total))
+        res_text = f"{info.width} × {info.height}" if info.width and info.height else empty
+        configure_cached(v["Resolution"], text=res_text)
+        configure_cached(v["Codec"], text=info.codec or empty)
+        configure_cached(
+            v["Duration"],
+            text=f"{info.duration_s:.2f} s" if info.duration_s else empty,
+        )
+        configure_cached(v["Timescale"], text=str(info.timescale) if info.timescale else empty)
+        configure_cached(v["Audio"], text="present" if info.has_audio else "none")
+        configure_cached(v["Queue"], text=f"{queue_index} / {queue_total}")
+        configure_cached(self.files_count, text=t("batch_files", lang, count=queue_total))

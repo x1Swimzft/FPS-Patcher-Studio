@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from fractions import Fraction
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from .ffmpeg_locator import FFmpegPaths
@@ -33,6 +33,8 @@ class VideoInfo:
     stream_count: int
     audio_codec: str | None = None
     bit_rate: int | None = None
+    audio_sample_rate: int | None = None
+    audio_channels: int | None = None
 
     @property
     def fps(self) -> float:
@@ -63,6 +65,8 @@ class PatchRequest:
     v4_dry_run: bool = False
     bxd_padding_bytes: int = 0
     bxd_max_tail_ms: int = 50
+    auto_normalize_audio: bool = False
+    auto_cap_bitrate: bool = False
 
 
 @dataclass(frozen=True)
@@ -137,6 +141,26 @@ class FFmpegDownloadEvent:
         return max(0, min(100, int(self.downloaded * 100 / self.total)))
 
 
+@dataclass(frozen=True)
+class UpdateAvailableEvent:
+    info: Any  # UpdateInfo from core.updater
+
+
+@dataclass(frozen=True)
+class UpdateDownloadEvent:
+    stage: str  # "downloading", "done", "error"
+    downloaded: int = 0
+    total: int = 0
+    path: Path | None = None
+    error: str | None = None
+
+    @property
+    def percent(self) -> int:
+        if self.total <= 0:
+            return 0
+        return max(0, min(100, int(self.downloaded * 100 / self.total)))
+
+
 Event = (
     LogEvent
     | ProgressEvent
@@ -144,4 +168,6 @@ Event = (
     | PatchDoneEvent
     | QueueChangedEvent
     | FFmpegDownloadEvent
+    | UpdateAvailableEvent
+    | UpdateDownloadEvent
 )

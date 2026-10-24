@@ -35,8 +35,10 @@ class QueueItem:
     strategy: str | None = None
     progress: float = 0.0
     item_id: str = field(init=False)
+    resolved: Path = field(init=False)
 
     def __post_init__(self) -> None:
+        self.resolved = self.path.resolve()
         self.item_id = short_id(self.path)
 
 
@@ -69,7 +71,7 @@ class InputQueue:
 
     def get(self, path: Path) -> QueueItem | None:
         key = path.resolve()
-        return next((i for i in self._items if i.path.resolve() == key), None)
+        return next((i for i in self._items if i.resolved == key), None)
 
     # ---------- add / remove ----------
     def add(self, paths: list[Path]) -> AddResult:

@@ -2,6 +2,41 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
+## [0.6.2] - 2026-10-24
+
+### Fixed: Click stutter still present in 0.6.1
+- Performance: Card focus repaints are coalesced into a single deferred paint, so a fast click burst paints only the final selection instead of every click
+- Performance: `InputQueue.get()` no longer calls `Path.resolve()` for every queued item on each lookup (was ~2ms of Win32 syscalls per click at 30 files)
+- Tests: added regression tests for click coalescing and the cached resolved path
+
+## [0.6.1] - 2026-10-24
+
+### Performance: UI Responsiveness & Micro-Lag Elimination
+- Performance: Eliminated UI lag & stuttering during rapid clicks and control toggling
+- Performance: Added `configure_cached` to avoid redundant CPU Tkinter canvas redraws
+- Performance: $O(1)$ in-place card focus updates in `InputList`, avoiding full list re-renders
+- Performance: Debounced Inspector panel syncs by 35ms during rapid navigation
+- Performance: Asynchronous non-blocking `settings.json` disk writes during UI appearance changes
+- Performance: Adaptive 50ms (busy) / 200ms (idle) poll loop dedicating 100% CPU to input responsiveness when idle
+
+## [0.6.0] - 2026-10-24
+
+### Features & Automation: Pre-Flight Pipeline & In-App Updater
+- **Smart Pre-Flight Audio Auto-Normalizer**:
+  - Automatically converts non-AAC or non-48kHz audio streams (e.g., PCM, ALAC, 44.1kHz) to AAC 48kHz stereo before container patching, preventing silent audio issues on mobile platforms and TikTok ingest.
+- **Smart Bitrate Limiter**:
+  - Applies a <18 Mbps mobile bitrate cap when source video exceeds 25 Mbps to eliminate mobile viewer buffering stalls. Includes hardware encoder fallback (`h264_nvenc`, `h264_amf`, `h264_qsv`) with libx264 software fallback.
+- **In-App Auto-Updater**:
+  - Seamless update checking against GitHub Releases with SHA-256 integrity verification, asset selection for Windows installers, and one-click update launch.
+
+### Performance & UI Stability Fixes
+- **Black Screen Flicker & Repaint Fix (v0.5.1 Regression Resolution)**:
+  - Eliminated window black screen flickering and slow sequential repaint on minimize, restore, and Alt+Tab.
+  - Removed unstable DWM acrylic backdrop in favor of clean solid styling.
+  - Coalesced GUI poll events while the window is iconic (minimized).
+  - Debounced window resize events to avoid rapid redraw thrashing.
+  - Reused `InputList` row card widgets instead of destroying and recreating them on every queue refresh.
+
 ## [0.5.0] - 2026-10-24
 
 ### Performance & Responsiveness: Zero-Freeze Streaming Engine

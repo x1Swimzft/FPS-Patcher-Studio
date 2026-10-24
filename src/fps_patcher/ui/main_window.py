@@ -29,6 +29,8 @@ from ..core.models import (
     ProbeDoneEvent,
     ProgressEvent,
     QueueChangedEvent,
+    UpdateAvailableEvent,
+    UpdateDownloadEvent,
 )
 from ..core.strategies import strategy_requires_ffmpeg
 from .control_panel import ControlPanel
@@ -59,7 +61,9 @@ from .theme import (
 
 log = logging.getLogger("fps_patcher.ui.main_window")
 
-POLL_MS = 50
+POLL_MS_BUSY = 50
+POLL_MS_IDLE = 200
+POLL_MS = POLL_MS_BUSY
 INSPECTOR_WIDTH = 340
 
 __all__ = ["MainWindow", "update_title_bar_theme"]
@@ -78,6 +82,12 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
         self._theme_mgr = get_theme_manager(settings)
         self._window_has_focus: bool = True
         self._focus_debounce_timer: str | None = None
+        self._is_minimized: bool = False
+        self._last_window_dims: tuple[int, int] | None = None
+        self._pending_minimized_logs: list[tuple[str, LogLevel | str]] = []
+        self._pending_minimized_progress: ProgressEvent | None = None
+        self._pending_minimized_queue_dirty: bool = False
+        self._pending_minimized_info_panel_dirty: bool = False
 
         ctk.set_appearance_mode(settings.appearance)
         self._apply_ui_scale(settings.ui_scale)
@@ -100,12 +110,15 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
             self.attributes("-topmost", True)
 
         # Apply real window backdrop with tint suppression
+        is_dark = ctk.get_appearance_mode().lower() == "dark"
+        win_bg = tokens.bg[1] if is_dark else tokens.bg[0]
         apply_window_backdrop(
             self,
             glass=settings.glass,
             alpha=settings.window_alpha,
             backdrop_mode=settings.glass_mode,
             tint_strength=settings.tint_strength,
+            bg_color=win_bg,
         )
         self._refresh_theme(tokens)
 
@@ -226,10 +239,18 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
         self.bind("<FocusIn>", self._on_window_focus_in, add="+")
         self.bind("<FocusOut>", self._on_window_focus_out, add="+")
 
+        # Window lifecycle & geometry guards (<Map>, <Unmap>, <Configure>)
+        self.bind("<Map>", self._on_window_map, add="+")
+        self.bind("<Unmap>", self._on_window_unmap, add="+")
+        self.bind("<Configure>", self._on_window_configure, add="+")
+
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self._theme_mgr.subscribe(self._on_theme_updated)
 
+        self._update_info: Any = None
+        self._configure_debounce_timer: Any = None
         self._init_ffmpeg()
+        self.controller.check_for_updates_background(__version__)
         self.after(POLL_MS, self._poll)
 
     # ---------- window focus awareness ----------
@@ -238,6 +259,9 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
             self.after_cancel(self._focus_debounce_timer)
             self._focus_debounce_timer = None
         self._update_window_focus(True)
+        if hasattr(self, "after"):
+            self.after(16, self._force_win32_repaint)
+            self.after(80, self._force_win32_repaint)
 
     def _on_window_focus_out(self, event: Any) -> None:
         if self._focus_debounce_timer is not None:
@@ -266,6 +290,116 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
     @property
     def is_window_focused(self) -> bool:
         return getattr(self, "_window_has_focus", True)
+
+    def _force_win32_repaint(self) -> None:
+        """Force recursive Win32 RedrawWindow and canvas repaint across all child widgets."""
+        if sys.platform != "win32":
+            return
+        # RDW_INVALIDATE (0x1) | RDW_ERASE (0x4) | RDW_ALLCHILDREN (0x80) |
+        # RDW_UPDATENOW (0x100) | RDW_FRAME (0x400) = 0x0585
+        flags = 0x0001 | 0x0004 | 0x0080 | 0x0100 | 0x0400
+        with contextlib.suppress(Exception):
+            hwnd = ctypes.windll.user32.GetParent(self.winfo_id()) or self.winfo_id()
+            ctypes.windll.user32.RedrawWindow(hwnd, None, None, flags)
+            ctypes.windll.user32.RedrawWindow(self.winfo_id(), None, None, flags)
+
+        def _redraw_node(w: Any) -> None:
+            with contextlib.suppress(Exception):
+                if hasattr(w, "winfo_id"):
+                    w_hwnd = w.winfo_id()
+                    if w_hwnd:
+                        ctypes.windll.user32.RedrawWindow(w_hwnd, None, None, flags)
+                if hasattr(w, "_draw"):
+                    w._draw(no_color_updates=False)
+            with contextlib.suppress(Exception):
+                for child in w.winfo_children():
+                    _redraw_node(child)
+
+        with contextlib.suppress(Exception):
+            _redraw_node(self)
+
+    # ---------- window map / unmap & resize debouncing ----------
+    @property
+    def is_minimized(self) -> bool:
+        try:
+            return self._is_minimized or str(self.state()).lower() == "iconic"
+        except Exception:
+            return False
+
+    def _on_window_unmap(self, event: Any) -> None:
+        if event.widget == self:
+            self._is_minimized = True
+
+    def _on_window_map(self, event: Any) -> None:
+        if event.widget == self:
+            was_minimized = self._is_minimized
+            self._is_minimized = False
+            if was_minimized:
+                self._flush_coalesced_ui_sync()
+            if hasattr(self, "after"):
+                self.after(16, self._force_win32_repaint)
+                self.after(80, self._force_win32_repaint)
+
+    def _on_window_configure(self, event: Any) -> None:
+        if event.widget != self:
+            return
+        w, h = event.width, event.height
+        if w <= 1 or h <= 1:
+            return
+        if getattr(self, "_last_window_dims", None) == (w, h):
+            return
+        self._last_window_dims = (w, h)
+        if hasattr(self, "after") and hasattr(self, "after_cancel"):
+            timer = getattr(self, "_configure_debounce_timer", None)
+            if timer is not None:
+                with contextlib.suppress(Exception):
+                    self.after_cancel(timer)
+            self._configure_debounce_timer = self.after(80, self._on_window_resized)
+
+    def _on_window_resized(self) -> None:
+        self._configure_debounce_timer = None
+        if not self.is_minimized:
+            self._force_win32_repaint()
+
+    def _flush_coalesced_ui_sync(self) -> None:
+        """Single coalesced repaint upon restoring from minimized/iconic state."""
+        tokens = self._theme_mgr.tokens
+        is_dark = ctk.get_appearance_mode().lower() == "dark"
+        win_bg = tokens.bg[1] if is_dark else tokens.bg[0]
+        apply_window_backdrop(
+            self,
+            glass=self.settings.glass,
+            alpha=self.settings.window_alpha,
+            backdrop_mode=self.settings.glass_mode,
+            tint_strength=self.settings.tint_strength,
+            bg_color=win_bg,
+        )
+        self._refresh_theme(tokens)
+
+        if self._pending_minimized_logs:
+            self.console.append_batch(self._pending_minimized_logs)
+            self._pending_minimized_logs.clear()
+
+        if self._pending_minimized_progress is not None:
+            p = self._pending_minimized_progress
+            self._pending_minimized_progress = None
+            f_name = p.current_file.name if p.current_file else "File"
+            f_pct = int(p.file_fraction * 100)
+            ov_pct = int(p.fraction * 100)
+            f_txt = f"[{p.file_index}/{p.total_files}] {f_name}: {f_pct}%"
+            b_txt = f"Batch progress ({p.file_index}/{p.total_files}): {ov_pct}%"
+            self.controls.set_batch_progress(p.file_fraction, p.fraction, f_txt, b_txt)
+
+        if self._pending_minimized_queue_dirty:
+            self._pending_minimized_queue_dirty = False
+            self.input_list.render()
+
+        if self._pending_minimized_info_panel_dirty:
+            self._pending_minimized_info_panel_dirty = False
+            self._sync_info_panel()
+
+        self._refresh_state()
+        self._force_win32_repaint()
 
     # ---------- window drag handling ----------
     def _setup_window_dragging(self) -> None:
@@ -381,6 +515,18 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
         self.version_badge.pack(side="left")
         # Compatibility alias
         self.brand_dot = self.version_badge
+
+        self.btn_update = ctk.CTkButton(
+            brand_frame,
+            text="",
+            height=22,
+            font=font_badge(fsize),
+            fg_color=tokens.accent,
+            hover_color=tokens.accent_hover,
+            text_color="#FFFFFF",
+            corner_radius=6,
+            command=self._on_update_clicked,
+        )
 
         # Right toolbar items
         right_frame = ctk.CTkFrame(self.header_bar, fg_color="transparent")
@@ -501,12 +647,12 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
         is_dark = ctk.get_appearance_mode().lower() == "dark"
         self.settings.appearance = "light" if is_dark else "dark"
         self._theme_mgr.apply(self.settings)
-        self.settings.save()
+        self.settings.save_async()
 
     def _set_appearance_mode(self, mode: str) -> None:
         self.settings.appearance = mode
         self._theme_mgr.apply(self.settings)
-        self.settings.save()
+        self.settings.save_async()
 
     def _show_appearance_menu(self, event: Any) -> None:
         from tkinter import Menu
@@ -678,12 +824,15 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
             corner_radius=ctrl_rad,
             font=font_body(size_opt=fsize),
         )
+        is_dark = ctk.get_appearance_mode().lower() == "dark"
+        win_bg = tokens.bg[1] if is_dark else tokens.bg[0]
         apply_window_backdrop(
             self,
             glass=self.settings.glass,
             alpha=self.settings.window_alpha,
             backdrop_mode=self.settings.glass_mode,
             tint_strength=self.settings.tint_strength,
+            bg_color=win_bg,
         )
 
     def _open_settings(self) -> None:
@@ -702,6 +851,9 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
         else:
             self.attributes("-topmost", False)
 
+        tokens = self._theme_mgr.tokens
+        is_dark = ctk.get_appearance_mode().lower() == "dark"
+        win_bg = tokens.bg[1] if is_dark else tokens.bg[0]
         self._refresh_theme()
         apply_window_backdrop(
             self,
@@ -709,6 +861,7 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
             alpha=settings.window_alpha,
             backdrop_mode=settings.glass_mode,
             tint_strength=settings.tint_strength,
+            bg_color=win_bg,
         )
         self._init_ffmpeg()
 
@@ -805,9 +958,26 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
         self._sync_info_panel(item_path)
 
     def _on_queue_focus_changed(self, item_path: Path | None) -> None:
-        self._sync_info_panel(item_path)
+        if item_path is None:
+            timer = getattr(self, "_sync_info_timer", None)
+            if timer is not None and hasattr(self, "after_cancel"):
+                with contextlib.suppress(Exception):
+                    self.after_cancel(timer)
+                self._sync_info_timer = None
+            self._sync_info_panel(None)
+            return
+
+        if hasattr(self, "after") and hasattr(self, "after_cancel"):
+            timer = getattr(self, "_sync_info_timer", None)
+            if timer is not None:
+                with contextlib.suppress(Exception):
+                    self.after_cancel(timer)
+            self._sync_info_timer = self.after(35, lambda: self._sync_info_panel(item_path))
+        else:
+            self._sync_info_panel(item_path)
 
     def _sync_info_panel(self, focus_path: Path | None = None) -> None:
+        self._sync_info_timer = None
         items = self.controller.items.items
         if not items:
             self.info_panel.clear()
@@ -924,24 +1094,34 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
         ):
             self._last_can_patch = can_patch
             self._last_busy = busy
-            self.controls.set_state(
-                can_patch=can_patch,
-                busy=busy,
-            )
-            self.input_list.set_state(busy=busy)
+            if not self.is_minimized:
+                self.controls.set_state(
+                    can_patch=can_patch,
+                    busy=busy,
+                )
+                self.input_list.set_state(busy=busy)
 
     # ---------- event loop ----------
     def _poll(self) -> None:
+        has_events = False
         try:
             events: list[Event] = []
             self.controller.drain(events.append)
             if events:
+                has_events = True
                 self._handle_batch(events)
-            self._refresh_state()
+            if not self.is_minimized:
+                self._refresh_state()
         except Exception:
             log.exception("Unhandled error in UI poll loop")
         finally:
-            self.after(POLL_MS, self._poll)
+            is_busy = (
+                self.controller.busy
+                or has_events
+                or getattr(self, "_ff_state", "") == "downloading"
+            )
+            interval = POLL_MS_BUSY if is_busy else POLL_MS_IDLE
+            self.after(interval, self._poll)
 
     def _handle(self, event: Event) -> None:
         self._handle_batch([event])
@@ -962,6 +1142,11 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
                 info_panel_dirty = True
             elif isinstance(event, FFmpegDownloadEvent):
                 self._handle_ffmpeg_event(event)
+            elif isinstance(event, UpdateAvailableEvent):
+                self._update_info = event.info
+                self._show_update_button(event.info)
+            elif isinstance(event, UpdateDownloadEvent):
+                self._handle_update_download_event(event)
             elif isinstance(event, ProbeDoneEvent):
                 queue_dirty = True
                 info_panel_dirty = True
@@ -1043,6 +1228,17 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
                         log_entries.append((line, "WARN"))
                     self._refresh_state()
 
+        if self.is_minimized:
+            if log_entries:
+                self._pending_minimized_logs.extend(log_entries)
+            if latest_progress is not None:
+                self._pending_minimized_progress = latest_progress
+            if queue_dirty:
+                self._pending_minimized_queue_dirty = True
+            if info_panel_dirty:
+                self._pending_minimized_info_panel_dirty = True
+            return
+
         if log_entries:
             self.console.append_batch(log_entries)
 
@@ -1071,6 +1267,71 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
             self.input_list.render()
         if info_panel_dirty:
             self._sync_info_panel()
+
+
+    def _show_update_button(self, info: Any) -> None:
+        if not hasattr(self, "btn_update"):
+            return
+        lang = self.settings.language
+        text = t("update_available_btn", lang, version=getattr(info, "version", ""))
+        self.btn_update.configure(text=text, state="normal")
+        if not getattr(self.btn_update, "winfo_ismapped", lambda: False)():
+            self.btn_update.pack(side="left", padx=(8, 0))
+
+    def _on_update_clicked(self) -> None:
+        if not self._update_info:
+            return
+        lang = self.settings.language
+        notes = getattr(self._update_info, "notes", "").strip()
+        if len(notes) > 400:
+            notes = notes[:400] + "..."
+        prompt = t(
+            "update_dialog_prompt",
+            lang,
+            version=getattr(self._update_info, "version", ""),
+            notes=notes if notes else "—",
+        )
+        if not messagebox.askyesno(t("update_dialog_title", lang), prompt):
+            return
+        self.btn_update.configure(
+            text=t("update_downloading", lang, percent=0),
+            state="disabled",
+        )
+        self.controller.start_update_download(self._update_info)
+
+    def _handle_update_download_event(self, event: UpdateDownloadEvent) -> None:
+        lang = self.settings.language
+        if event.stage == "downloading":
+            pct = event.percent
+            self.btn_update.configure(
+                text=t("update_downloading", lang, percent=pct),
+                state="disabled",
+            )
+        elif event.stage == "done":
+            self.btn_update.configure(
+                text=t("update_ready_launch", lang),
+                state="disabled",
+            )
+            if event.path:
+                try:
+                    from ..core.updater import launch_installer
+
+                    launch_installer(event.path)
+                    self._on_close()
+                except Exception as exc:
+                    messagebox.showerror(
+                        t("app_title", lang),
+                        t("update_failed", lang, error=str(exc)),
+                    )
+                    self._show_update_button(self._update_info)
+        elif event.stage == "error":
+            err_msg = event.error or "Unknown error"
+            if "SHA-256" in err_msg:
+                display_msg = t("update_sha256_failed", lang)
+            else:
+                display_msg = t("update_failed", lang, error=err_msg)
+            messagebox.showerror(t("app_title", lang), display_msg)
+            self._show_update_button(self._update_info)
 
     def _handle_ffmpeg_event(self, event: FFmpegDownloadEvent) -> None:
         if event.stage == "downloading":

@@ -22,6 +22,7 @@ from .models import (
     PatchResult,
     ProgressEvent,
 )
+from .preflight import make_plan, run_preflight
 from .prober import probe
 from .strategies import get_strategy
 from .v4_patcher import MethodV4DirectPatch
@@ -134,6 +135,16 @@ def patch(
 
     stderr_tail: deque[str] = deque(maxlen=15)
 
+    # Smart pre-flight (audio normalise / bitrate cap) works on a temp copy; the
+    # original source is never modified. ``work_src`` feeds the patch strategies.
+    work_src = src
+    work_before = before
+    plan = make_plan(
+        before,
+        normalize_audio=req.auto_normalize_audio,
+        cap_bitrate=req.auto_cap_bitrate,
+    )
+
     def on_stdout(line: str) -> None:
         frac = _parse_progress(line, before.duration_s)
         if frac is not None:
@@ -144,6 +155,23 @@ def patch(
         emit(LogEvent(line, "DEBUG"))
 
     try:
+        if plan.needed:
+            if paths is None:
+                emit(LogEvent("[PREFLIGHT] Skipped: FFmpeg is not configured.", "WARN"))
+            else:
+                what = " + ".join(
+                    n
+                    for n, on in (
+                        ("audio -> AAC 48kHz stereo", plan.normalize_audio),
+                        ("bitrate cap ~16 Mbps", plan.cap_bitrate),
+                    )
+                    if on
+                )
+                emit(LogEvent(f"[PREFLIGHT] Auto-fix: {what}", "INFO"))
+                work_src = run_preflight(src, plan, paths, emit, cancel_event)
+                work_before = probe(work_src, ffprobe_bin)
+                emit(LogEvent("[PREFLIGHT] Done; patching the fixed copy.", "OK"))
+
         if strategy.name == "v4-forensic":
             emit(LogEvent("Executing Method V4 Forensic Lossless Patch...", "INFO"))
 
@@ -152,7 +180,7 @@ def patch(
                 emit(LogEvent(msg, lvl))
 
             v4_patcher = MethodV4DirectPatch(
-                src=src,
+                src=work_src,
                 out=tmp,
                 target_timescale=req.timescale,
                 sync_mvhd=req.v4_sync_mvhd,
@@ -195,7 +223,7 @@ def patch(
             norm_name = strategy.name.replace("x1t-", "bxd-")
             is_pc = norm_name in ("bxd-experimental", "bxd-pc")
             bxd_patcher = MethodBXDDirectPatch(
-                src=src,
+                src=work_src,
                 out=tmp,
                 target_timescale=req.timescale,
                 multiplier=10,
@@ -210,11 +238,11 @@ def patch(
             bxd_patcher.execute()
         elif strategy.name == "direct-atom":
             emit(LogEvent("Executing Method V3 Direct MP4 atom patch...", "INFO"))
-            patch_video_track_timescale(src, tmp, req.timescale, cancel_event)
+            patch_video_track_timescale(work_src, tmp, req.timescale, cancel_event)
         else:
             if paths is None:
                 raise FFmpegNotFoundError("FFmpeg executable required for stream copy.")
-            args = strategy.build_args(req, before, tmp)
+            args = strategy.build_args(replace(req, src=work_src), work_before, tmp)
             emit(LogEvent("ffmpeg " + " ".join(f'"{a}"' if " " in a else a for a in args), "DEBUG"))
             code = run_streaming(paths.ffmpeg, args, on_stdout, on_stderr, cancel_event)
             if code != 0:
@@ -225,12 +253,12 @@ def patch(
         norm_strat = strategy.name.replace("x1t-", "bxd-")
         if norm_strat == "bxd-hybrid" and req.bxd_max_tail_ms > 0:
             dur_tol = max(0.25, (req.bxd_max_tail_ms / 1000.0) + 0.1)
-        warnings = verify(before, after, req.timescale, duration_tolerance_s=dur_tol)
+        warnings = verify(work_before, after, req.timescale, duration_tolerance_s=dur_tol)
         for w in warnings:
             emit(LogEvent(w, "WARN"))
 
         # Output detailed payload integrity log
-        integrity = verify_payload_integrity(src, tmp)
+        integrity = verify_payload_integrity(work_src, tmp)
         experimental = any(status == "EXPERIMENTAL" for status in integrity.values())
         for item, status in integrity.items():
             level: LogLevel = (
@@ -267,6 +295,9 @@ def patch(
         except Exception:
             pass
         raise PatchError(str(exc), list(stderr_tail)) from exc
+    finally:
+        if work_src != src:
+            work_src.unlink(missing_ok=True)
 
     after = replace(after, path=final)
     elapsed = time.perf_counter() - start

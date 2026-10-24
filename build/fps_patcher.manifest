@@ -3,7 +3,7 @@
   <assemblyIdentity
     type="win32"
     name="FPSPatcherStudio"
-    version="0.5.0.0"
+    version="0.6.2.0"
     processorArchitecture="*"
   />
   <description>FPS Patcher Studio</description>

@@ -115,6 +115,9 @@ class Settings:
     verify_after: bool = True
     backup_original: bool = True
     stop_on_error: bool = False
+    auto_normalize_audio: bool = True
+    auto_cap_bitrate: bool = False
+    check_updates_on_start: bool = True
 
     # V2 FFmpeg
     check_ffmpeg_on_start: bool = True
@@ -220,10 +223,28 @@ class Settings:
         if not self.filename_template:
             self.filename_template = "{name}_{fps}fps"
 
-    def save(self, path: Path | None = None) -> None:
+    def save(self, path: Path | None = None, async_write: bool = False) -> None:
         self._clamp()
         path = path or app_data_dir() / "settings.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         payload = {f.name: getattr(self, f.name) for f in fields(self) if f.init}
-        path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        text = json.dumps(payload, indent=2)
+
+        def _do_write() -> None:
+            tmp = path.with_suffix(f".tmp_{os.getpid()}")
+            try:
+                tmp.write_text(text, encoding="utf-8")
+                tmp.replace(path)
+            except Exception:
+                path.write_text(text, encoding="utf-8")
+
+        if async_write:
+            import threading
+            threading.Thread(target=_do_write, daemon=True, name="settings-save").start()
+        else:
+            _do_write()
+
+    def save_async(self, path: Path | None = None) -> None:
+        """Non-blocking background save to prevent main UI thread stalls."""
+        self.save(path=path, async_write=True)
 

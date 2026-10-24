@@ -41,6 +41,7 @@ from .theme import (
     STATUS_WARNING_TEXT,
     ThemeTokens,
     attach_focus_ring,
+    configure_cached,
     font_body,
     font_caption,
     get_corner_radii,
@@ -115,6 +116,8 @@ class InputList(ctk.CTkFrame):
         self._last_order: list[str] = []
         self._ctk_images: dict[str, ctk.CTkImage] = {}
         self._thumb_requested: set[str] = set()
+        self._focus_paint_timer: Any = None
+        self._painted_focus_id: str | None = None
         self._can_patch = False
         self._busy = False
 
@@ -493,13 +496,75 @@ class InputList(ctk.CTkFrame):
         return selected[0] if selected else items[0]
 
     def _on_card_clicked(self, path: Path) -> None:
+        if self._focused_path == path:
+            return
         self._focused_path = path
         item = self.controller.items.get(path)
         if item is not None and item.info is not None:
             self.controller.current = item.info
         if self._on_focus_change is not None:
             self._on_focus_change(path)
-        self.render()
+        # Coalesce repaints: a fast click burst paints only the final selection.
+        if self._focus_paint_timer is not None:
+            self.after_cancel(self._focus_paint_timer)
+        self._focus_paint_timer = self.after(16, self._paint_focus)
+
+    def _paint_focus(self) -> None:
+        self._focus_paint_timer = None
+        items = self.controller.items.items
+        active = self._resolve_active_item(items)
+        active_id = active.item_id if active is not None else None
+        if active_id == self._painted_focus_id:
+            return
+        if self._painted_focus_id is not None:
+            prev = next((i for i in items if i.item_id == self._painted_focus_id), None)
+            if prev is not None:
+                self._update_row_focus(prev, is_focused=False)
+        if active is not None:
+            self._update_row_focus(active, is_focused=True)
+        self._painted_focus_id = active_id
+        self._update_preview_strip(active)
+
+    def _update_row_focus(self, item: QueueItem, *, is_focused: bool) -> None:
+        row = self._row_widgets.get(item.item_id)
+        if row is None:
+            return
+        tokens = self._theme_mgr.tokens
+        _, card_rad = get_corner_radii(self.settings.radius_style)
+
+        if is_focused:
+            if self._window_focused:
+                card_bg = tokens.accent_light
+                card_border = tokens.accent
+                primary_text_color = tokens.text
+                meta_text_color = tokens.text
+                sub_text_color = STATUS_DANGER_TEXT if item.error else tokens.muted
+            else:
+                card_bg = tokens.surface_raised
+                card_border = MAC_UNFOCUSED_BORDER
+                primary_text_color = tokens.text
+                meta_text_color = tokens.muted
+                sub_text_color = STATUS_DANGER_TEXT if item.error else tokens.muted
+        else:
+            card_bg = tokens.surface
+            card_border = tokens.border
+            primary_text_color = tokens.text
+            meta_text_color = tokens.muted
+            sub_text_color = STATUS_DANGER_TEXT if item.error else tokens.muted
+
+        configure_cached(row, corner_radius=card_rad, fg_color=card_bg, border_color=card_border)
+
+        path_w = getattr(row, "_lbl_path", None)
+        if path_w:
+            configure_cached(path_w, text_color=primary_text_color)
+        sub_w = getattr(row, "_lbl_sub", None)
+        if sub_w:
+            configure_cached(sub_w, text_color=sub_text_color)
+        meta_w = getattr(row, "_lbl_meta", None)
+        if meta_w:
+            configure_cached(meta_w, text_color=meta_text_color)
+
+        self._row_sigs[item.item_id] = self._make_sig(item, is_focused=is_focused)
 
     def _make_sig(self, item: QueueItem, *, is_focused: bool) -> tuple[Any, ...]:
         return (
@@ -524,12 +589,14 @@ class InputList(ctk.CTkFrame):
         selected_items = self.controller.items.selected()
         sel_count = len(selected_items)
 
-        self.lbl_selected_count.configure(
-            text=self._tr("selected_count", selected=sel_count, total=total)
+        configure_cached(
+            self.lbl_selected_count,
+            text=self._tr("selected_count", selected=sel_count, total=total),
         )
         all_sel = bool(items and sel_count == total)
-        self.btn_select_all.configure(
-            text=self._tr("deselect_all") if all_sel else self._tr("select_all")
+        configure_cached(
+            self.btn_select_all,
+            text=self._tr("deselect_all") if all_sel else self._tr("select_all"),
         )
 
         has_failed = any(i.status in ("failed", "skipped") for i in items)
@@ -546,6 +613,7 @@ class InputList(ctk.CTkFrame):
             self._row_widgets.clear()
             self._row_sigs.clear()
             self._last_order.clear()
+            self._painted_focus_id = None
             self.drop_zone.pack(fill="both", expand=True, padx=4, pady=12)
             self._update_preview_strip(None)
             return
@@ -597,6 +665,7 @@ class InputList(ctk.CTkFrame):
                 self._request_row_thumb(row_frame, item)
 
         self._last_order = current_order
+        self._painted_focus_id = active_id
         self._update_preview_strip(active_item)
 
     def _create_row_frame(
@@ -717,6 +786,7 @@ class InputList(ctk.CTkFrame):
             text=item.path.name,
             font=font_body(bold=True, size_opt=fsize),
             text_color=primary_text_color,
+            fg_color="transparent",
             anchor="w",
         )
         lbl_path.pack(anchor="w", fill="x")
@@ -727,6 +797,7 @@ class InputList(ctk.CTkFrame):
             text=sub_info,
             font=font_caption(fsize),
             text_color=sub_text_color,
+            fg_color="transparent",
             anchor="w",
         )
         lbl_sub.pack(anchor="w", fill="x")
@@ -737,6 +808,7 @@ class InputList(ctk.CTkFrame):
             text=_format_meta(item),
             font=font_caption(fsize),
             text_color=meta_text_color,
+            fg_color="transparent",
             anchor="e",
         )
         lbl_meta.grid(row=0, column=3, sticky="e", padx=(0, 10), pady=10)
@@ -776,6 +848,8 @@ class InputList(ctk.CTkFrame):
         row.chk = chk
         row._thumb = thumb_lbl
         row.thumb = thumb_lbl
+        row._center_box = center_box
+        row.center_box = center_box
         row._lbl_path = lbl_path
         row.lbl_path = lbl_path
         row._lbl_name = lbl_path
@@ -882,11 +956,25 @@ class InputList(ctk.CTkFrame):
                 item.status, is_selected=False, window_focused=self._window_focused
             )
 
+        is_dark = ctk.get_appearance_mode().lower() == "dark"
+        eff_card_bg = (
+            card_bg[1] if is_dark else card_bg[0]
+        ) if isinstance(card_bg, (tuple, list)) else card_bg
+
         row.configure(
             corner_radius=card_rad,
             fg_color=card_bg,
             border_color=card_border,
         )
+
+        center_b = getattr(row, "_center_box", None)
+        if center_b:
+            center_b.configure(fg_color="transparent")
+            with contextlib.suppress(Exception):
+                if hasattr(center_b, "_canvas"):
+                    center_b._canvas.configure(bg=eff_card_bg)
+                if hasattr(center_b, "_draw"):
+                    center_b._draw(no_color_updates=False)
 
         chk_w = getattr(row, "_chk", None)
         if chk_w:
@@ -924,8 +1012,14 @@ class InputList(ctk.CTkFrame):
             path_w.configure(
                 text=item.path.name,
                 text_color=primary_text_color,
+                fg_color="transparent",
                 font=font_body(bold=True, size_opt=fsize),
             )
+            with contextlib.suppress(Exception):
+                if hasattr(path_w, "_canvas"):
+                    path_w._canvas.configure(bg=eff_card_bg)
+                if hasattr(path_w, "_draw"):
+                    path_w._draw(no_color_updates=False)
 
         sub_w = getattr(row, "_lbl_sub", None)
         if sub_w:
@@ -933,16 +1027,28 @@ class InputList(ctk.CTkFrame):
             sub_w.configure(
                 text=sub_info,
                 text_color=sub_text_color,
+                fg_color="transparent",
                 font=font_caption(fsize),
             )
+            with contextlib.suppress(Exception):
+                if hasattr(sub_w, "_canvas"):
+                    sub_w._canvas.configure(bg=eff_card_bg)
+                if hasattr(sub_w, "_draw"):
+                    sub_w._draw(no_color_updates=False)
 
         meta_w = getattr(row, "_lbl_meta", None)
         if meta_w:
             meta_w.configure(
                 text=_format_meta(item),
                 text_color=meta_text_color,
+                fg_color="transparent",
                 font=font_caption(fsize),
             )
+            with contextlib.suppress(Exception):
+                if hasattr(meta_w, "_canvas"):
+                    meta_w._canvas.configure(bg=eff_card_bg)
+                if hasattr(meta_w, "_draw"):
+                    meta_w._draw(no_color_updates=False)
 
         status_w = getattr(row, "_status_badge", None)
         if status_w:
@@ -1014,7 +1120,8 @@ class InputList(ctk.CTkFrame):
             except Exception:
                 pass
 
-        self.after(0, update_ui)
+        with contextlib.suppress(Exception):
+            self.after(0, update_ui)
 
     def _update_preview_strip(self, active_item: QueueItem | None) -> None:
         if not bool(self.player_switch.get()) or active_item is None:
@@ -1059,11 +1166,13 @@ class InputList(ctk.CTkFrame):
         items = self.controller.items.items
         sel_count = len(self.controller.items.selected())
         all_sel = bool(items and sel_count == len(items))
-        self.btn_select_all.configure(
-            text=self._tr("deselect_all") if all_sel else self._tr("select_all")
+        configure_cached(
+            self.btn_select_all,
+            text=self._tr("deselect_all") if all_sel else self._tr("select_all"),
         )
-        self.lbl_selected_count.configure(
-            text=self._tr("selected_count", selected=sel_count, total=len(items))
+        configure_cached(
+            self.lbl_selected_count,
+            text=self._tr("selected_count", selected=sel_count, total=len(items)),
         )
 
     def _toggle_select_all(self) -> None:
