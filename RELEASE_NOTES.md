@@ -38,10 +38,10 @@ frozen build, Windows installer and portable zip below were built from branch
 
 | Artifact | Exact size | SHA-256 |
 |---|---:|---|
-| `FPSPatcherStudio-v0.9.0-Setup.exe` | 88,045,551 B | `3f946b3a5e732f1d4f0988e9b271888100d520a6e04b058aa3fd32cc14e6d25b` |
-| `FPSPatcherStudio-v0.9.0-win64.zip` | 122,846,936 B | `f0ae5a9f485391ca34033e5e3a340d368501096fb463630b025f0a57a155a046` |
+| `FPSPatcherStudio-v0.9.0-Setup.exe` | 88,036,840 B | `72bcea663a2b6e8f993876aa552f9d03744b01d4ac86f5e6657b293f224d828f` |
+| `FPSPatcherStudio-v0.9.0-win64.zip` | 122,847,007 B | `49c8b227c9dfdfd93836cd752984fd41f14a0848420971bacf1f217f94017232` |
 
-One-folder `dist/FPSPatcherStudio/`: **322,912,074 B** (183 files). The zip keeps
+One-folder `dist/FPSPatcherStudio/`: **322,912,234 B** (183 files). The zip keeps
 the top-level `FPSPatcherStudio/` folder. Checksum sidecars use the
 `<lowercase-hash>  <filename>` (sha256sum) format.
 
@@ -49,8 +49,8 @@ Size deltas:
 
 | Measure | v0.9.0 | vs pre-Qt baseline | vs dual-UI build |
 |---|---:|---:|---:|
-| `dist` | 322,912,074 B | +63,472,152 B (+24.46%) | -12,135,503 B (-3.62%) |
-| `Setup.exe` | 88,045,551 B | +15,314,820 B (+21.05%) | -3,375,054 B (-3.69%) |
+| `dist` | 322,912,234 B | +63,472,312 B (+24.46%) | -12,135,343 B (-3.62%) |
+| `Setup.exe` | 88,036,840 B | +15,306,109 B (+21.05%) | -3,383,765 B (-3.69%) |
 
 Baselines: pre-Qt `dist` 259,439,922 B / installer 72,730,731 B; dual-UI `dist`
 335,047,577 B / installer 91,420,605 B.

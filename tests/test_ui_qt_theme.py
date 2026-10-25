@@ -239,6 +239,15 @@ def test_new_install_uses_crimson_but_existing_files_keep_their_preset(
     assert chosen.window_alpha == 1.0
     assert chosen.qt_v090_migrated is True
 
+    translucent = tmp_path / "translucent.json"
+    translucent.write_text(
+        json.dumps({"theme_preset": "Graphite", "window_alpha": 0.98}),
+        encoding="utf-8",
+    )
+    migrated_translucent = Settings.load(translucent)
+    assert migrated_translucent.theme_preset == "Crimson Gamer"
+    assert migrated_translucent.window_alpha == 1.0
+
     still_obsidian = tmp_path / "still_obsidian.json"
     still_obsidian.write_text(
         json.dumps({"theme_preset": "Obsidian", "qt_v090_migrated": True}),

@@ -196,7 +196,11 @@ class Settings:
             "yes",
         )
         if needs_migration:
-            if str(raw.get("theme_preset", "Obsidian")) == "Obsidian":
+            try:
+                old_alpha = float(raw.get("window_alpha", 1.0))
+            except (TypeError, ValueError):
+                old_alpha = 0.98
+            if str(raw.get("theme_preset", "Obsidian")) == "Obsidian" or old_alpha < 1.0:
                 filtered["theme_preset"] = DEFAULT_THEME_PRESET
             filtered["window_alpha"] = 1.0
             filtered["qt_v090_migrated"] = True
