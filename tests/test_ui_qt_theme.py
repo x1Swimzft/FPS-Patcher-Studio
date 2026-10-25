@@ -131,6 +131,11 @@ def test_make_theme_resolves_mode_density_metrics_and_preset() -> None:
     comfortable = make_theme(Settings(layout_density="Comfortable"))
     assert (comfortable.outer, comfortable.inner, comfortable.spacing) == (6, 10, 12)
 
+    accent = make_theme(Settings(custom_accent="#FF00FF"))
+    assert accent.color("accent") == "#ff00ff"
+    assert accent.card_radius == accent.radii.card
+    assert accent.control_radius == accent.radii.control
+
 
 def test_build_qss_uses_theme_values_and_variant_switches() -> None:
     theme = make_theme(Settings())
