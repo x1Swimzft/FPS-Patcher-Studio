@@ -5,7 +5,7 @@
 FPS Patcher Studio now runs on a native **PySide6/Qt 6** interface. The legacy
 Tk/CustomTkinter UI has been removed; Qt is the only UI runtime. The production
 frozen build, Windows installer and portable zip below were built from branch
-`ui/pyside6` (`d542feb`) and smoke-tested on Windows x64.
+`ui/pyside6` (`67be740`) and smoke-tested on Windows x64.
 
 ### Highlights
 
