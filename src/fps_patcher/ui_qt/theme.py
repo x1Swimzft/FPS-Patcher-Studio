@@ -10,7 +10,7 @@ import contextlib
 import ctypes
 import sys
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -408,6 +408,16 @@ class Theme:
     def is_dark(self) -> bool:
         return self.mode == "dark"
 
+    @property
+    def card_radius(self) -> int:
+        """Alias used by the shared card widgets."""
+        return self.radii.card
+
+    @property
+    def control_radius(self) -> int:
+        """Alias used by the shared control widgets."""
+        return self.radii.control
+
     def __getattr__(self, name: str) -> Any:
         """Expose density/metrics/radii/type fields directly (e.g. ``outer``)."""
         if name.startswith("__"):
@@ -418,9 +428,31 @@ class Theme:
         raise AttributeError(f"{type(self).__name__!r} has no attribute {name!r}")
 
 
+def _custom_accent(raw: str) -> str | None:
+    accent = (raw or "").strip()
+    if len(accent) != 7 or not accent.startswith("#"):
+        return None
+    try:
+        int(accent[1:], 16)
+    except ValueError:
+        return None
+    return accent.lower()
+
+
 def make_theme(settings: Settings) -> Theme:
     """Resolve presets and layout switches from persisted settings."""
     tokens = PRESETS.get(settings.theme_preset, PRESETS["Obsidian"])
+    accent = _custom_accent(getattr(settings, "custom_accent", ""))
+    if accent:
+        tokens = replace(
+            tokens,
+            accent=(accent, accent),
+            accent_hover=(accent, accent),
+            accent_pressed=(accent, accent),
+            accent_dim=("", ""),
+            accent_dim_border=("", ""),
+            on_accent=("", ""),
+        )
     mode = "light" if settings.appearance == "light" else "dark"
     density = DENSITY_METRICS.get(
         getattr(settings, "layout_density", "Compact"), DENSITY_METRICS["Compact"]
