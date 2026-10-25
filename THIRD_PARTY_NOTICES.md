@@ -9,7 +9,8 @@
 | Component | Author / Maintainer | Primary License | Used For |
 |---|---|---|---|
 | [Python](https://www.python.org/) | Python Software Foundation | PSF License 2.0 | CPython 3.11 Runtime |
-| [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter) | Tom Schimansky | Creative Commons Zero v1.0 / MIT | Modern desktop UI framework |
+| [PySide6 / Qt 6](https://doc.qt.io/qtforpython-6/) | The Qt Company / Qt Project | GNU LGPL v3 (Qt Company LGPL exception) | Qt 6 widget UI shell and Qt platform/style/image plugins |
+| [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter) | Tom Schimansky | Creative Commons Zero v1.0 / MIT | Legacy desktop UI framework |
 | [TkinterDnD2](https://github.com/petasis/tkinterdnd2) | Georgios Petasis & Michael Lange | MIT License | Drag-and-drop file support |
 | [pywinstyles](https://github.com/Akash-Bora/pywinstyles) | Akash Bora | MIT License | Windows 10/11 Acrylic, Mica & title bar theming |
 | [Pillow](https://python-pillow.org/) | Alex Clark and Contributors | HPND License | Image loading, thumbnail resizing, icon processing |
@@ -326,3 +327,42 @@ every copy of the combined executable is accompanied by a complete copy of
 the source code of the bootloader.
 ```
 *Because of this exception, distributing FPS Patcher Studio under the MIT License is fully permissible.*
+
+---
+
+## 10. PySide6 / Qt 6 (LGPL v3 Compliance Notice)
+
+- **Project**: Qt for Python (PySide6) and the Qt 6 libraries
+- **Website**: https://doc.qt.io/qtforpython-6/ and https://www.qt.io/
+- **Components**: `PySide6`, `shiboken6`, `Qt6Core`, `Qt6Gui`, `Qt6Widgets`,
+  `Qt6Svg` (transitive plugin dependency) and the Qt platform/style/image-format
+  plugins shipped in `_internal/PySide6/plugins`
+- **License**: GNU Lesser General Public License version 3 (LGPL v3). The Qt
+  libraries used by this application are dynamically linked; no GPL-only Qt
+  module is used.
+- **License text**: https://www.gnu.org/licenses/lgpl-3.0.html and
+  https://www.gnu.org/licenses/gpl-3.0.html (LGPL v3 incorporates GPL v3 terms).
+  The full LGPL v3 text is also distributed with the Qt/PySide6 wheels.
+
+### Compliance & Separation Notice
+
+1. **Dynamic linking only**: the frozen one-folder build (`dist\FPSPatcherStudio`)
+   ships Qt as separate DLLs under `_internal\PySide6`. The application does not
+   statically link or modify Qt.
+2. **Replaceable libraries**: users may replace the bundled Qt DLLs and plugins
+   with compatible builds. In the one-folder layout, replace the files in
+   `_internal\PySide6` and `_internal\PySide6\plugins` in place; no recompilation
+   of FPS Patcher Studio is required. Keep the same Qt 6.12 ABI and plugin layout.
+3. **Source code**: PySide6, shiboken6 and Qt source are available from
+   https://download.qt.io/official_releases/QtForPython/ and
+   https://download.qt.io/official_releases/qt/ (or the corresponding release
+   tags in the Qt/PySide repositories). FPS Patcher Studio's own source is
+   available in this repository.
+4. **No warranty**: Qt is provided "AS IS", without warranty of any kind, as
+   stated in the LGPL v3.
+5. **Notice retention**: this notice is copied into the application folder by
+   `build/release.ps1` (`THIRD_PARTY_NOTICES.md`) and must remain with every
+   redistributed build.
+
+*This notice is not legal advice; confirm distribution terms with counsel before
+shipping a commercial build.*
