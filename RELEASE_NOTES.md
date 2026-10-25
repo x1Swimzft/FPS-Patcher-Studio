@@ -5,7 +5,7 @@
 FPS Patcher Studio now runs on a native **PySide6/Qt 6** interface. The legacy
 Tk/CustomTkinter UI has been removed; Qt is the only UI runtime. The production
 frozen build, Windows installer and portable zip below were built from branch
-`ui/pyside6` (`b44fb34`) and smoke-tested on Windows x64.
+`ui/pyside6` (`d542feb`) and smoke-tested on Windows x64.
 
 ### Highlights
 
@@ -26,6 +26,9 @@ frozen build, Windows installer and portable zip below were built from branch
 - **Accessibility and contrast** — accessible names on icon-only and interactive
   controls, visible keyboard focus rings, and WCAG AA contrast checks across all
   seven presets in light and dark modes.
+- **Final polish** — Crimson Gamer is the first preset card and the reset default;
+  pre-v0.9.0 Obsidian settings migrate to Crimson with a fully opaque window; and
+  the Custom target FPS field no longer duplicates the Output timescale.
 - **Legacy Tk removed** — `customtkinter`, `tkinterdnd2` and `pywinstyles` are no
   longer dependencies; Tcl/Tk, CustomTkinter and the old data files are excluded
   from the frozen build. The payload contains no `tcl8*`/`tk8*`, `tcl86t.dll`,
