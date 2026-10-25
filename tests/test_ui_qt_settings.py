@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import fields
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -40,7 +40,9 @@ def _dialog(qtbot: Any, settings: Settings) -> SettingsDialog:
 def _show(dialog: SettingsDialog) -> None:
     dialog.show()
     QApplication.processEvents()
-    dialog.layout().activate()
+    layout = dialog.layout()
+    assert layout is not None
+    layout.activate()
     QApplication.processEvents()
 
 
@@ -54,9 +56,11 @@ def test_dialog_size_and_footer_alignment(qtbot: Any, appdata: Path) -> None:
     footer = dialog.findChild(QWidget, "SettingsFooter")
     assert footer is not None
     assert footer.height() == 52
-    assert footer.layout().contentsMargins().left() == 20
-    assert footer.layout().contentsMargins().top() == 10
-    assert footer.layout().spacing() == 8
+    footer_layout = footer.layout()
+    assert footer_layout is not None
+    assert footer_layout.contentsMargins().left() == 20
+    assert footer_layout.contentsMargins().top() == 10
+    assert footer_layout.spacing() == 8
 
     assert dialog._reset_btn.objectName() == "SettingsFooterButton"
     assert dialog._cancel_btn.objectName() == "SettingsFooterButton"
@@ -110,7 +114,7 @@ def test_seven_preset_swatches_select_and_preview(qtbot: Any, appdata: Path) -> 
     assert next(iter(dialog._preset_cards)) == "Crimson Gamer"
     assert set(dialog._preset_cards) == set(dialog._preset.itemText(i) for i in range(7))
     assert sum(card.property("selected") == "true" for card in cards) == 1
-    assert all(len(card.dots) == 3 for card in cards)
+    assert all(len(cast(Any, card).dots) == 3 for card in cards)
 
     graphite = dialog._preset_cards["Graphite"]
     qtbot.mouseClick(graphite, Qt.MouseButton.LeftButton)

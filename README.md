@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-v0.7.0-blue.svg)
+![Version](https://img.shields.io/badge/version-v1.0.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.11+-3776AB.svg?logo=python&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-Windows%2064--bit-0078D6.svg?logo=windows&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
@@ -11,7 +11,7 @@
 **High-precision MP4/MOV container timing patcher with Apple macOS HIG desktop aesthetic and lossless color preservation.**  
 *Direct ISO-BMFF atom rewriting • Bit-exact sample preservation • Sub-second processing • X1T Engine*
 
-[📥 Downloads](#-downloads-v070) • [🛡️ Security & Integrity](#️-security-provenance--virustotal-transparency) • [✨ Key Features](#-key-features) • [⚙️ Presets](#️-patching-presets-x1t-engine) • [🔍 Forensic Inspector](#-mp4-forensic-inspector) • [🚀 Getting Started](#-getting-started)
+[📥 Downloads](#-downloads-v100) • [🛡️ Security & Integrity](#️-security-provenance--virustotal-transparency) • [✨ Key Features](#-key-features) • [⚙️ Presets](#️-patching-presets-x1t-engine) • [🔍 Forensic Inspector](#-mp4-forensic-inspector) • [🚀 Getting Started](#-getting-started)
 
 </div>
 
@@ -35,30 +35,38 @@ Unlike traditional video converters or FFmpeg stream copying, FPS Patcher Studio
 
 ---
 
-## 📥 Downloads (v0.7.0)
+## 📥 Downloads (v1.0.0)
 
-| Distribution | File | Architecture | SHA-256 Checksum | Description |
-|---|---|---|---|---|
-| **Installer** | [FPSPatcherStudio-v0.7.0-Setup.exe](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases/download/v0.7.0/FPSPatcherStudio-v0.7.0-Setup.exe) | Windows x64 | `f82e527ab980268daae564b3dcd100ff6f06d1ad83ed6d6cde7d91ee83429631` | Inno Setup installer with desktop shortcut & uninstaller |
-| **Portable** | [FPSPatcherStudio-v0.7.0-win64.zip](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases/download/v0.7.0/FPSPatcherStudio-v0.7.0-win64.zip) | Windows x64 | `a169b861cdac077d43b39e88591bdc42881b6be6bb26ecb8d38f9fae0a642ef9` | Standalone portable archive — extract and run `FPSPatcherStudio.exe` |
+| Distribution | File | Architecture |
+|---|---|---|
+| **Installer** | [FPSPatcherStudio-v1.0.0-Setup.exe](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases/download/v1.0.0/FPSPatcherStudio-v1.0.0-Setup.exe) | Windows x64 |
+| **Portable** | [FPSPatcherStudio-v1.0.0-win64.zip](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases/download/v1.0.0/FPSPatcherStudio-v1.0.0-win64.zip) | Windows x64 |
+
+The links only resolve after v1.0.0 is published. Until then, build from source
+(`build/release.ps1`) or use the artifacts produced by that script in `release/`.
+Approximate sizes: installer ~84 MB, portable zip ~117 MB, one-folder build ~323 MB
+(189 files). Exact sizes and hashes are in `FPSPatcherStudio-v1.0.0.sha256` and
+`FPSPatcherStudio-v1.0.0.manifest.json`, which are generated from the artifacts
+themselves and therefore are the authoritative numbers.
 
 ---
 
 ## 🛡️ Security, Provenance & VirusTotal Transparency
 
-FPS Patcher Studio is 100% open-source software built reproducibly from source. We believe in total security transparency and publish multi-engine scan results for every release.
+FPS Patcher Studio is open source and built from this repository with
+`build/release.ps1` (PyInstaller + Inno Setup). The v1.0.0 artifacts are
+**unsigned**: no VirusTotal "clean" claim is made here, and none should be
+inferred. Verify the SHA-256 hash before running anything:
 
-### VirusTotal Inspection Matrix
-
-| Artifact | SHA-256 Hash | VirusTotal Detection | Major Vendors (66+ Clean) | Heuristic Flags |
-|---|---|---|---|---|
-| **Installer**<br>`FPSPatcherStudio-v0.7.0-Setup.exe` | `f82e527ab980268daae564b3dcd100ff6f06d1ad83ed6d6cde7d91ee83429631` | [**Clean**](https://www.virustotal.com/gui/file/f82e527ab980268daae564b3dcd100ff6f06d1ad83ed6d6cde7d91ee83429631) | ✅ **Clean** (All tier-1 enterprise and consumer antivirus engines) | Standard open-source executable |
-| **Portable ZIP**<br>`FPSPatcherStudio-v0.7.0-win64.zip` | `a169b861cdac077d43b39e88591bdc42881b6be6bb26ecb8d38f9fae0a642ef9` | [**Clean**](https://www.virustotal.com/gui/file/a169b861cdac077d43b39e88591bdc42881b6be6bb26ecb8d38f9fae0a642ef9) | ✅ **Clean** (Microsoft Defender, Kaspersky, BitDefender, ESET, Avast, Sophos, CrowdStrike) | Standalone packaged Python archive |
+```powershell
+certutil -hashfile FPSPatcherStudio-v1.0.0-Setup.exe SHA256
+Get-Content FPSPatcherStudio-v1.0.0.sha256
+```
 
 ### Understanding False Positives & Code Signing
-- **Heuristic False Positives**: PyInstaller packages Python applications by embedding a compressed archive inside a PE wrapper. Automated machine-learning heuristics occasionally misclassify new, unrated PyInstaller binaries. Over 66 tier-1 vendors report 0 detections.
-- **Authenticode Signature**: The current v0.9.0 release is unsigned while the project applies for free code signing through SignPath Foundation. Historical v0.7.0 builds used a project self-signed developer certificate (`CN=FPS Patcher Studio (Dev)`) and are not trusted by public certificate roots.
-- **Formal Dispute Dossier**: Active vendor whitelisting disputes and templates are documented in [docs/FALSE_POSITIVE_DISPUTES.md](docs/FALSE_POSITIVE_DISPUTES.md).
+- **Heuristic false positives**: PyInstaller embeds a compressed Python archive in a PE wrapper. Machine-learning heuristics can misclassify new, unrated binaries. This risk is reduced by Authenticode signing and download reputation, not by "zero detections" claims.
+- **Authenticode signature**: v1.0.0 is unsigned while the project applies for free code signing through SignPath Foundation. Older v0.7.0 builds used a project self-signed developer certificate (`CN=FPS Patcher Studio (Dev)`) and are not trusted by public certificate roots.
+- **Formal dispute dossier**: vendor whitelisting disputes and templates are documented in [docs/FALSE_POSITIVE_DISPUTES.md](docs/FALSE_POSITIVE_DISPUTES.md).
 
 ### Code signing policy
 Free code signing provided by SignPath.io, certificate by SignPath Foundation (application pending).
@@ -71,12 +79,15 @@ Free code signing provided by SignPath.io, certificate by SignPath Foundation (a
 ### How to Verify Downloaded Binaries
 Open PowerShell and verify the SHA-256 hash before running:
 ```powershell
-# For the Setup Installer:
-Get-FileHash -Path "FPSPatcherStudio-v0.7.0-Setup.exe" -Algorithm SHA256
-
-# For the Portable ZIP:
-Get-FileHash -Path "FPSPatcherStudio-v0.7.0-win64.zip" -Algorithm SHA256
+# Compare each file's hash with the matching line in the published sidecar
+Get-FileHash -Path "FPSPatcherStudio-v1.0.0-Setup.exe" -Algorithm SHA256
+Get-FileHash -Path "FPSPatcherStudio-v1.0.0-win64.zip" -Algorithm SHA256
+Get-Content "FPSPatcherStudio-v1.0.0.sha256"
 ```
+
+The build also writes `release/FPSPatcherStudio-v1.0.0.sha256`,
+`release/FPSPatcherStudio-v1.0.0.manifest.json` and a CycloneDX SBOM at
+`release/FPSPatcherStudio-v1.0.0.cdx.json`.
 
 ### Security & Compliance Resources
 - 🔒 **[SECURITY.md](SECURITY.md)**: Vulnerability disclosure policy, response SLA, and safe harbor.
@@ -149,11 +160,20 @@ Open the **Forensic** window to inspect deep container metadata before and after
 ## 🚀 Getting Started
 
 ### Method 1: Using Prebuilt Binary
-1. Download `FPSPatcherStudio-v0.7.0-Setup.exe` or portable `.zip` from [Releases](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases).
+1. Download `FPSPatcherStudio-v1.0.0-Setup.exe` or the portable `.zip` from [Releases](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases).
 2. Launch `FPSPatcherStudio.exe`.
-3. Drag & drop `.mp4` or `.mov` clips into the drop zone (or right-click in Windows Explorer).
-4. Select desired Target Preset (default: **X1T For Mobile**) or specify a custom timescale.
-5. Click **Start Patch**. Patched files will be saved instantly.
+3. Drag & drop `.mp4`, `.mov` or `.m4v` clips into the drop zone (or right-click in Windows Explorer).
+4. Select the target preset (default: **X1T For Mobile**) or specify a custom timescale.
+5. Click **Start Patch**. Patched files are saved next to the source or in the configured output folder.
+
+### Method 3: Headless CLI
+```powershell
+FPSPatcherStudio.exe --cli patch "clip.mp4" --preset 60 --output out --json
+FPSPatcherStudio.exe --cli probe "clip.mp4" --json
+FPSPatcherStudio.exe --cli score "clip.mp4" --profile tiktok --json
+```
+Run it from cmd/PowerShell: a windowed build attaches to the parent console. Exit codes are
+0 (ok), 1 (file failure), 2 (usage) and 130 (cancelled). See `BUILDING.md` §7.
 
 ### Method 2: Running from Source
 Requires [Python 3.11+](https://www.python.org/) and [uv](https://docs.astral.sh/uv/):
@@ -180,7 +200,7 @@ Run quality gates:
 uv run pytest -q
 
 # Run static type checking
-uv run mypy src tests
+uv run mypy src tests tools
 
 # Run code style and linter
 uv run ruff check src tests

@@ -1,5 +1,78 @@
 # Release Notes
 
+## v1.0.0 - Consolidation (2026-10-25)
+
+FPS Patcher Studio ships as a Qt-only application with the Phase 2 automation
+features and Phase 3 platform profiles complete, plus a headless CLI. PyInstaller
+remains the release backend; Nuitka was prepared but not adopted (see below).
+
+### Highlights
+
+- **Qt-only UI** — the Tk/CustomTkinter interface is gone; Qt is the sole runtime.
+  Every Phase 2/3 surface lives in the Qt UI: watch folder switch + auto-queue,
+  Explorer right-click verb, Rec.709 tag / metadata scrub options, platform profile
+  selector, per-row readiness badge.
+- **Readiness detail on the badge** — hovering a badge shows every check; clicking it
+  writes the per-check status, detail and recommendation to the Activity Console.
+- **Watch folder correctness** — files already in the folder when watching starts are
+  ignored (no backlog storm), files that change or arrive afterwards are queued, and
+  a Settings apply no longer restarts the watcher (so an export finishing during the
+  dialog is not lost).
+- **Headless CLI** — `--cli patch|probe|score` with `--json`, exit codes 0/1/2/130,
+  and no Qt import on that path. A windowed frozen build rebinds the parent console's
+  std handles, so output works from cmd/PowerShell including `> file`.
+- **Explorer coverage** — the per-user verb now registers `.mp4`, `.mov` and `.m4v`.
+- **Updater** — HTTP 404 from `/releases/latest` means "nothing published yet" instead
+  of a failed check.
+- **CI gates repaired** — `ruff check src tests tools` and `mypy src tests tools`
+  (94 files) are clean again; the previous 30 test/tool typing errors were fixed.
+
+### Release artifacts (v1.0.0, Windows x64, unsigned)
+
+| Artifact | Approx. size |
+|---|---:|
+| `FPSPatcherStudio-v1.0.0-Setup.exe` | ~84 MB |
+| `FPSPatcherStudio-v1.0.0-win64.zip` | ~117 MB |
+
+Exact sizes and SHA-256 hashes are written next to the artifacts in
+`FPSPatcherStudio-v1.0.0.sha256` and `FPSPatcherStudio-v1.0.0.manifest.json`; those
+self-generated files are authoritative. The one-folder `dist/FPSPatcherStudio/`
+build is ~323 MB (189 files), and the build also writes the CycloneDX SBOM
+`FPSPatcherStudio-v1.0.0.cdx.json` (recorded as `sbom_path` in the manifest).
+
+### Verification
+
+- `build/release.ps1` exited **0** (gates → PyInstaller → 6-second launch smoke →
+  Inno Setup → hashes → manifest). Artifacts are unsigned by design.
+- Gates at build time: `ruff check src tests tools` clean, `mypy src tests tools`
+  clean (94 files), `pytest -q` **372 passed**.
+- Frozen build: `--quick-patch <clip>` returned 0 and wrote the patched file;
+  `--cli probe <clip> --json` returned 0 with valid JSON on stdout (direct console
+  and redirected to a file).
+- Real-ffmpeg e2e tests (PCM `.mov` normalize, `colr` add/scrub with `mdat` hash)
+  ran as part of the suite.
+
+### Nuitka (roadmap 4.1)
+
+Not adopted. `build/build_nuitka.ps1` (isolated, dry-run by default) and a rewritten
+`docs/NUITKA_EVALUATION.md` are included, but this machine has no MSVC, so **no**
+size, cold-start or antivirus measurement exists and none is claimed. The release
+pipeline stays on PyInstaller.
+
+### Known limitations
+
+- Registry writes, toast display, real Explorer drag-and-drop and 150%/200% DPI were
+  not exercised end-to-end here; registry/UI behavior is covered by unit tests only.
+- The readiness score is a local metadata heuristic; it cannot guarantee that a
+  platform will skip recompression. HDR/BT.2020 is reported, never retagged.
+- Fragmented MP4 is skipped with a warning; offset repair for fragments is absent.
+- `notify_done`, `preserve_mtime`, `verify_after`, `backup_original`, `stop_on_error`,
+  `extra_ffmpeg_args`, `log_to_file` and `confirm_overwrite` are persisted settings
+  with no runtime consumer on the Qt line. They are documented here rather than
+  silently claimed to work.
+- The windowed EXE has no console of its own; a double-click launch discards CLI
+  output. Start it from a terminal for CLI mode.
+
 ## v0.9.0 - PySide6 UI Cutover (2026-10-25)
 
 FPS Patcher Studio now runs on a native **PySide6/Qt 6** interface. The legacy

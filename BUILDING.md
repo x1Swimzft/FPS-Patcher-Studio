@@ -123,7 +123,7 @@ if (-not $proc.HasExited) {
 
 ```powershell
 New-Item -ItemType Directory -Force -Path "release"
-Compress-Archive -Path "dist\FPSPatcherStudio" -DestinationPath "release\FPSPatcherStudio-v0.7.0-win64.zip" -Force
+Compress-Archive -Path "dist\FPSPatcherStudio" -DestinationPath "release\FPSPatcherStudio-v1.0.0-win64.zip" -Force
 ```
 
 ### Step 5.4: Compile Inno Setup Installer
@@ -131,9 +131,9 @@ Compress-Archive -Path "dist\FPSPatcherStudio" -DestinationPath "release\FPSPatc
 Locate `ISCC.exe` (typically in `C:\Program Files\Inno Setup 7\ISCC.exe` or `C:\Program Files (x86)\Inno Setup 6\ISCC.exe`) and compile:
 
 ```powershell
-& "C:\Program Files\Inno Setup 7\ISCC.exe" /DAppVersion=0.7.0 "build\installer.iss"
+& "C:\Program Files\Inno Setup 7\ISCC.exe" /DAppVersion=1.0.0 "build\installer.iss"
 ```
-The installer will be produced at `release\FPSPatcherStudio-v0.7.0-Setup.exe`.
+The installer will be produced at `release\FPSPatcherStudio-v1.0.0-Setup.exe`.
 
 ---
 
@@ -179,9 +179,9 @@ verb is unchanged.
 
 **Frozen windowed builds** use `--windows-console-mode=disable`, so the process has no
 stdout of its own. Starting `FPSPatcherStudio.exe --cli ...` from cmd/PowerShell works:
-the CLI calls `AttachConsole(ATTACH_PARENT_PROCESS)` and rebinds stdout/stderr to
-`CONOUT$`. Launching it by double-click still has no console to attach to, so output is
-discarded — use a terminal, or invoke the source entry point for automation.
+the CLI reattaches to the parent console or rebinds the inherited std handles, including
+`> file` redirection. Launching it by double-click still has no console to attach to, so
+output is discarded — use a terminal, or invoke the source entry point for automation.
 
 ---
 
@@ -190,14 +190,14 @@ discarded — use a terminal, or invoke the source entry point for automation.
 Calculate SHA-256 hashes for all generated release artifacts and record them in the standard `sha256sum` format:
 
 ```powershell
-Get-ChildItem "release" -File | Where-Object { $_.Name -like "FPSPatcherStudio-v0.7.0-*" -and $_.Extension -ne ".sha256" } |
+Get-ChildItem "release" -File | Where-Object { $_.Name -like "FPSPatcherStudio-v1.0.0-*" -and $_.Extension -ne ".sha256" } |
     ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)" } |
-    Set-Content -Path "release\FPSPatcherStudio-v0.7.0.sha256" -Encoding ASCII
+    Set-Content -Path "release\FPSPatcherStudio-v1.0.0.sha256" -Encoding ASCII
 ```
 
 Verify output:
 ```powershell
-Get-Content "release\FPSPatcherStudio-v0.7.0.sha256"
+Get-Content "release\FPSPatcherStudio-v1.0.0.sha256"
 ```
 
 ---

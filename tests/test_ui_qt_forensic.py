@@ -11,7 +11,7 @@ import pytest
 
 pytest.importorskip("PySide6")
 
-from PySide6.QtWidgets import QApplication  # noqa: E402
+from PySide6.QtWidgets import QApplication, QFileDialog  # noqa: E402
 
 from fps_patcher.config import Settings  # noqa: E402
 from fps_patcher.ui.strings import t  # noqa: E402
@@ -74,7 +74,7 @@ def _fake_diff(source: Path, target: Path) -> SimpleNamespace:
     )
 
 
-def _make_ready(dialog: ForensicDialog, diff: SimpleNamespace, target: Path) -> None:
+def _make_ready(dialog: ForensicDialog, diff: Any, target: Path) -> None:
     dialog._diff = diff
     dialog._analysis_inputs = (None, target)
     dialog._refresh_actions()
@@ -126,7 +126,7 @@ def test_export_json_calls_core_artifacts_writer(
         return paths  # type: ignore[return-value]
 
     monkeypatch.setattr(
-        fd.QFileDialog, "getExistingDirectory", staticmethod(lambda *a, **k: str(out_dir))
+        QFileDialog, "getExistingDirectory", staticmethod(lambda *a, **k: str(out_dir))
     )
     monkeypatch.setattr(fd, "export_diff_artifacts", fake_export)
     dialog.export_json_button.click()
@@ -151,7 +151,7 @@ def test_export_report_writes_markdown_report(
 
     report = tmp_path / "report.md"
     monkeypatch.setattr(
-        fd.QFileDialog,
+        QFileDialog,
         "getSaveFileName",
         staticmethod(lambda *a, **k: (str(report), "Markdown (*.md)")),
     )
@@ -178,7 +178,7 @@ def test_repair_runs_through_bridge_and_updates_status(
     _make_ready(dialog, _fake_diff(tmp_path / "orig.mp4", target), target)
 
     monkeypatch.setattr(
-        fd.QFileDialog,
+        QFileDialog,
         "getSaveFileName",
         staticmethod(lambda *a, **k: (str(output), "Videos (*.mp4)")),
     )

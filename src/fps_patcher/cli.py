@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import signal
 import sys
 import threading
@@ -23,6 +24,7 @@ from .core.models import FPS_PRESETS, SUPPORTED_EXTENSIONS, LogEvent, PatchReque
 from .core.patcher import patch
 from .core.platform_profiles import evaluate_readiness, profile_ids
 from .core.prober import probe
+from .core.strategies import get_strategy
 
 EXIT_OK = 0
 EXIT_FILE_ERROR = 1
@@ -33,28 +35,49 @@ _PRESET_TIMESCALES = {value: timescale for value, timescale in FPS_PRESETS.items
 _DEFAULT_TIMESCALE = 60000
 
 
+def _rebind_stream(name: str, std_id: int, kernel32: Any) -> None:
+    """Point sys.<name> at the inherited handle when the windowed build has none."""
+    stream = getattr(sys, name, None)
+    if stream is not None:
+        try:
+            if stream.fileno() >= 0:
+                return
+        except (OSError, ValueError, AttributeError):
+            pass
+    handle = kernel32.GetStdHandle(std_id)
+    if handle in (0, -1):
+        return
+    # FILE_TYPE_DISK: cmd/PowerShell redirected us to a file, so honour it.
+    if kernel32.GetFileType(handle) == 1:
+        import msvcrt
+
+        fd = msvcrt.open_osfhandle(handle, os.O_WRONLY)
+    else:
+        fd = os.open("CONOUT$", os.O_WRONLY)
+    stream_out = open(  # noqa: SIM115 - lifetime is the process
+        fd, "w", encoding="utf-8", buffering=1
+    )
+    setattr(sys, name, stream_out)
+
+
 def attach_console() -> None:
     """Windowed frozen build: borrow the parent console so CLI output is visible.
 
-    A ``--windows-console-mode=disable`` EXE has no stdout. Callers that need the
-    output must start it from a console (cmd/PowerShell); this reattaches and
-    rebinds the streams. No-ops when a console is already present.
+    A ``--windows-console-mode=disable`` EXE has no stdout. Starting it from
+    cmd/PowerShell (with or without ``> file``) gets the inherited std handles
+    rebound; a double-click launch has no console to attach to and stays silent.
+    No-op outside a frozen Windows build.
     """
-    if sys.platform != "win32":
+    if sys.platform != "win32" or not getattr(sys, "frozen", False):
         return
     try:
         from ctypes import WinDLL
 
         kernel32 = WinDLL("kernel32", use_last_error=True)
-        if kernel32.GetConsoleWindow():
-            return
-        if not kernel32.AttachConsole(-1):  # ATTACH_PARENT_PROCESS
-            return
-        for name in ("stdout", "stderr"):
-            stream = open(  # noqa: SIM115 - rebound for the process lifetime
-                "CONOUT$", "w", encoding="utf-8", buffering=1
-            )
-            setattr(sys, name, stream)
+        if kernel32.GetConsoleWindow() == 0 and not kernel32.AttachConsole(-1):
+            return  # ATTACH_PARENT_PROCESS unavailable: no console to borrow
+        _rebind_stream("stdout", -11, kernel32)
+        _rebind_stream("stderr", -12, kernel32)
     except Exception:
         return
 
@@ -94,8 +117,16 @@ def _info_dict(info: VideoInfo) -> dict[str, Any]:
     }
 
 
+def _strategy_name(value: str) -> str:
+    try:
+        get_strategy(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"unknown strategy {value!r}") from None
+    return value
+
+
 def _emit_stderr(event: object) -> None:
-    if isinstance(event, LogEvent):
+    if isinstance(event, LogEvent) and sys.stderr is not None:
         print(f"[{event.level}] {event.message}", file=sys.stderr)
 
 
@@ -123,7 +154,10 @@ def _parser() -> argparse.ArgumentParser:
     )
     patch_cmd.add_argument("--timescale", type=int, default=None, help="Explicit timescale.")
     patch_cmd.add_argument(
-        "--strategy", default=None, help="Patch strategy (default from settings)."
+        "--strategy",
+        type=_strategy_name,
+        default=None,
+        help="Patch strategy (default from settings).",
     )
     patch_cmd.add_argument("--output", type=Path, default=None, help="Output directory.")
     patch_cmd.add_argument("--normalize-audio", action="store_true")
@@ -151,7 +185,11 @@ def _parser() -> argparse.ArgumentParser:
 
 def _cmd_patch(args: argparse.Namespace, settings: Settings) -> int:
     ffmpeg = _locate_ffmpeg(settings)
-    timescale = args.timescale or args.preset or _DEFAULT_TIMESCALE
+    timescale = (
+        args.timescale
+        if args.timescale is not None
+        else (args.preset if args.preset is not None else _DEFAULT_TIMESCALE)
+    )
     if timescale <= 0:
         print("error: --timescale must be positive", file=sys.stderr)
         return EXIT_USAGE

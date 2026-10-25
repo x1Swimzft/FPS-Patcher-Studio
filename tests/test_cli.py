@@ -53,6 +53,18 @@ def test_cli_rejects_bad_preset_and_profile() -> None:
     with pytest.raises(SystemExit) as exc:
         main(["score", "clip.mp4", "--profile", "myspace"])
     assert exc.value.code == 2
+    with pytest.raises(SystemExit) as exc:
+        main(["patch", "clip.mp4", "--strategy", "not-a-strategy"])
+    assert exc.value.code == 2
+
+
+def test_cli_rejects_zero_timescale(
+    ff: FFmpegPaths, tmp_path: Path, capsys: Any
+) -> None:
+    clip = tmp_path / "clip.mp4"
+    clip.write_bytes(b"x")
+    assert main(["patch", str(clip), "--timescale", "0"], _settings(ff, tmp_path)) == 2
+    assert "positive" in capsys.readouterr().err
 
 
 def test_cli_rejects_unsupported_file_type(
@@ -155,6 +167,42 @@ def test_cli_cancel_returns_130(
     assert code == 130
     assert payload["cancelled"] is True
     assert payload["files"][0]["error"] == "cancelled"
+
+
+def test_cli_cancel_removes_partial_temp(
+    clip30: Path, ff: FFmpegPaths, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: Any
+) -> None:
+    """The cancel event reaches the runner and patcher cleanup leaves no `.part`."""
+    from fps_patcher.core.errors import PatchCancelledError
+
+    def cancel_inside(
+        _ffmpeg: object,
+        _args: object,
+        _on_stdout: object,
+        _on_stderr: object,
+        cancel_event: Any = None,
+    ) -> int:
+        assert cancel_event is not None
+        cancel_event.set()
+        raise PatchCancelledError("Patch cancelled by user.")
+    monkeypatch.setattr("fps_patcher.core.patcher.run_streaming", cancel_inside)
+    out_dir = tmp_path / "out"
+    code = main(
+        [
+            "patch",
+            str(clip30),
+            "--strategy",
+            "timescale",
+            "--output",
+            str(out_dir),
+            "--json",
+        ],
+        _settings(ff, out_dir),
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 130
+    assert payload["cancelled"] is True
+    assert list(out_dir.glob(".*.part")) == []
 
 
 def test_cli_patch_maps_options_to_request(

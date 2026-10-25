@@ -1,133 +1,104 @@
-# Technical Evaluation: Nuitka as Experimental Build Backend
+# Nuitka Evaluation (roadmap 4.1)
 
-**Target Project**: FPS Patcher Studio (`fps-patcher-studio`)  
-**Current Backend**: PyInstaller 6.x (One-folder, windowed build via `build/fps_patcher.spec`)  
-**Alternative Evaluated**: Nuitka 2.x+ (Python-to-C/C++ Ahead-of-Time Compiler)  
-**Date**: October 2026  
-**Status**: Feasibility Confirmed (Experimental Alternative)
+**Status: NOT RUN in this environment — script and checklist ready.**
+**Date:** 2026-10-25 · **App version:** 1.0.0 · **Current release backend:** PyInstaller 6.x
+(`build/fps_patcher.spec`, driven by `build/release.ps1`).
 
----
+| Check | Result on this machine |
+| --- | --- |
+| Windows | yes |
+| `cl.exe` on PATH | **no** |
+| Visual Studio / Build Tools install | **none** (`vswhere.exe` absent, no `Program Files\Microsoft Visual Studio`) |
+| PyInstaller | not installed in the project venv (`uv run --with pyinstaller` fetches it) |
+| Inno Setup 7 | present (`C:\Program Files\Inno Setup 7\ISCC.exe`) |
+| Nuitka build attempted | **no** — no C compiler, so no size, cold-start or AV number below is measured |
 
-## 1. Executive Summary
+Nothing in this document is a measurement of the Qt build. Earlier revisions of this file
+carried Tk-era numbers (`--enable-plugin=tk-inter`, CustomTkinter, "0 false positives",
+"~32 MB", "0.4.0.0") that no longer describe this project; they have been removed.
 
-| Dimension | PyInstaller (Current) | Nuitka (Evaluated) | Advantage |
-| :--- | :--- | :--- | :--- |
-| **Build Time** | 15 – 35 seconds | 6 – 15 minutes (cold compile) | **PyInstaller** (15x faster) |
-| **Toolchain Reqs** | Python only (`uv run --with pyinstaller`) | Python + MSVC (Visual Studio 2022) or MinGW64 | **PyInstaller** (zero extra toolchain) |
-| **Runtime Execution** | CPython bytecode (`.pyc`) in zip | Native machine code (C/C++ translation) | **Nuitka** (lower latency) |
-| **Anti-Virus (AV) Heuristics** | Moderate false positives (generic packer signatures) | Very low false positives (authentic MSVC PE) | **Nuitka** |
-| **Reverse Engineering** | Bytecode easily decompiled (`pycdc`, `uncompyle6`) | Compiled C binary (IDA/Ghidra disassembly required) | **Nuitka** |
-| **Tkinter / UI Stability** | Fully tested with `collect_data_files` | Requires explicit data & plugin flags | **PyInstaller** |
-| **Distribution Size** | ~38 MB (excluding FFmpeg) | ~32 MB (excluding FFmpeg) | **Nuitka** (~15% leaner) |
+## 1. Why Nuitka is on the roadmap
 
-**Recommendation**: Maintain **PyInstaller as the primary release backend** for rapid iteration, clean CI/CD, and zero-C-compiler dependencies. Provide **Nuitka as an optional experimental build target** for hardened enterprise deployments, anti-reverse-engineering, or when anti-virus heuristic false positives become a critical deployment hurdle.
+- Native C/C++ output instead of a PyInstaller bootloader + embedded bytecode.
+- Harder to decompile.
+- Standard MSVC PE headers, which is the usual argument for fewer heuristic AV hits.
 
----
+The last point is **not a guarantee**: an unsigned Nuitka EXE can still be flagged, and
+"0/70 on VirusTotal" is not something this project can promise. The real mitigation is
+**Authenticode code signing** (see `docs/CODE_SIGNING_POLICY.md` and
+`docs/SIGNPATH_APPLICATION.md`), independent of the packaging backend.
 
-## 2. Library Compatibility Deep-Dive
+## 2. Qt-era compatibility notes
 
-### 2.1 CustomTkinter (v6.x)
-- **Mechanism**: CustomTkinter loads JSON theme definitions (`assets/themes/*.json`) and font assets dynamically via `sys._MEIPASS` or package directory relative paths.
-- **Compatibility with Nuitka**: **Fully Compatible** with flag:
-  ```text
-  --include-package-data=customtkinter
-  ```
-- **Caveat**: Without `--include-package-data=customtkinter`, CustomTkinter fails at startup with `FileNotFoundError: Could not find theme file`.
+| Area | Concern | Handling |
+| --- | --- | --- |
+| PySide6 6.12 | Qt plugins (`platforms/qwindows.dll`, styles, imageformats) and `shiboken6` | `--enable-plugin=pyside6` (Nuitka's official plugin); verify the GUI starts, not just the CLI |
+| App assets | `src/fps_patcher/ui/assets` (fonts/icons) resolved relative to the package | `--include-package-data=fps_patcher` + explicit `--include-data-dir` |
+| Pillow | thumbnail decoding | normally auto-detected; check `thumbnails` on a real video |
+| `ctypes` / `winreg` | DWM backdrop, Job Objects, Explorer verb, console attach | stdlib, no extra flags; test the registry verb on a real machine |
+| `subprocess` | FFmpeg/FFprobe, PowerShell toast | external binaries are **not** bundled; FFmpeg is located at runtime as today |
+| Tcl/Tk | removed from the project in the Qt cutover | no `tk-inter` plugin, no Tk data |
 
-### 2.2 TkinterDnD2 (v0.6.3+)
-- **Mechanism**: TkinterDnD2 loads native Tcl/Tk C shared libraries (`tkdnd/win64/tkdnd.dll` and `pkgIndex.tcl`) into the active Tcl interpreter via `tk.eval("package require tkdnd")`.
-- **Compatibility with Nuitka**: **Compatible with manual asset inclusion**:
-  Nuitka's built-in `tk-inter` plugin packages standard Tcl/Tk, but is unaware of third-party Tcl extensions located inside `site-packages/tkinterdnd2`.
-  Required compilation flags:
-  ```text
-  --enable-plugin=tk-inter
-  --include-package-data=tkinterdnd2
-  ```
-  On Windows, Nuitka must bundle the `tkdnd` subdirectory preserving the directory structure relative to the Python package.
+The current PyInstaller spec excludes Tcl/Tk/CustomTkinter/TkinterDnD2/pywinstyles; the
+Nuitka script does not need those exclusions because the dependencies are gone.
 
-### 2.3 pywinstyles (v1.8+)
-- **Mechanism**: Calls Windows Desktop Window Manager (`dwmapi.dll`) and `user32.dll` via Python's standard `ctypes.windll`.
-- **Compatibility with Nuitka**: **100% Native Compatibility**.
-  Nuitka compiles `ctypes` bindings directly. Ctypes functions resolve Windows OS DLL symbols at runtime identically to CPython.
+## 3. Build script (separate from the release pipeline)
 
----
+`build/build_nuitka.ps1`:
 
-## 3. C Compiler Requirements on Windows
+- dry run by default (prints the exact command and exits 0); without MSVC it prints the
+  command and exits 3 so automation can tell "not run" from "ran";
+- `-Run` builds, `-SkipSmokeTest` skips the 6-second launch check;
+- fetches Nuitka with `uv run --with nuitka --with zstandard`, so `pyproject.toml`,
+  `uv.lock` and the PyInstaller spec are untouched (reversible by deleting `dist\nuitka`);
+- output: `dist\nuitka\FPSPatcherStudio.dist\`, not `dist\FPSPatcherStudio` and never `release\`;
+- refuses to fall back to MinGW — a MinGW PE is not the artifact this evaluation is about;
+- reads the version from `src/fps_patcher/__init__.py` (no duplicated version literal);
+- `--windows-console-mode=disable` keeps the windowed GUI; the CLI reattaches to the parent
+  console (`src/fps_patcher/cli.py::attach_console`).
 
-Nuitka is an Ahead-of-Time (AOT) compiler that translates Python AST into optimized C and C++ source code before passing it to a native C compiler.
-
-### 3.1 Supported Compilers on Windows
-1. **Microsoft Visual C++ (MSVC) — Recommended**:
-   - Visual Studio 2022 or "Build Tools for Visual Studio 2022" (requires `Desktop development with C++` workload).
-   - Links directly against Windows Universal C Runtime (UCRT).
-   - Produces PE binaries with standard Microsoft telemetry headers, significantly lowering SmartScreen / Defender suspicion.
-2. **MinGW-w64 (GCC/Clang)**:
-   - Nuitka can automatically download a portable `w64devkit` if no compiler is detected.
-   - *Limitation*: Binaries compiled with MinGW on Windows occasionally trigger heuristic alerts from Defender due to non-standard MSVC runtime linkage.
-
----
-
-## 4. Anti-Virus (AV) Detection Impact Analysis
-
-Generic PyInstaller executables are common targets for heuristic detection (e.g. `Win32:Trojan-gen`, `Heur.Bzc`) because the PyInstaller bootloader header has historically been abused by script-kiddie malware.
-
-| Detection Vector | PyInstaller | Nuitka |
-| :--- | :--- | :--- |
-| **Executable Stub** | Generic PyInstaller Bootloader | Pure native C compiled executable |
-| **Code Structure** | Embedded Python Bytecode Archive | Native machine instructions (`.text` section) |
-| **Entropy** | High (compressed archive in PE overlay) | Normal native PE executable entropy |
-| **VirusTotal Baseline** | Typically 1–4 false positives (unsigned) | 0 false positives (clean engine score) |
-| **SmartScreen Trust** | Harder to establish reputation unsigned | Establishes reputation faster |
-
----
-
-## 5. Step-by-Step Experimental Nuitka Build Guide
-
-To build FPS Patcher Studio experimentally using Nuitka on a Windows workstation:
-
-### Step 1: Install MSVC Build Tools
-Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) and select:
-- **MSVC v143 - VS 2022 C++ x64/x86 build tools**
-- **Windows 11 SDK (or Windows 10 SDK)**
-
-### Step 2: Install Nuitka & Dependencies
-Add Nuitka and zstandard to your development environment:
 ```powershell
-uv add --dev nuitka zstandard
+powershell -ExecutionPolicy Bypass -File build\build_nuitka.ps1        # dry run
+powershell -ExecutionPolicy Bypass -File build\build_nuitka.ps1 -Run   # real build
 ```
 
-### Step 3: Run Experimental Standalone Build
-Execute the following Nuitka command from the repository root:
-```powershell
-uv run nuitka `
-    --standalone `
-    --assume-yes-for-downloads `
-    --enable-plugin=tk-inter `
-    --include-package-data=customtkinter `
-    --include-package-data=tkinterdnd2 `
-    --include-data-dir="src/fps_patcher/ui/assets=fps_patcher/ui/assets" `
-    --windows-icon-from-ico="build/app.ico" `
-    --windows-company-name="FPS Patcher Studio" `
-    --windows-product-name="FPS Patcher Studio" `
-    --windows-file-version="0.4.0.0" `
-    --windows-product-version="0.4.0.0" `
-    --windows-file-description="FPS Patcher Studio" `
-    --windows-uac-admin=no `
-    --windows-uac-uiaccess=no `
-    --output-dir="dist/nuitka" `
-    --main="src/fps_patcher/__main__.py"
-```
+## 4. Checklist for a machine with MSVC
 
-### Step 4: Verification Checklist for Nuitka Binary
-1. Check output folder: `dist/nuitka/__main__.dist/`
-2. Rename executable if desired to `FPSPatcherStudio.exe`.
-3. Verify `fps_patcher/ui/assets` is present and contains fonts.
-4. Launch `FPSPatcherStudio.exe` and test Drag & Drop functionality.
-5. Verify process memory and startup time compared to PyInstaller build.
+1. Install **Build Tools for Visual Studio 2022** → workload *Desktop development with C++*
+   (MSVC v143 + Windows 10/11 SDK). Open *x64 Native Tools Command Prompt for VS 2022*.
+2. `powershell -ExecutionPolicy Bypass -File build\build_nuitka.ps1 -Run`
+3. Record the real wall-clock build time (cold and warm) — do not reuse the old 6–15 min claim.
+4. Launch `dist\nuitka\FPSPatcherStudio.dist\FPSPatcherStudio.exe`:
+   - main window appears, theme applies, queue row paints;
+   - add a clip, probe, readiness badge and inspector popover work;
+   - patch one real clip end-to-end (FFmpeg located, output verified);
+   - `--quick-patch <clip>` from Explorer and from a terminal;
+   - `--cli probe <clip> --json` and `--cli patch <clip> --json` print to the parent console;
+   - watch folder switch + Explorer verb install/uninstall on a real account;
+   - toast appears (or is documented as suppressed by Windows).
+5. Measure: on-disk size of the `.dist` folder, cold-start to usable window (3 runs, median),
+   peak RSS during a patch, and compare against the PyInstaller `dist\FPSPatcherStudio`.
+6. Scan the **unsigned** binary on VirusTotal only as a diagnostic. Record the exact
+   date/engine count; never publish "0/70". Re-scan after signing.
 
----
+## 5. Decision rule and current decision
 
-## 6. Conclusion & Roadmap
+Switch the release pipeline to Nuitka only if **all** of the following hold:
 
-- **Short Term (v0.4.x)**: Retain PyInstaller as default. The build completes in <30 seconds and integrates seamlessly into GitHub Actions without multi-gigabyte C++ compiler toolchains.
-- **Medium Term (v0.5+)**: If user feedback reports false positive antivirus quarantining despite Authenticode signing, introduce `-Backend nuitka` flag to `build/release.ps1` for production release tagging.
+1. every smoke test in §4 passes on a clean Windows 10/11 machine;
+2. a real patch, quick-patch and CLI run succeed from the Nuitka build;
+3. the build is reproducible on CI or a documented workstation, and the PyInstaller
+   fallback still exists until a signed Nuitka release has shipped once;
+4. size/cold-start are not materially worse than PyInstaller (record the numbers).
+
+**Decision today: keep PyInstaller.** Nuitka has not been built or measured here, so the
+first condition cannot be met. This is a "not evaluated", not a "failed" result. The script
+and checklist make the evaluation repeatable when a machine with MSVC is available.
+
+## 6. Known risks if Nuitka is adopted later
+
+- PySide6 plugin coverage can lag Qt releases; pin `pyside6==6.12.0` (already pinned).
+- Cold builds are much slower than PyInstaller; release.ps1 assumes a <1 minute build.
+- `--standalone` folder layout differs, so `installer.iss` and the ZIP step would need a
+  `-Backend nuitka` branch — deliberately **not** added yet.
+- AV reputation still depends on signing and download reputation, not on the compiler.

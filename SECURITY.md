@@ -10,9 +10,10 @@ We provide active security fixes, dependency patches, and vulnerability triage f
 
 | Version | Supported | Status / Notes |
 |---|---|---|
-| **0.9.x** | ✅ Yes | Current stable release branch. Active security maintenance. |
+| **1.0.x** | ✅ Yes | Current stable release branch. Active security maintenance. |
+| **0.9.x** | ✅ Yes | Previous Qt cutover branch. |
 | **0.8.x** | ✅ Yes | Previous hardened release branch. |
-| **0.7.x** | ⚠️ Security fixes only | Upgrade to v0.9.0 for the current platform/readiness features. |
+| **0.7.x** | ⚠️ Security fixes only | Upgrade to v1.0.0 for the current platform/readiness features. |
 | **0.6.x** | ❌ No | Deprecated. |
 | **< 0.6.x** | ❌ No | Deprecated legacy builds. |
 
@@ -71,28 +72,27 @@ Before executing downloaded binaries, verify their integrity using SHA-256 check
 
 ### 4.1. Verifying SHA-256 Checksums
 
-Compare the hash of your downloaded file against the published release manifest.
+Compare the hash of your downloaded file against the published
+`FPSPatcherStudio-v1.0.0.sha256` sidecar (or the `sha256` fields in
+`FPSPatcherStudio-v1.0.0.manifest.json`).
 
 #### PowerShell (Windows 10/11):
 ```powershell
-# Verify Setup Installer (v0.7.0)
-(Get-FileHash -Path "FPSPatcherStudio-v0.7.0-Setup.exe" -Algorithm SHA256).Hash.ToLower() -eq "f82e527ab980268daae564b3dcd100ff6f06d1ad83ed6d6cde7d91ee83429631"
-
-# Verify Portable ZIP Archive (v0.7.0)
-(Get-FileHash -Path "FPSPatcherStudio-v0.7.0-win64.zip" -Algorithm SHA256).Hash.ToLower() -eq "a169b861cdac077d43b39e88591bdc42881b6be6bb26ecb8d38f9fae0a642ef9"
+$expected = (Get-Content "FPSPatcherStudio-v1.0.0.sha256") -match "Setup\.exe$"
+(Get-FileHash -Path "FPSPatcherStudio-v1.0.0-Setup.exe" -Algorithm SHA256).Hash.ToLower()
+# compare with the hash at the start of $expected
 ```
-*If the result outputs `True`, the file is authentic and unaltered.*
+*Equal hashes mean the file is authentic and unaltered.*
 
 #### Windows Command Prompt (`cmd.exe`):
 ```cmd
-certutil -hashfile FPSPatcherStudio-v0.7.0-Setup.exe SHA256
-certutil -hashfile FPSPatcherStudio-v0.7.0-win64.zip SHA256
+certutil -hashfile FPSPatcherStudio-v1.0.0-Setup.exe SHA256
+certutil -hashfile FPSPatcherStudio-v1.0.0-win64.zip SHA256
 ```
 
 #### Linux / WSL / macOS:
 ```bash
-echo "f82e527ab980268daae564b3dcd100ff6f06d1ad83ed6d6cde7d91ee83429631  FPSPatcherStudio-v0.7.0-Setup.exe" | sha256sum -c -
-echo "a169b861cdac077d43b39e88591bdc42881b6be6bb26ecb8d38f9fae0a642ef9  FPSPatcherStudio-v0.7.0-win64.zip" | sha256sum -c -
+sha256sum -c FPSPatcherStudio-v1.0.0.sha256
 ```
 
 ---
@@ -104,11 +104,11 @@ Official Windows release binaries are code-signed when a SignPath Foundation sig
 #### Inspect via PowerShell:
 ```powershell
 Get-AuthenticodeSignature -FilePath "FPSPatcherStudio.exe"
-Get-AuthenticodeSignature -FilePath "FPSPatcherStudio-v0.9.0-Setup.exe"
+Get-AuthenticodeSignature -FilePath "FPSPatcherStudio-v1.0.0-Setup.exe"
 ```
 
 #### Understanding Signature Status:
-- **Current release (v0.9.0)**: unsigned while the project applies for free code signing through SignPath Foundation.
+- **Current release (v1.0.0)**: unsigned while the project applies for free code signing through SignPath Foundation.
 - **Historical v0.7.0 builds**: signed using an internal project certificate (`CN=FPS Patcher Studio (Dev)`). That certificate is not rooted in a public Certificate Authority, so Windows SmartScreen and VirusTotal may report an untrusted root (`invalid-signature`). This indicates an unverified root CA, **not** that the binary is compromised or corrupt.
 - **SignPath Foundation**: when approved, the certificate is issued to SignPath Foundation, not to the project maintainer. SignPath Foundation is the publisher of signed builds. See [`docs/CODE_SIGNING_POLICY.md`](docs/CODE_SIGNING_POLICY.md).
 - **Commercial EV Code Signing** is not currently used; the SignPath application is the active path.

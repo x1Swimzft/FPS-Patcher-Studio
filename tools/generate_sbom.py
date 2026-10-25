@@ -228,6 +228,11 @@ def generate_markdown_report(
         "webencodings": ("BSD-3-Clause", "Character encoding aliases for web (tinycss2)"),
     }
 
+    transitive_names = [
+        k for k in sorted(pkg_map) if k not in runtime_declared and k not in dev_declared
+    ]
+    total_count = len(runtime_declared) + len(dev_declared) + len(transitive_names)
+
     lines = [
         "# Software Supply Chain & Dependency Audit Report",
         "",
@@ -240,8 +245,12 @@ def generate_markdown_report(
         "",
         "## 1. Executive Summary",
         "",
-        "- **Total Resolved Packages**: 28 (4 runtime, 5 direct dev, 19 transitive).",
-        "- **Vulnerability Status**: **0 Known CVEs** across all dependencies (verified OSV).",
+        f"- **Total Resolved Packages**: {total_count} "
+        f"({len(runtime_declared)} runtime, {len(dev_declared)} direct dev, "
+        f"{len(transitive_names)} transitive).",
+        "- **Vulnerability Status**: Not scanned by this generator. Run `pip-audit`/"
+        "OSV against `uv.lock` (CI does) and record the result with the release; "
+        "no scan claim is made here.",
         "- **Key Remediation**: Upgraded `pillow` to `13.0.0` (resolving 28 historical GHSA CVEs) "
         "and added `pillow>=13.0.0` to `project.dependencies` to ensure runtime safety.",
         "- **Cryptographic Integrity**: 100% of packages pinned with SHA-256 hashes in `uv.lock`.",
@@ -291,15 +300,13 @@ def generate_markdown_report(
         "",
         "## 4. Transitive Dependencies",
         "",
-        "The following 19 transitive dependencies are pulled by direct runtime and dev packages:",
+        f"The following {len(transitive_names)} transitive dependencies are pulled by "
+        "direct runtime and dev packages:",
         "",
         "| Package | Version | Direct Parent | License |",
         "| :--- | :--- | :--- | :--- |",
     ])
 
-    transitive_names = [
-        k for k in sorted(pkg_map) if k not in runtime_declared and k not in dev_declared
-    ]
     for name in transitive_names:
         pkg = pkg_map[name]
         ver = pkg.get("version", "N/A")
@@ -349,7 +356,7 @@ def generate_markdown_report(
         "- **Automated Security Workflow**: `.github/workflows/security-audit.yml` runs:",
         "  1. `ruff check src tests` (Linter & code quality rules)",
         "  2. `mypy src tests` (Strict static type checker)",
-        "  3. `pytest -q` (Full 208+ test suite regression verification)",
+        "  3. `pytest -q` (full suite regression verification)",
         "  4. `python tools/generate_sbom.py` (CycloneDX SBOM generation & lockfile audit)",
         "  5. `pip-audit` / OSV vulnerability scanning against pinned lockfile.",
         "",

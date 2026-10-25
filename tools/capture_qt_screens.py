@@ -19,6 +19,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import Any
 
 PRESETS = (
     ("Obsidian", "obsidian"),
@@ -69,7 +70,7 @@ def _isolate_environment(scale: float, root: Path) -> None:
         os.environ["PATH"] = str(BIN_DIR) + os.pathsep + os.environ.get("PATH", "")
 
 
-def _settings(preset: str, appearance: str, language: str, scale: float):
+def _settings(preset: str, appearance: str, language: str, scale: float) -> Any:
     from fps_patcher.config import Settings
 
     return Settings(
@@ -102,13 +103,13 @@ def _load_thai_fonts() -> list[str]:
     return families
 
 
-def _grab(widget, target: Path) -> None:
+def _grab(widget: Any, target: Path) -> None:
     pixmap = widget.grab()
     if not pixmap.save(str(target), "PNG"):
         raise RuntimeError(f"could not save {target}")
 
 
-def _wait_for_ffmpeg(window) -> None:
+def _wait_for_ffmpeg(window: Any) -> None:
     """Let the background FFmpeg check settle so the badge is deterministic."""
     from PySide6.QtTest import QTest
 
@@ -124,7 +125,7 @@ def _clear_queue_file() -> None:
     (app_data_dir() / "queue.json").unlink(missing_ok=True)
 
 
-def _close_window(window) -> None:
+def _close_window(window: Any) -> None:
     from PySide6.QtTest import QTest
     from PySide6.QtWidgets import QApplication
 
@@ -135,7 +136,13 @@ def _close_window(window) -> None:
 
 
 def _capture_combo(
-    window_cls, dialog_cls, preset: str, slug: str, mode: str, lang: str, scale: float
+    window_cls: Any,
+    dialog_cls: Any,
+    preset: str,
+    slug: str,
+    mode: str,
+    lang: str,
+    scale: float,
 ) -> list[Path]:
     from PySide6.QtTest import QTest
 
@@ -166,7 +173,7 @@ def _capture_combo(
     return [main_path, settings_path]
 
 
-def _fake_video_info(path: Path, *, fps: int, duration: float, size_mb: int):
+def _fake_video_info(path: Path, *, fps: int, duration: float, size_mb: int) -> Any:
     from fractions import Fraction
 
     from fps_patcher.core.models import VideoInfo
@@ -216,7 +223,7 @@ def _make_clip(path: Path, color: str) -> None:
         path.write_bytes(b"\0" * 1024)
 
 
-def _capture_rich_queue(window_cls, scale: float, root: Path) -> Path:
+def _capture_rich_queue(window_cls: Any, scale: float, root: Path) -> Path:
     from PySide6.QtTest import QTest
 
     from fps_patcher.app.queue_model import InputQueue
@@ -241,7 +248,7 @@ def _capture_rich_queue(window_cls, scale: float, root: Path) -> Path:
 
     queue = InputQueue()
     queue.add(paths)
-    specs = (
+    specs: tuple[tuple[Any, float, Any, Any], ...] = (
         ("ready", 0.0, None, _fake_video_info(paths[0], fps=60, duration=42.5, size_mb=184)),
         ("patching", 0.42, None, _fake_video_info(paths[1], fps=120, duration=95.0, size_mb=512)),
         (
@@ -276,7 +283,7 @@ def _capture_rich_queue(window_cls, scale: float, root: Path) -> Path:
     return target
 
 
-def _validate(path: Path, expected: tuple[int, int]):
+def _validate(path: Path, expected: tuple[int, int]) -> tuple[bool, str, int, float]:
     from PIL import Image, ImageStat
 
     if not path.is_file():
@@ -298,7 +305,7 @@ def _validate(path: Path, expected: tuple[int, int]):
     return True, "ok", size_bytes, spread
 
 
-def _suppress_registry_side_effects(window_cls) -> None:
+def _suppress_registry_side_effects(window_cls: Any) -> None:
     # `explorer_menu=False` makes MainWindow call shell_integration.uninstall(),
     # which would delete a real HKCU Explorer verb. Captures must not touch the
     # registry; this is the only startup path that does.

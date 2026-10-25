@@ -102,8 +102,11 @@ def _png_bytes() -> bytes:
     image.fill(Qt.GlobalColor.red)
     buffer = QBuffer()
     buffer.open(QIODevice.OpenModeFlag.WriteOnly)
-    assert image.save(buffer, "PNG")
-    return bytes(buffer.data())
+    # Qt accepts the format as str; the stubs only declare bytes/None.
+    assert image.save(buffer, "PNG")  # type: ignore[call-overload]
+    data = buffer.data().data()
+    assert isinstance(data, bytes)
+    return data
 
 
 def test_thumbnail_loader_skips_work_without_ffmpeg(

@@ -2,7 +2,13 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
-## [Unreleased]
+## [1.0.0] - 2026-10-25
+
+### Consolidated: Qt-only v1.0.0
+- Qt is the only UI runtime; the Phase 2 automation set (watch folder, Explorer verb, Rec.709 tag / metadata scrub, toast) and Phase 3 platform profiles + readiness badges are complete on it.
+- Release backend stays PyInstaller; `build/build_nuitka.ps1` and a rewritten `docs/NUITKA_EVALUATION.md` document the Nuitka path, which was **not built or measured** here (no MSVC).
+- `ruff check src tests tools` and `mypy src tests tools` pass again (30 pre-existing test/tool typing errors fixed); `pytest -q` 372 passed.
+- `build/release.ps1` produced the v1.0.0 installer, portable zip, SHA-256 files, JSON manifest (with `sbom_path`) and CycloneDX SBOM. Artifacts are unsigned.
 
 ### Added: Headless CLI (roadmap 4.2)
 - `fps-patcher-studio --cli patch INPUT... [--preset 60|120] [--timescale N] [--strategy NAME] [--output DIR] [--normalize-audio] [--cap-bitrate] [--tag-bt709] [--scrub-metadata] [--overwrite|--auto-rename] [--json]`.
@@ -11,6 +17,11 @@ All notable changes to FPS Patcher Studio are documented in this file.
 - No Qt import on the CLI path (covered by an import-blocking test). Ctrl+C sets a cancel event, the child FFmpeg process is killed, temp files are removed, and the exit code is 130.
 - Frozen windowed builds reattach to the parent console (`AttachConsole`) so `FPSPatcherStudio.exe --cli ...` prints from cmd/PowerShell; a double-click launch has no console and discards output. Documented in `BUILDING.md`.
 - `--quick-patch <file>` (Explorer verb) is unchanged.
+
+### Added: Nuitka evaluation scaffold (roadmap 4.1, not adopted)
+- `build/build_nuitka.ps1` — isolated, dry-run-by-default `--standalone` build with Nuitka's PySide6 plugin. It never touches `pyproject.toml`, `uv.lock`, `build/fps_patcher.spec` or `release/`, and refuses a MinGW fallback.
+- `docs/NUITKA_EVALUATION.md` rewritten for the Qt build; the Tk-era flags and unmeasured AV/size claims were removed.
+- **Not run:** this machine has no MSVC (`cl.exe`, `vswhere`, Visual Studio all absent), so there is no size, cold-start or VirusTotal measurement. Release backend stays PyInstaller.
 
 ### Changed: PySide6 UI cutover
 - Qt/PySide6 is the sole UI runtime; the legacy Tk/CustomTkinter UI and its tests were removed.

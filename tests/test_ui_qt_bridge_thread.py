@@ -74,11 +74,14 @@ def test_core_and_app_never_import_a_ui_toolkit() -> None:
             tree = ast.parse(source.read_text(encoding="utf-8"), filename=str(source))
             for node in ast.walk(tree):
                 roots: set[str] = set()
+                line = 0
                 if isinstance(node, ast.Import):
                     roots = {alias.name.split(".")[0] for alias in node.names}
+                    line = node.lineno
                 elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
                     roots = {node.module.split(".")[0]}
+                    line = node.lineno
                 bad = roots & TOOLKITS
                 if bad:
-                    offenders.append(f"{source.relative_to(SRC)}:{node.lineno} {sorted(bad)}")
+                    offenders.append(f"{source.relative_to(SRC)}:{line} {sorted(bad)}")
     assert offenders == []

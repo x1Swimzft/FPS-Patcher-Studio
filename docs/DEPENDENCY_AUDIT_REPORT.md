@@ -1,16 +1,16 @@
 # Software Supply Chain & Dependency Audit Report
 
-**Project**: `fps-patcher-studio` v0.9.0  
-**Audit Date**: 2026-10-25 06:23:07 UTC  
+**Project**: `fps-patcher-studio` v1.0.0  
+**Audit Date**: 2026-10-25 10:58:05 UTC  
 **Tool**: `tools/generate_sbom.py` (CycloneDX 1.5 Specification)  
-**SBOM Artifact**: [`release/FPSPatcherStudio-v0.9.0.cdx.json`](../release/FPSPatcherStudio-v0.9.0.cdx.json)  
+**SBOM Artifact**: [`release/FPSPatcherStudio-v1.0.0.cdx.json`](../release/FPSPatcherStudio-v1.0.0.cdx.json)  
 
 ---
 
 ## 1. Executive Summary
 
-- **Total Resolved Packages**: **30** (2 runtime, 6 direct dev, 22 transitive) in `uv.lock`, excluding the root project.
-- **Vulnerability Status**: **0 Known CVEs** across all dependencies (verified OSV).
+- **Total Resolved Packages**: 30 (2 runtime, 6 direct dev, 22 transitive).
+- **Vulnerability Status**: Not scanned by this generator. Run `pip-audit`/OSV against `uv.lock` (CI does) and record the result with the release; no scan claim is made here.
 - **Key Remediation**: Upgraded `pillow` to `13.0.0` (resolving 28 historical GHSA CVEs) and added `pillow>=13.0.0` to `project.dependencies` to ensure runtime safety.
 - **Cryptographic Integrity**: 100% of packages pinned with SHA-256 hashes in `uv.lock`.
 - **Bundled Binaries & Assets**: Verified zero bundled binary executables/DLLs in `src/`. FFmpeg downloader features HTTPS TLS verification, strict Zip Slip immunity, zip-bomb decompression protection (512MB limit), and optional SHA-256 integrity.
@@ -97,16 +97,10 @@ The following 22 transitive dependencies are pulled by direct runtime and dev pa
 - **Automated Security Workflow**: `.github/workflows/security-audit.yml` runs:
   1. `ruff check src tests` (Linter & code quality rules)
   2. `mypy src tests` (Strict static type checker)
-  3. `pytest -q` (Full 356-test suite regression verification)
+  3. `pytest -q` (full suite regression verification)
   4. `python tools/generate_sbom.py` (CycloneDX SBOM generation & lockfile audit)
   5. `pip-audit` / OSV vulnerability scanning against pinned lockfile.
 
 ---
-
-> **Count note (2026-10-25):** `tools/generate_sbom.py` writes the executive-summary
-> and transitive-count strings as static text. They were corrected here to match
-> `uv.lock` (30 packages: 2 runtime, 6 dev, 22 transitive) and the 356-test suite.
-> Update the generator template when the dependency set or test count changes, or
-> the next regeneration will restore the stale numbers.
 
 *Report generated automatically by FPS Patcher Studio Security Toolchain.*

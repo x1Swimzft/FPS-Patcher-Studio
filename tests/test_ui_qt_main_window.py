@@ -17,6 +17,8 @@ from fps_patcher.ui.strings import t  # noqa: E402
 from fps_patcher.ui_qt import main_window as mw  # noqa: E402
 from fps_patcher.ui_qt.settings_dialog import SettingsDialog  # noqa: E402
 
+_REAL_SYNC_WATCHER = mw.MainWindow._sync_watcher
+
 
 def _queue_video(window: Any, tmp_path: Path) -> Path:
     video = tmp_path / "clip.mp4"
@@ -336,4 +338,52 @@ def test_readiness_badge_has_tooltip_and_click_logs_checks(
     assert "[READINESS]" in lines
     assert "100/100" in lines
     assert "Container:" in lines
+    window.close()
+
+
+def test_sync_watcher_reuses_a_running_watcher_for_the_same_folder(
+    qtbot: Any, monkeypatch: Any, tmp_path: Path
+) -> None:
+    from qt_support import make_main_window
+
+    class FakeWatcher:
+        instances: list[Any] = []
+
+        def __init__(self, folder: Path, callback: Any) -> None:
+            self.folder = folder
+            self.callback = callback
+            self.starts = 0
+            self.stops = 0
+            FakeWatcher.instances.append(self)
+
+        def start(self) -> None:
+            self.starts += 1
+
+        def stop(self, **_kwargs: Any) -> None:
+            self.stops += 1
+
+    other = tmp_path / "other"
+    other.mkdir()
+    window = make_main_window(qtbot, monkeypatch, tmp_path)
+    monkeypatch.setattr(mw.MainWindow, "_sync_watcher", _REAL_SYNC_WATCHER)
+    monkeypatch.setattr(mw, "FolderWatcher", FakeWatcher)
+    window.settings.watch_folder_enabled = True
+    window.settings.watch_folder = str(tmp_path)
+
+    window._sync_watcher()
+    first = FakeWatcher.instances[0]
+    assert first.starts == 1
+
+    window._sync_watcher()  # Settings apply with the same folder
+    assert len(FakeWatcher.instances) == 1
+    assert first.stops == 0
+
+    window.settings.watch_folder = str(other)
+    window._sync_watcher()
+    assert len(FakeWatcher.instances) == 2
+    assert first.stops == 1
+
+    window.settings.watch_folder_enabled = False
+    window._sync_watcher()
+    assert FakeWatcher.instances[-1].stops == 1
     window.close()

@@ -3,7 +3,14 @@
 **Generated**: 2026-10-24  
 **Repository**: `https://github.com/x1Swimzft/FPS-Patcher-Studio`  
 **Workspace**: `E:\Project\fps-patcher-studio`  
-**Current Base Version**: `v0.5.0`
+**Current Base Version**: `v1.0.0` (2026-10-25)
+
+> **Status at v1.0.0:** Qt is the only UI. Phase 2 (watch folder, Explorer verb,
+> Rec.709 color guard, metadata scrub) and Phase 3 (platform profiles + readiness)
+> shipped on the Qt line. The headless CLI (4.2) is delivered. Nuitka (4.1) was
+> evaluated but **not adopted**: see `docs/NUITKA_EVALUATION.md` for the checklist
+> and why no build was measured in this environment. The v0.5.1 Tk analysis below
+> is kept as history and no longer describes the code.
 
 ---
 
@@ -122,9 +129,10 @@ When minimizing, restoring, maximizing, or Alt-Tabbing back to `FPS Patcher Stud
 ---
 
 ### Phase 4: `v1.0.0` — Native C++ Compilation (Nuitka) & Headless CLI
-**เป้าหมาย**: ความเร็วระดับ Native, เปิดโปรแกรมใน 0.3 วินาที และ VirusTotal 0/70 ถาวร
+**สถานะ**: ✅ CLI ส่งมอบแล้ว · ⚠️ Nuitka ประเมินแล้วแต่ยังไม่เปลี่ยน pipeline (ไม่มี MSVC ในเครื่องที่วัด)
 
 - **4.1 Nuitka C++ Compilation Pipeline**:
-  - ย้ายการ Build จาก PyInstaller ไปเป็น Nuitka C++ (`--standalone --windows-console-mode=disable`) ตามแผนใน `docs/NUITKA_EVALUATION.md` เพื่อกำจัดปัญหา False Positive ของ Antivirus แบบถาวร
+  - เพิ่ม `build/build_nuitka.ps1` แบบแยกส่วน (dry-run โดยค่าเริ่มต้น, ไม่แตะ PyInstaller/`uv.lock`/`release/`) พร้อมคู่มือใน `docs/NUITKA_EVALUATION.md`
+  - **ยังไม่เปิดใช้**: ยังไม่มี MSVC ในเครื่องนี้ จึงไม่มีตัวเลขขนาด/เวลาเปิดโปรแกรม/VirusTotal ที่วัดจริง และไม่มีการอ้าง 0/70 — การแก้ปัญหา false positive ที่แท้จริงคือ Authenticode signing
 - **4.2 Full CLI Interface**:
-  - รองรับการสั่งงานผ่าน Command Line เต็มรูปแบบ (`FPSPatcherStudio.exe --cli patch input.mp4 --preset x1t-mobile`) สำหรับเชื่อมกับสคริปต์อัตโนมัติอื่นๆ
+  - `FPSPatcherStudio.exe --cli patch|probe|score` พร้อม `--json`, exit codes 0/1/2/130, ไม่ import Qt, และต่อ console ของ parent ได้ใน frozen windowed build

@@ -217,7 +217,7 @@ def test_build_palette_has_core_and_disabled_roles() -> None:
 
 def test_theme_manager_rebuilds_and_notifies() -> None:
     manager = ThemeManager(Settings())
-    seen = []
+    seen: list[object] = []
     manager.subscribe(seen.append)
     manager.apply(Settings(theme_preset="Graphite", layout_density="Comfortable"))
 

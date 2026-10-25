@@ -1016,7 +1016,7 @@ class QueueView(QWidget):
         self.hover_row = -1
         self.hover_remove = -1
         self.hover_action = ""
-        self.hover_readiness = False
+        self.hover_readiness: str | None = None
         self._known_ids: set[str] | None = None
         self._motion_window: QWidget | None = None
         self._readiness_cache: dict[str, tuple[int, str, ReadinessReport]] = {}
@@ -1644,7 +1644,7 @@ class QueueView(QWidget):
             self.hover_row = -1
             self.hover_remove = -1
             self.hover_action = ""
-            self.hover_readiness = False
+            self.hover_readiness = None
             QToolTip.hideText()
             self.list_view.viewport().setCursor(Qt.CursorShape.ArrowCursor)
             self.list_view.viewport().update()
@@ -1708,7 +1708,7 @@ class QueueView(QWidget):
             self.hover_row = -1
             self.hover_remove = -1
             self.hover_action = ""
-            self.hover_readiness = False
+            self.hover_readiness = None
             QToolTip.hideText()
             self.list_view.viewport().setCursor(Qt.CursorShape.ArrowCursor)
             if changed:
@@ -1718,6 +1718,7 @@ class QueueView(QWidget):
         item = self.model.item_at(index.row())
         badge = self.delegate.readiness_rect(item) if item is not None else None
         over_readiness = badge is not None and badge.contains(pos)
+        readiness_id = item.item_id if (over_readiness and item is not None) else None
         action = "" if over_readiness else self._action_at(rect, pos)
         over_remove = action == "remove"
         over_check = self.delegate.checkbox_rect(rect).contains(pos)
@@ -1730,10 +1731,10 @@ class QueueView(QWidget):
             index.row(),
             index.row() if over_remove else -1,
             action,
-            over_readiness,
+            readiness_id,
         )
-        if over_readiness != self.hover_readiness:
-            if over_readiness and item is not None:
+        if readiness_id != self.hover_readiness:
+            if readiness_id is not None and item is not None:
                 QToolTip.showText(
                     self.list_view.viewport().mapToGlobal(pos),
                     self.delegate.readiness_tooltip(item),
@@ -1751,7 +1752,7 @@ class QueueView(QWidget):
         self.hover_row = index.row()
         self.hover_remove = index.row() if over_remove else -1
         self.hover_action = action
-        self.hover_readiness = over_readiness
+        self.hover_readiness = readiness_id
         interactive = bool(action) or over_check or over_readiness
         self.list_view.viewport().setCursor(
             Qt.CursorShape.PointingHandCursor if interactive else Qt.CursorShape.ArrowCursor

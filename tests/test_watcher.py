@@ -6,6 +6,7 @@ import os
 import threading
 import time
 from pathlib import Path
+from typing import Any, cast
 
 from fps_patcher.app.watcher import FolderWatcher
 
@@ -180,7 +181,7 @@ def test_prime_ignores_files_that_already_exist(tmp_path: Path) -> None:
     old = _touch(tmp_path, "old.mp4")
     seen: list[Path] = []
     watcher = FolderWatcher(tmp_path, seen.append, settle_scans=1, min_age_s=0.0)
-    watcher._is_locked = lambda _path: False  # type: ignore[method-assign]
+    watcher._is_locked = cast(Any, lambda _path: False)
 
     watcher.prime()
     assert watcher.scan(now=0.0) == []
@@ -198,7 +199,7 @@ def test_start_ignores_backlog_and_delivers_new_files(tmp_path: Path) -> None:
     watcher = FolderWatcher(
         tmp_path, seen.append, poll_interval=0.01, settle_scans=1, min_age_s=0.0
     )
-    watcher._is_locked = lambda _path: False  # type: ignore[method-assign]
+    watcher._is_locked = cast(Any, lambda _path: False)
     watcher.start()
     try:
         deadline = time.time() + 2
@@ -220,7 +221,7 @@ def test_restart_delivers_files_that_arrived_while_stopped(tmp_path: Path) -> No
     watcher = FolderWatcher(
         tmp_path, seen.append, poll_interval=0.01, settle_scans=1, min_age_s=0.0
     )
-    watcher._is_locked = lambda _path: False  # type: ignore[method-assign]
+    watcher._is_locked = cast(Any, lambda _path: False)
     watcher.start()
     deadline = time.time() + 2
     while not watcher._primed and time.time() < deadline:

@@ -23,8 +23,10 @@ class FakeWinreg:
 
     def __init__(self) -> None:
         self.keys: dict[str, dict[str, str]] = {}
+        self.roots: list[Any] = []
 
     def CreateKeyEx(self, root: Any, path: str, reserved: int, access: int) -> str:
+        self.roots.append(root)
         self.keys.setdefault(path, {})
         return path
 
@@ -37,6 +39,7 @@ class FakeWinreg:
         self.keys[key][name] = value
 
     def OpenKey(self, root: Any, path: str, reserved: int, access: int) -> str:
+        self.roots.append(root)
         if path not in self.keys:
             raise FileNotFoundError(path)
         return path
@@ -45,6 +48,7 @@ class FakeWinreg:
         return self.keys[key][name], self.REG_SZ
 
     def DeleteKey(self, root: Any, path: str) -> None:
+        self.roots.append(root)
         if path not in self.keys:
             raise FileNotFoundError(path)
         del self.keys[path]
@@ -77,6 +81,8 @@ def test_registry_install_query_uninstall(fake_registry: FakeWinreg) -> None:
 
     shell_integration.uninstall()
     assert not shell_integration.is_installed()
+    assert fake_registry.roots
+    assert all(root == FakeWinreg.HKEY_CURRENT_USER for root in fake_registry.roots)
 
 
 def test_registry_install_is_idempotent(fake_registry: FakeWinreg) -> None:
