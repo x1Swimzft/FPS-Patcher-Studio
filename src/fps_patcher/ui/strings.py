@@ -275,6 +275,21 @@ STRINGS: dict[str, dict[str, str]] = {
         "update_ready_launch": "Launching installer...",
         "update_failed": "Update failed: {error}",
         "update_sha256_failed": "Update package failed SHA-256 verification and was discarded.",
+        # Compact Qt shell additions
+        "layout_density": "Layout density",
+        "density_compact": "Compact",
+        "density_comfortable": "Comfortable",
+        "custom": "Custom",
+        "progress_idle": "Idle · file {index}/{total}",
+        "progress_patching": "Patching {index}/{total}",
+        "readiness_summary": "Readiness is a local metadata heuristic.",
+        "readiness_info_title": "Readiness details",
+        "close": "Close",
+        "more_actions": "More actions",
+        "info": "Info",
+        "no_selection": "No file selected",
+        "queue_collapsed": "Queue · {count} files",
+        "browse_folder": "Add Folder",
     },
     "th": {
         # App & Header
@@ -542,6 +557,21 @@ STRINGS: dict[str, dict[str, str]] = {
         "update_ready_launch": "กำลังเปิดตัวติดตั้ง...",
         "update_failed": "การอัปเดตล้มเหลว: {error}",
         "update_sha256_failed": "ไฟล์อัปเดตไม่ผ่านการตรวจสอบความถูกต้อง SHA-256 จึงถูกลบออก",
+        # Compact Qt shell additions
+        "layout_density": "ความหนาแน่นเลย์เอาต์",
+        "density_compact": "กะทัดรัด",
+        "density_comfortable": "สบายตา",
+        "custom": "กำหนดเอง",
+        "progress_idle": "ว่าง · ไฟล์ {index}/{total}",
+        "progress_patching": "กำลังแปลง {index}/{total}",
+        "readiness_summary": "ความพร้อมเป็นการประเมินจากข้อมูลเมตาภายในเครื่อง",
+        "readiness_info_title": "รายละเอียดความพร้อม",
+        "close": "ปิด",
+        "more_actions": "การกระทำเพิ่มเติม",
+        "info": "ข้อมูล",
+        "no_selection": "ยังไม่ได้เลือกไฟล์",
+        "queue_collapsed": "คิว · {count} ไฟล์",
+        "browse_folder": "เพิ่มโฟลเดอร์",
     },
 }
 
