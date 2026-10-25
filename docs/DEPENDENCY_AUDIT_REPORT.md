@@ -97,7 +97,7 @@ The following 22 transitive dependencies are pulled by direct runtime and dev pa
 - **Automated Security Workflow**: `.github/workflows/security-audit.yml` runs:
   1. `ruff check src tests` (Linter & code quality rules)
   2. `mypy src tests` (Strict static type checker)
-  3. `pytest -q` (Full 354-test suite regression verification)
+  3. `pytest -q` (Full 356-test suite regression verification)
   4. `python tools/generate_sbom.py` (CycloneDX SBOM generation & lockfile audit)
   5. `pip-audit` / OSV vulnerability scanning against pinned lockfile.
 
@@ -105,7 +105,7 @@ The following 22 transitive dependencies are pulled by direct runtime and dev pa
 
 > **Count note (2026-10-25):** `tools/generate_sbom.py` writes the executive-summary
 > and transitive-count strings as static text. They were corrected here to match
-> `uv.lock` (30 packages: 2 runtime, 6 dev, 22 transitive) and the 354-test suite.
+> `uv.lock` (30 packages: 2 runtime, 6 dev, 22 transitive) and the 356-test suite.
 > Update the generator template when the dependency set or test count changes, or
 > the next regeneration will restore the stale numbers.
 

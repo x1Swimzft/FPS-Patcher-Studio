@@ -35,10 +35,10 @@ frozen build, Windows installer and portable zip below were built from branch
 
 | Artifact | Exact size | SHA-256 |
 |---|---:|---|
-| `FPSPatcherStudio-v0.9.0-Setup.exe` | 88,042,955 B | `28e7a7d4a14fe9c617271a5645953bd5af0dd6849e67a37ef7154c6f823f84bc` |
-| `FPSPatcherStudio-v0.9.0-win64.zip` | 122,845,436 B | `43a8dd6f4d4e8ea43658e8858d8987a387d8bc2e89876c75e3a43dee0667a4b1` |
+| `FPSPatcherStudio-v0.9.0-Setup.exe` | 88,045,551 B | `3f946b3a5e732f1d4f0988e9b271888100d520a6e04b058aa3fd32cc14e6d25b` |
+| `FPSPatcherStudio-v0.9.0-win64.zip` | 122,846,936 B | `f0ae5a9f485391ca34033e5e3a340d368501096fb463630b025f0a57a155a046` |
 
-One-folder `dist/FPSPatcherStudio/`: **322,911,139 B** (183 files). The zip keeps
+One-folder `dist/FPSPatcherStudio/`: **322,912,074 B** (183 files). The zip keeps
 the top-level `FPSPatcherStudio/` folder. Checksum sidecars use the
 `<lowercase-hash>  <filename>` (sha256sum) format.
 
@@ -46,8 +46,8 @@ Size deltas:
 
 | Measure | v0.9.0 | vs pre-Qt baseline | vs dual-UI build |
 |---|---:|---:|---:|
-| `dist` | 322,911,139 B | +63,471,217 B (+24.46%) | -12,136,438 B (-3.62%) |
-| `Setup.exe` | 88,042,955 B | +15,312,224 B (+21.05%) | -3,377,650 B (-3.69%) |
+| `dist` | 322,912,074 B | +63,472,152 B (+24.46%) | -12,135,503 B (-3.62%) |
+| `Setup.exe` | 88,045,551 B | +15,314,820 B (+21.05%) | -3,375,054 B (-3.69%) |
 
 Baselines: pre-Qt `dist` 259,439,922 B / installer 72,730,731 B; dual-UI `dist`
 335,047,577 B / installer 91,420,605 B.
@@ -55,7 +55,7 @@ Baselines: pre-Qt `dist` 259,439,922 B / installer 72,730,731 B; dual-UI `dist`
 Verification: frozen exe stayed alive for 8 s with isolated `APPDATA` and closed
 cleanly; no missing DLL/platform-plugin error. Frozen `--quick-patch` with no
 target printed the usage line to stderr and exited **2** without initialising Qt.
-Installer built with Inno Setup 7; test suite at cutover: **354 passed**.
+Installer built with Inno Setup 7; test suite at cutover: **356 passed**.
 
 ### Compatibility
 

@@ -24,12 +24,12 @@ Measured v0.9.0 release build (`ui/pyside6`, `b44fb34`, 2026-10-25):
 
 | Artifact | Exact size | Delta vs pre-Qt baseline |
 |---|---:|---:|
-| `dist/FPSPatcherStudio/` | 322,911,139 B | +63,471,217 B (+24.46%) |
-| `release/FPSPatcherStudio-v0.9.0-Setup.exe` | 88,042,955 B | +15,312,224 B (+21.05%) |
-| `release/FPSPatcherStudio-v0.9.0-win64.zip` | 122,845,436 B | n/a (zip added post-Qt) |
+| `dist/FPSPatcherStudio/` | 322,912,074 B | +63,472,152 B (+24.46%) |
+| `release/FPSPatcherStudio-v0.9.0-Setup.exe` | 88,045,551 B | +15,314,820 B (+21.05%) |
+| `release/FPSPatcherStudio-v0.9.0-win64.zip` | 122,846,936 B | n/a (zip added post-Qt) |
 
 Against the dual-UI build (`dist` 335,047,577 B, installer 91,420,605 B) the
-Qt-only cutover is 12,136,438 B smaller in `dist` (-3.62%) and 3,377,650 B
+Qt-only cutover is 12,135,503 B smaller in `dist` (-3.62%) and 3,375,054 B
 smaller in the installer (-3.69%). The zip keeps the top-level
 `FPSPatcherStudio/` folder; SHA-256 values are in `RELEASE_NOTES.md`.
 
@@ -163,7 +163,7 @@ All of these landed in `ui_qt`:
 - `pyproject.toml` depends on `pillow` and `pyside6==6.12.0` only.
   `build/release.ps1` gates and `installer.iss` need no structural change.
 - Baseline before the Qt UI was `dist` 259,439,922 bytes / `Setup.exe`
-  72,730,731 bytes. The measured v0.9.0 build is **322,911,139 / 88,042,955
+  72,730,731 bytes. The measured v0.9.0 build is **322,912,074 / 88,045,551
   bytes** (table above); `lzma2` solid compression keeps the installer growth
   below the raw `dist` growth (21.05% vs 24.46%).
 - PySide6 licensing/notices are recorded in `THIRD_PARTY_NOTICES.md`; the one-folder
@@ -232,7 +232,7 @@ Resolved parity items:
 - Theme tokens, QSS, QPalette, seven presets, density, SegmentedControl, Switch,
   setup cards, queue model/delegate, console drawer, settings dialog, motion and
   DWM helpers are implemented.
-- `pytest -q`: **354 passed**. `ruff check .`: clean. `mypy src/fps_patcher`:
+- `pytest -q`: **356 passed**. `ruff check .`: clean. `mypy src/fps_patcher`:
   clean. Qt tests live in `tests/test_ui_qt_*.py`.
 - Screenshot matrix: **113 PNGs** in `images/after-qt/` (7 presets x light/dark
   x en/th = 56 combinations; 56 main + 56 settings at 100/125, plus one
@@ -241,8 +241,8 @@ Resolved parity items:
   and 56/56 at 125%, every image the expected size and non-blank. Reproduce with
   `tools/capture_qt_screens.py`.
 - Frozen build validated with PySide6 6.12.0 + PyInstaller 6.22.3 + Inno Setup 7.1.0.
-  Post-cutover sizes are measured, not assumed: `dist` 322,911,139 B, installer
-  88,042,955 B, zip 122,845,436 B. Payload check found zero Tcl/Tk, CustomTkinter,
+  Post-cutover sizes are measured, not assumed: `dist` 322,912,074 B, installer
+  88,045,551 B, zip 122,846,936 B. Payload check found zero Tcl/Tk, CustomTkinter,
   TkinterDnD2 or pywinstyles files and `platforms/qwindows.dll` present.
   The exe stayed alive for 8 s with isolated `APPDATA` and closed cleanly.
   Frozen `--quick-patch` with no target printed usage to stderr and exited 2

@@ -15,6 +15,7 @@ from PySide6.QtCore import Qt  # noqa: E402
 from PySide6.QtWidgets import (  # noqa: E402
     QApplication,
     QFrame,
+    QMessageBox,
     QWidget,
 )
 
@@ -105,6 +106,8 @@ def test_seven_preset_swatches_select_and_preview(qtbot: Any, appdata: Path) -> 
 
     cards = dialog.findChildren(QFrame, "PresetSwatchCard")
     assert len(cards) == 7
+    assert dialog._preset.itemText(0) == "Crimson Gamer"
+    assert next(iter(dialog._preset_cards)) == "Crimson Gamer"
     assert set(dialog._preset_cards) == set(dialog._preset.itemText(i) for i in range(7))
     assert sum(card.property("selected") == "true" for card in cards) == 1
     assert all(len(card.dots) == 3 for card in cards)
@@ -115,6 +118,31 @@ def test_seven_preset_swatches_select_and_preview(qtbot: Any, appdata: Path) -> 
     assert dialog._draft.theme_preset == "Graphite"
     assert dialog._theme_manager.theme.tokens.name == "Graphite"
     assert graphite.property("selected") == "true"
+
+
+def test_reset_defaults_is_crimson_and_fully_opaque(
+    qtbot: Any, monkeypatch: Any, appdata: Path
+) -> None:
+    settings = Settings(
+        theme_preset="Graphite",
+        window_alpha=0.9,
+        reduce_motion=True,
+    )
+    dialog = _dialog(qtbot, settings)
+    monkeypatch.setattr(
+        QMessageBox,
+        "question",
+        lambda *args, **kwargs: QMessageBox.StandardButton.Yes,
+    )
+
+    dialog._reset_all()
+
+    assert dialog._draft.theme_preset == "Crimson Gamer"
+    assert dialog._draft.window_alpha == 1.0
+    assert dialog._draft.qt_v090_migrated is True
+    assert dialog._alpha.value() == 100
+    assert settings.theme_preset == "Crimson Gamer"
+    assert settings.window_alpha == 1.0
 
 
 def test_dialog_has_seven_tabs_and_density_control(qtbot: Any, appdata: Path) -> None:
@@ -153,7 +181,8 @@ def test_legacy_json_applies_all_keys_and_cancel_restores_theme(
     path.write_text(json.dumps(legacy), encoding="utf-8")
 
     settings = Settings.load(path)
-    assert settings.theme_preset == "Obsidian"
+    assert settings.theme_preset == "Crimson Gamer"
+    assert settings.window_alpha == 1.0
     manager = ThemeManager(settings)
     dialog = SettingsDialog(settings, manager)
     qtbot.addWidget(dialog)
@@ -164,7 +193,9 @@ def test_legacy_json_applies_all_keys_and_cancel_restores_theme(
     expected_keys = {item.name for item in fields(Settings) if item.init}
     assert set(payload) == expected_keys
     assert payload["layout_density"] == "Compact"
-    assert payload["theme_preset"] == "Obsidian"
+    assert payload["theme_preset"] == "Crimson Gamer"
+    assert payload["window_alpha"] == 1.0
+    assert payload["qt_v090_migrated"] is True
 
     # Preview a different preset/mode, then Cancel: the live theme must snap back.
     dialog._preset.setCurrentText("Graphite")
@@ -174,9 +205,9 @@ def test_legacy_json_applies_all_keys_and_cancel_restores_theme(
 
     dialog.reject()
 
-    assert manager.theme.tokens.name == "Obsidian"
+    assert manager.theme.tokens.name == "Crimson Gamer"
     assert manager.theme.mode == "dark"
-    assert settings.theme_preset == "Obsidian"
+    assert settings.theme_preset == "Crimson Gamer"
     assert settings.appearance == "dark"
 
 

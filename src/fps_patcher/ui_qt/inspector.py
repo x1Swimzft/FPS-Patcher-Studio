@@ -159,13 +159,13 @@ class Inspector(QWidget):
         custom_layout = QVBoxLayout(self.custom_row)
         custom_layout.setContentsMargins(0, 0, 0, 0)
         custom_layout.setSpacing(theme.outer)
-        self.custom_label = QLabel(t("timescale_lbl", lang))
+        self.custom_label = QLabel(t("custom_fps_lbl", lang))
         self.custom_label.setProperty("role", "caption")
         custom_layout.addWidget(self.custom_label)
         self.custom_edit = QLineEdit()
         self.custom_edit.setFixedHeight(theme.entry_height)
-        self.custom_edit.setAccessibleName(t("timescale_lbl", lang))
-        self.custom_edit.setPlaceholderText(t("timescale_lbl", lang))
+        self.custom_edit.setAccessibleName(t("custom_fps_lbl", lang))
+        self.custom_edit.setPlaceholderText(t("custom_fps_placeholder", lang))
         self.custom_edit.editingFinished.connect(self._commit_custom)
         custom_layout.addWidget(self.custom_edit)
         target_layout.addWidget(self.custom_row)
@@ -636,9 +636,9 @@ QWidget#Inspector QProgressBar::chunk {{
         self.warn_label.setText(t("bxd_pc_warn", lang))
         self.readiness_label.setText(t("readiness_summary", lang))
         self.timescale_field.setAccessibleName(t("timescale_lbl", lang))
-        self.custom_edit.setAccessibleName(t("timescale_lbl", lang))
-        self.custom_edit.setPlaceholderText(t("timescale_lbl", lang))
-        self.custom_label.setText(t("timescale_lbl", lang))
+        self.custom_edit.setAccessibleName(t("custom_fps_lbl", lang))
+        self.custom_edit.setPlaceholderText(t("custom_fps_placeholder", lang))
+        self.custom_label.setText(t("custom_fps_lbl", lang))
         self.strategy_combo.setAccessibleName(t("strategy_lbl", lang))
         self.profile_combo.setAccessibleName(t("platform_profile_lbl", lang))
         self.info_btn.setToolTip(t("readiness_tip", lang))
@@ -1015,7 +1015,9 @@ QWidget#Inspector QProgressBar::chunk {{
         self.set_custom_visible(is_custom)
         self._set_timescale_invalid(False)
         if is_custom:
-            self.custom_edit.setText(str(self.settings.custom_timescale))
+            self.custom_edit.setText(
+                self._format_custom_fps(self.settings.custom_timescale)
+            )
         self._update_timescale_display()
         if persist:
             self.settings.last_preset = preset
@@ -1035,11 +1037,21 @@ QWidget#Inspector QProgressBar::chunk {{
         self._update_timescale_display()
         self.target_changed.emit()
 
+    @staticmethod
+    def _format_custom_fps(timescale: int) -> str:
+        fps = int(timescale) / 1000.0
+        text = f"{fps:.3f}".rstrip("0").rstrip(".")
+        return text or "0"
+
     def _parse_custom_timescale(self) -> int | None:
+        """The custom field is FPS; the canonical request value is timescale."""
         try:
-            value = int(self.custom_edit.text().strip())
+            fps = float(self.custom_edit.text().strip().replace(",", "."))
         except ValueError:
             return None
+        if fps <= 0:
+            return None
+        value = round(fps * 1000)
         return value if 1 <= value <= MAX_TIMESCALE else None
 
     def _update_timescale_display(self) -> None:

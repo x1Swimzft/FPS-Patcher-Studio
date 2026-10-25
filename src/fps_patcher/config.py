@@ -24,10 +24,10 @@ MAX_BXD_PADDING_BYTES = 512 * 1024 * 1024  # 512 MB ceiling
 DEFAULT_THEME_PRESET = "Crimson Gamer"
 
 THEME_PRESETS = [
+    "Crimson Gamer",
     "Obsidian",
     "Midnight Violet",
     "Emerald Terminal",
-    "Crimson Gamer",
     "Graphite",
     "Amber Warm",
     "Light",
@@ -98,7 +98,7 @@ class Settings:
     v4_export_report: bool = False
     v4_dry_run: bool = False
     glass: bool = True
-    window_alpha: float = 0.98
+    window_alpha: float = 1.0
 
     # BXD Preset & Diagnostic options
     bxd_padding_bytes: int = 0  # 0 = automatic BXD multiplier size; clamped <= 512 MB
@@ -106,7 +106,7 @@ class Settings:
     mask_diagnostic_paths: bool = True
 
     # V2 Appearance
-    theme_preset: str = "Obsidian"
+    theme_preset: str = DEFAULT_THEME_PRESET
     custom_accent: str = ""
     tint_strength: int = 80
     glass_mode: str = "Solid"
@@ -115,6 +115,7 @@ class Settings:
     radius_style: str = "Normal"
     layout_density: str = "Compact"
     reduce_motion: bool = False
+    qt_v090_migrated: bool = True
 
     # V2 Output
     filename_template: str = "{name}_{fps}fps"
@@ -172,14 +173,33 @@ class Settings:
             if not isinstance(raw, dict):
                 return cls()
         except FileNotFoundError:
-            # A genuinely new install gets the Crimson Gamer identity; existing
-            # files keep their stored preset (and legacy files keep Obsidian).
-            return cls(theme_preset=DEFAULT_THEME_PRESET)
+            # A genuinely new install gets the Crimson Gamer identity and an
+            # opaque window; no settings file is created until the app saves.
+            return cls(
+                theme_preset=DEFAULT_THEME_PRESET,
+                window_alpha=1.0,
+                qt_v090_migrated=True,
+            )
         except (OSError, json.JSONDecodeError):
             return cls()
 
         known = {f.name for f in fields(cls) if f.init}
         filtered: dict[str, Any] = {k: v for k, v in raw.items() if k in known}
+
+        # v0.9.0 cutover: any pre-cutover file is migrated once. Obsidian was the
+        # old implicit default, and the old 98% window alpha made the whole app
+        # translucent. Keep an explicitly chosen non-Obsidian preset.
+        raw_migrated = raw.get("qt_v090_migrated", False)
+        needs_migration = raw_migrated is not True and str(raw_migrated).lower() not in (
+            "1",
+            "true",
+            "yes",
+        )
+        if needs_migration:
+            if str(raw.get("theme_preset", "Obsidian")) == "Obsidian":
+                filtered["theme_preset"] = DEFAULT_THEME_PRESET
+            filtered["window_alpha"] = 1.0
+            filtered["qt_v090_migrated"] = True
 
         # Safe clamping and validation
         try:
@@ -188,6 +208,8 @@ class Settings:
             return cls()
 
         instance._clamp()
+        if needs_migration:
+            instance.save(path)
         return instance
 
     def _clamp(self) -> None:
@@ -198,7 +220,7 @@ class Settings:
         self.strategy = new_strat
 
         if self.theme_preset not in THEME_PRESETS:
-            self.theme_preset = "Obsidian"
+            self.theme_preset = DEFAULT_THEME_PRESET
         if self.glass_mode not in BACKDROP_MODES:
             self.glass_mode = "Acrylic"
         if self.font_size not in FONT_SIZES:
@@ -222,7 +244,9 @@ class Settings:
         try:
             self.window_alpha = max(0.85, min(1.0, float(self.window_alpha)))
         except (ValueError, TypeError):
-            self.window_alpha = 0.96
+            self.window_alpha = 1.0
+
+        self.qt_v090_migrated = bool(self.qt_v090_migrated)
 
         try:
             self.ui_scale = max(50, min(200, int(self.ui_scale)))

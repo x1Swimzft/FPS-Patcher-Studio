@@ -38,6 +38,7 @@ from PySide6.QtWidgets import (
 from .. import __version__
 from ..config import (
     BACKDROP_MODES,
+    DEFAULT_THEME_PRESET,
     FONT_SIZES,
     LAYOUT_DENSITIES,
     MAX_BXD_PADDING_BYTES,
@@ -1342,7 +1343,11 @@ class SettingsDialog(QDialog):
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
-        self._draft = Settings()
+        self._draft = Settings(
+            theme_preset=DEFAULT_THEME_PRESET,
+            window_alpha=1.0,
+            qt_v090_migrated=True,
+        )
         self._rebuild()
         self._apply()
 

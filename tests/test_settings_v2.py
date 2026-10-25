@@ -29,9 +29,10 @@ def test_filename_template_rendering() -> None:
 
 def test_settings_v2_defaults_and_roundtrip(tmp_path: Path) -> None:
     s = Settings()
-    assert s.theme_preset == "Obsidian"
+    assert s.theme_preset == "Crimson Gamer"
     assert s.tint_strength == 80
-    assert s.window_alpha == 0.98
+    assert s.window_alpha == 1.0
+    assert s.qt_v090_migrated is True
     assert s.glass_mode == "Solid"
     assert s.language == "en"
 
@@ -64,10 +65,13 @@ def test_settings_v2_backward_compatibility_migration(tmp_path: Path) -> None:
     assert loaded.ffmpeg_dir == "C:/ffmpeg"
     assert loaded.output_dir == "D:/out"
     assert loaded.last_preset == "120 FPS"
-    # New fields should receive safe defaults
-    assert loaded.theme_preset == "Obsidian"
+    # v0.9.0 cutover migration: legacy Obsidian + 98% alpha become Crimson + opaque.
+    assert loaded.theme_preset == "Crimson Gamer"
+    assert loaded.window_alpha == 1.0
+    assert loaded.qt_v090_migrated is True
     assert loaded.tint_strength == 80
     assert loaded.glass is True
+    assert json.loads(old_file.read_text(encoding="utf-8"))["qt_v090_migrated"] is True
 
 
 def test_settings_v2_clamping_and_corrupt_recovery(tmp_path: Path) -> None:
@@ -75,9 +79,10 @@ def test_settings_v2_clamping_and_corrupt_recovery(tmp_path: Path) -> None:
         "tint_strength": 9999,  # Should clamp to 100
         "window_alpha": 0.1,  # Should clamp to 0.85
         "ui_scale": -50,  # Should clamp to 50
-        "theme_preset": "NonExistentPreset",  # Fallback to Obsidian
+        "theme_preset": "NonExistentPreset",  # Fallback to Crimson Gamer
         "glass_mode": "InvalidMode",  # Fallback to Acrylic
         "language": "es",  # Fallback to en
+        "qt_v090_migrated": True,  # Exercise clamping, not cutover migration
     }
     corrupt_file = tmp_path / "corrupt_settings.json"
     corrupt_file.write_text(json.dumps(corrupt_data), encoding="utf-8")
@@ -86,7 +91,7 @@ def test_settings_v2_clamping_and_corrupt_recovery(tmp_path: Path) -> None:
     assert loaded.tint_strength == 100
     assert loaded.window_alpha == 0.85
     assert loaded.ui_scale == 50
-    assert loaded.theme_preset == "Obsidian"
+    assert loaded.theme_preset == "Crimson Gamer"
     assert loaded.glass_mode == "Acrylic"
     assert loaded.language == "en"
 
@@ -94,7 +99,8 @@ def test_settings_v2_clamping_and_corrupt_recovery(tmp_path: Path) -> None:
     broken_file = tmp_path / "broken.json"
     broken_file.write_text("{broken json: 123", encoding="utf-8")
     safe_loaded = Settings.load(broken_file)
-    assert safe_loaded.theme_preset == "Obsidian"
+    assert safe_loaded.theme_preset == "Crimson Gamer"
+    assert safe_loaded.window_alpha == 1.0
 
 
 def test_concurrent_settings_saves_never_corrupt_the_file(tmp_path: Path) -> None:

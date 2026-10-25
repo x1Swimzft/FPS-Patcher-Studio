@@ -107,7 +107,7 @@ def test_density_corner_and_font_scale_values() -> None:
 def test_make_theme_resolves_mode_density_metrics_and_preset() -> None:
     dark = make_theme(Settings())
     assert dark.mode == "dark"
-    assert dark.color("bg") == PRESETS["Obsidian"].bg[1]
+    assert dark.color("bg") == PRESETS["Crimson Gamer"].bg[1]
     assert (dark.outer, dark.inner, dark.spacing) == (4, 6, 8)
     assert dark.metrics.window_width == 1040
     assert dark.metrics.window_height == 700
@@ -123,7 +123,7 @@ def test_make_theme_resolves_mode_density_metrics_and_preset() -> None:
 
     light = make_theme(Settings(appearance="light"))
     assert light.mode == "light"
-    assert light.color("bg") == PRESETS["Obsidian"].bg[0]
+    assert light.color("bg") == PRESETS["Crimson Gamer"].bg[0]
 
     system = make_theme(Settings(appearance="system"))
     assert system.mode == "dark"
@@ -201,7 +201,7 @@ def test_build_qss_uses_theme_values_and_variant_switches() -> None:
     assert build_qss(make_theme(Settings(layout_density="Comfortable"))) != qss
     assert build_qss(make_theme(Settings(radius_style="Sharp"))) != qss
     assert build_qss(make_theme(Settings(font_size="L"))) != qss
-    assert build_qss(make_theme(Settings(theme_preset="Crimson Gamer"))) != qss
+    assert build_qss(make_theme(Settings(theme_preset="Graphite"))) != qss
 
 
 def test_build_palette_has_core_and_disabled_roles() -> None:
@@ -234,11 +234,24 @@ def test_new_install_uses_crimson_but_existing_files_keep_their_preset(
 
     existing = tmp_path / "existing.json"
     existing.write_text(json.dumps({"theme_preset": "Graphite"}), encoding="utf-8")
-    assert Settings.load(existing).theme_preset == "Graphite"
+    chosen = Settings.load(existing)
+    assert chosen.theme_preset == "Graphite"
+    assert chosen.window_alpha == 1.0
+    assert chosen.qt_v090_migrated is True
+
+    still_obsidian = tmp_path / "still_obsidian.json"
+    still_obsidian.write_text(
+        json.dumps({"theme_preset": "Obsidian", "qt_v090_migrated": True}),
+        encoding="utf-8",
+    )
+    assert Settings.load(still_obsidian).theme_preset == "Obsidian"
 
     legacy = tmp_path / "legacy.json"
     legacy.write_text(json.dumps({"ffmpeg_dir": "C:/ffmpeg"}), encoding="utf-8")
-    assert Settings.load(legacy).theme_preset == "Obsidian"
+    migrated = Settings.load(legacy)
+    assert migrated.theme_preset == "Crimson Gamer"
+    assert migrated.window_alpha == 1.0
+    assert migrated.qt_v090_migrated is True
 
 
 def test_settings_round_trip_keeps_layout_density(tmp_path: Path) -> None:

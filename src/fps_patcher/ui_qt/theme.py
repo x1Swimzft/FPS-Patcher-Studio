@@ -16,7 +16,7 @@ from typing import Any
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QFontDatabase
 
-from ..config import THEME_PRESETS, Settings
+from ..config import DEFAULT_THEME_PRESET, THEME_PRESETS, Settings
 
 # ============================================================================
 # 1. COLOUR TOKENS
@@ -440,7 +440,7 @@ def _custom_accent(raw: str) -> str | None:
 
 def make_theme(settings: Settings) -> Theme:
     """Resolve presets and layout switches from persisted settings."""
-    tokens = PRESETS.get(settings.theme_preset, PRESETS["Obsidian"])
+    tokens = PRESETS.get(settings.theme_preset, PRESETS[DEFAULT_THEME_PRESET])
     accent = _custom_accent(getattr(settings, "custom_accent", ""))
     if accent:
         tokens = replace(

@@ -90,16 +90,16 @@ PyInstaller 6.22.3 and Inno Setup 7.1.0:
 
 | Artifact | Exact size | SHA-256 |
 |---|---:|---|
-| `dist/FPSPatcherStudio/` (183 files) | 322,911,139 B | n/a (directory) |
-| `release/FPSPatcherStudio-v0.9.0-Setup.exe` | 88,042,955 B | `28e7a7d4a14fe9c617271a5645953bd5af0dd6849e67a37ef7154c6f823f84bc` |
-| `release/FPSPatcherStudio-v0.9.0-win64.zip` | 122,845,436 B | `43a8dd6f4d4e8ea43658e8858d8987a387d8bc2e89876c75e3a43dee0667a4b1` |
+| `dist/FPSPatcherStudio/` (183 files) | 322,912,074 B | n/a (directory) |
+| `release/FPSPatcherStudio-v0.9.0-Setup.exe` | 88,045,551 B | `3f946b3a5e732f1d4f0988e9b271888100d520a6e04b058aa3fd32cc14e6d25b` |
+| `release/FPSPatcherStudio-v0.9.0-win64.zip` | 122,846,936 B | `f0ae5a9f485391ca34033e5e3a340d368501096fb463630b025f0a57a155a046` |
 
 Size comparison:
 
 | Measure | v0.9.0 | Pre-Qt baseline | Dual-UI build |
 |---|---:|---:|---:|
-| `dist` | 322,911,139 B | 259,439,922 B (+63,471,217 / +24.46%) | 335,047,577 B (-12,136,438 / -3.62%) |
-| `Setup.exe` | 88,042,955 B | 72,730,731 B (+15,312,224 / +21.05%) | 91,420,605 B (-3,377,650 / -3.69%) |
+| `dist` | 322,912,074 B | 259,439,922 B (+63,472,152 / +24.46%) | 335,047,577 B (-12,135,503 / -3.62%) |
+| `Setup.exe` | 88,045,551 B | 72,730,731 B (+15,314,820 / +21.05%) | 91,420,605 B (-3,375,054 / -3.69%) |
 
 Payload audit: no `tcl8*`, `tk8*`, `tcl86t.dll`, `tk86t.dll`, `customtkinter`,
 `tkinterdnd2` or `pywinstyles` files; `platforms/qwindows.dll` is present.

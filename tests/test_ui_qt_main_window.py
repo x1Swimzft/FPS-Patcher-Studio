@@ -116,6 +116,33 @@ def test_language_switch_retranslates_live(
     window.close()
 
 
+def test_custom_fps_is_not_duplicated_in_output(
+    qtbot: Any, monkeypatch: Any, tmp_path: Path
+) -> None:
+    from qt_support import make_main_window
+
+    window = make_main_window(
+        qtbot,
+        monkeypatch,
+        tmp_path,
+        last_preset="Custom",
+        custom_timescale=90000,
+    )
+    inspector = window.inspector
+
+    assert inspector.custom_label.text() == t("custom_fps_lbl", "en")
+    assert inspector.custom_edit.text() == "90"
+    assert inspector.timescale_field.text() == "90000"
+    assert inspector.timescale() == 90000
+
+    inspector.custom_edit.setText("120")
+    inspector._commit_custom()
+    assert inspector.timescale() == 120000
+    assert inspector.timescale_field.text() == "120000"
+    assert window.settings.custom_timescale == 120000
+    window.close()
+
+
 @pytest.mark.parametrize("preset", THEME_PRESETS)
 def test_all_seven_presets_construct(
     qtbot: Any, monkeypatch: Any, tmp_path: Path, preset: str
