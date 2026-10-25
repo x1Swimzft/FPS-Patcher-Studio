@@ -418,6 +418,111 @@ QPushButton:focus, QLineEdit:focus, QComboBox:focus, QSpinBox:focus,
 QCheckBox:focus, QRadioButton:focus, QListWidget#QueueList:focus {{
     border: 2px solid {c("border_focus")};
 }}
+QWidget#SettingsFooter {{
+    background: {c("toolbar_bg")};
+    border-top: 1px solid {c("border")};
+}}
+QPushButton#SettingsFooterButton, QPushButton#SettingsPrimaryButton {{
+    min-height: 32px;
+    max-height: 32px;
+    margin: 0px;
+    padding: 0px 16px;
+    border-width: 1px;
+    border-style: solid;
+    border-radius: {control}px;
+    font-size: {body}px;
+}}
+QPushButton#SettingsFooterButton {{
+    background: {c("surface")};
+    border-color: {c("border")};
+    color: {c("text")};
+}}
+QPushButton#SettingsFooterButton:hover {{
+    background: {c("surface_hover")};
+    border-color: {c("border_hover")};
+}}
+QPushButton#SettingsFooterButton:pressed {{
+    background: {c("surface_raised")};
+}}
+QPushButton#SettingsPrimaryButton {{
+    background: {c("accent")};
+    border-color: {c("accent")};
+    color: {c("on_accent")};
+    font-weight: 600;
+}}
+QPushButton#SettingsPrimaryButton:hover {{
+    background: {c("accent_hover")};
+    border-color: {c("accent_hover")};
+}}
+QPushButton#SettingsPrimaryButton:pressed {{
+    background: {c("accent_pressed")};
+    border-color: {c("accent_pressed")};
+}}
+QPushButton#SettingsFooterButton:disabled, QPushButton#SettingsPrimaryButton:disabled {{
+    background: {c("accent_dim")};
+    border-color: {c("accent_dim_border")};
+    color: {c("muted")};
+}}
+QPushButton#SettingsNavPill {{
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: {control}px;
+    color: {c("text2")};
+    font-size: {body}px;
+    min-height: 34px;
+    max-height: 34px;
+    padding: 0 {inner}px;
+    text-align: left;
+}}
+QPushButton#SettingsNavPill:hover {{
+    background: {c("surface_hover")};
+    color: {c("text")};
+}}
+QPushButton#SettingsNavPill[active="true"] {{
+    background: {c("accent_dim")};
+    border-left: 3px solid {c("accent")};
+    color: {c("accent")};
+}}
+QFrame#PresetSwatchCard {{
+    background: {c("surface_raised")};
+    border: 1px solid {c("border")};
+    border-radius: {card}px;
+}}
+QFrame#PresetSwatchCard:hover {{
+    background: {c("surface_hover")};
+    border-color: {c("border_hover")};
+}}
+QFrame#PresetSwatchCard[selected="true"] {{
+    background: {c("accent_dim")};
+    border: 2px solid {c("accent")};
+}}
+QLabel#QueueThumb {{
+    background: {c("surface_raised")};
+    border: 1px solid {c("border")};
+    border-radius: 6px;
+}}
+QLabel#QueueMetaPill {{
+    background: {c("surface_raised")};
+    border: 1px solid {c("border")};
+    border-radius: {RADIUS_PILL}px;
+    color: {c("text2")};
+    font-size: {caption}px;
+    padding: 1px {outer}px;
+}}
+QPushButton#QueueRowAction {{
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: {control}px;
+    min-height: 26px;
+    max-height: 26px;
+    min-width: 26px;
+    max-width: 26px;
+    padding: 0;
+}}
+QPushButton#QueueRowAction:hover {{
+    background: {c("surface_hover")};
+    border-color: {c("border")};
+}}
 """
 
 

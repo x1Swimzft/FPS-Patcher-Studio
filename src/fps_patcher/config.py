@@ -21,6 +21,8 @@ _SAVE_LOCK = threading.Lock()
 APP_DIR_NAME = "FPSPatcherStudio"
 MAX_BXD_PADDING_BYTES = 512 * 1024 * 1024  # 512 MB ceiling
 
+DEFAULT_THEME_PRESET = "Crimson Gamer"
+
 THEME_PRESETS = [
     "Obsidian",
     "Midnight Violet",
@@ -169,6 +171,10 @@ class Settings:
             raw = json.loads(path.read_text(encoding="utf-8"))
             if not isinstance(raw, dict):
                 return cls()
+        except FileNotFoundError:
+            # A genuinely new install gets the Crimson Gamer identity; existing
+            # files keep their stored preset (and legacy files keep Obsidian).
+            return cls(theme_preset=DEFAULT_THEME_PRESET)
         except (OSError, json.JSONDecodeError):
             return cls()
 

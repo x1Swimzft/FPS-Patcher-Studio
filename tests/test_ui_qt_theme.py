@@ -185,8 +185,18 @@ def test_build_qss_uses_theme_values_and_variant_switches() -> None:
         "QDialog",
         "QToolTip",
         "QListWidget#QueueList",
+        "QPushButton#SettingsFooterButton",
+        "QPushButton#SettingsPrimaryButton",
+        "QPushButton#SettingsNavPill",
+        "QFrame#PresetSwatchCard",
+        "QLabel#QueueThumb",
+        "QLabel#QueueMetaPill",
+        "QPushButton#QueueRowAction",
     ):
         assert selector in qss, selector
+    assert "min-height: 32px;" in qss
+    assert "max-height: 32px;" in qss
+    assert "padding: 0px 16px;" in qss
 
     assert build_qss(make_theme(Settings(layout_density="Comfortable"))) != qss
     assert build_qss(make_theme(Settings(radius_style="Sharp"))) != qss
@@ -214,6 +224,21 @@ def test_theme_manager_rebuilds_and_notifies() -> None:
     assert manager.theme.tokens.name == "Graphite"
     assert manager.theme.outer == 6
     assert seen and seen[-1] is manager.theme
+
+
+def test_new_install_uses_crimson_but_existing_files_keep_their_preset(
+    tmp_path: Path,
+) -> None:
+    missing = tmp_path / "missing.json"
+    assert Settings.load(missing).theme_preset == "Crimson Gamer"
+
+    existing = tmp_path / "existing.json"
+    existing.write_text(json.dumps({"theme_preset": "Graphite"}), encoding="utf-8")
+    assert Settings.load(existing).theme_preset == "Graphite"
+
+    legacy = tmp_path / "legacy.json"
+    legacy.write_text(json.dumps({"ffmpeg_dir": "C:/ffmpeg"}), encoding="utf-8")
+    assert Settings.load(legacy).theme_preset == "Obsidian"
 
 
 def test_settings_round_trip_keeps_layout_density(tmp_path: Path) -> None:
