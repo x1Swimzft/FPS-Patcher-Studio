@@ -1,9 +1,11 @@
 # Release Notes
 
-## PySide6 UI Cutover (Unreleased)
+## v0.9.0 - PySide6 UI Cutover (2026-10-25)
 
 FPS Patcher Studio now runs on a native **PySide6/Qt 6** interface. The legacy
-Tk/CustomTkinter UI has been removed; Qt is the only UI runtime.
+Tk/CustomTkinter UI has been removed; Qt is the only UI runtime. The production
+frozen build, Windows installer and portable zip below were built from branch
+`ui/pyside6` (`b44fb34`) and smoke-tested on Windows x64.
 
 ### Highlights
 
@@ -26,7 +28,34 @@ Tk/CustomTkinter UI has been removed; Qt is the only UI runtime.
   seven presets in light and dark modes.
 - **Legacy Tk removed** — `customtkinter`, `tkinterdnd2` and `pywinstyles` are no
   longer dependencies; Tcl/Tk, CustomTkinter and the old data files are excluded
-  from the frozen build.
+  from the frozen build. The payload contains no `tcl8*`/`tk8*`, `tcl86t.dll`,
+  `tk86t.dll` or legacy UI files; `platforms/qwindows.dll` is present.
+
+### Release artifacts (v0.9.0, Windows x64)
+
+| Artifact | Exact size | SHA-256 |
+|---|---:|---|
+| `FPSPatcherStudio-v0.9.0-Setup.exe` | 88,042,955 B | `28e7a7d4a14fe9c617271a5645953bd5af0dd6849e67a37ef7154c6f823f84bc` |
+| `FPSPatcherStudio-v0.9.0-win64.zip` | 122,845,436 B | `43a8dd6f4d4e8ea43658e8858d8987a387d8bc2e89876c75e3a43dee0667a4b1` |
+
+One-folder `dist/FPSPatcherStudio/`: **322,911,139 B** (183 files). The zip keeps
+the top-level `FPSPatcherStudio/` folder. Checksum sidecars use the
+`<lowercase-hash>  <filename>` (sha256sum) format.
+
+Size deltas:
+
+| Measure | v0.9.0 | vs pre-Qt baseline | vs dual-UI build |
+|---|---:|---:|---:|
+| `dist` | 322,911,139 B | +63,471,217 B (+24.46%) | -12,136,438 B (-3.62%) |
+| `Setup.exe` | 88,042,955 B | +15,312,224 B (+21.05%) | -3,377,650 B (-3.69%) |
+
+Baselines: pre-Qt `dist` 259,439,922 B / installer 72,730,731 B; dual-UI `dist`
+335,047,577 B / installer 91,420,605 B.
+
+Verification: frozen exe stayed alive for 8 s with isolated `APPDATA` and closed
+cleanly; no missing DLL/platform-plugin error. Frozen `--quick-patch` with no
+target printed the usage line to stderr and exited **2** without initialising Qt.
+Installer built with Inno Setup 7; test suite at cutover: **354 passed**.
 
 ### Compatibility
 
@@ -46,5 +75,6 @@ Tk/CustomTkinter UI has been removed; Qt is the only UI runtime.
 - macOS uses the solid-surface fallback; no `NSVisualEffectView`.
 - Real 150%/200% monitor DPI and Explorer drag-and-drop were not exercised
   end-to-end in this environment (offscreen 100%/125% were).
-- Artifact sizes change with the dependency removal; the release build records the
-  measured `dist` and `Setup.exe` bytes rather than quoting an estimate here.
+- `_internal/PIL/_imagingtk.cp311-win_amd64.pyd` (14 KB, Pillow's unused ImageTk
+  shim) is still collected by PyInstaller. It imports no Tcl/Tk DLLs and is never
+  loaded by the Qt app; no Tcl/Tk runtime or data is shipped.

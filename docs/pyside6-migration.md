@@ -20,6 +20,19 @@ they describe Tk modules or "still needed" work, read that as pre-cutover contex
 | Test binding | `pytest-qt==4.5.0` |
 | Windows packaging | PyInstaller one-folder + Inno Setup (`lzma2`, solid) |
 
+Measured v0.9.0 release build (`ui/pyside6`, `b44fb34`, 2026-10-25):
+
+| Artifact | Exact size | Delta vs pre-Qt baseline |
+|---|---:|---:|
+| `dist/FPSPatcherStudio/` | 322,911,139 B | +63,471,217 B (+24.46%) |
+| `release/FPSPatcherStudio-v0.9.0-Setup.exe` | 88,042,955 B | +15,312,224 B (+21.05%) |
+| `release/FPSPatcherStudio-v0.9.0-win64.zip` | 122,845,436 B | n/a (zip added post-Qt) |
+
+Against the dual-UI build (`dist` 335,047,577 B, installer 91,420,605 B) the
+Qt-only cutover is 12,136,438 B smaller in `dist` (-3.62%) and 3,377,650 B
+smaller in the installer (-3.69%). The zip keeps the top-level
+`FPSPatcherStudio/` folder; SHA-256 values are in `RELEASE_NOTES.md`.
+
 Installed Qt distributions: `pyside6-essentials`, `pyside6-addons`, `pyside6-webengine`,
 `pyside6-pdf` (all 6.12.0; wheels ~247 MB downloaded). In this dev environment the
 uncompressed PySide6 tree is ~646.7 MB, of which `Qt6WebEngineCore.dll` alone is ~194.1 MB.
@@ -150,9 +163,9 @@ All of these landed in `ui_qt`:
 - `pyproject.toml` depends on `pillow` and `pyside6==6.12.0` only.
   `build/release.ps1` gates and `installer.iss` need no structural change.
 - Baseline before the Qt UI was `dist` 259,439,922 bytes / `Setup.exe`
-  72,730,731 bytes. Measure the post-cutover `dist` and `Setup.exe` during the
-  release build instead of relying on an estimate; `lzma2` solid compression makes
-  the installer grow less than the raw `dist`.
+  72,730,731 bytes. The measured v0.9.0 build is **322,911,139 / 88,042,955
+  bytes** (table above); `lzma2` solid compression keeps the installer growth
+  below the raw `dist` growth (21.05% vs 24.46%).
 - PySide6 licensing/notices are recorded in `THIRD_PARTY_NOTICES.md`; the one-folder
   layout keeps Qt DLLs replaceable.
 
@@ -188,6 +201,7 @@ sufficient and no third-party backdrop package ships.
 |---|---|---|
 | Phase 2 — visual parity | `594f7eb`, `0e5bb50`, `aea8e56`, `efbb2a3`, `584fd1d` | Default Crimson preset and shared polish strings/QSS, forensic repair/export parity, wide settings dialog, queue thumbnails + rich empty state + override card, empty-state icon spacing. |
 | Phase 3 — integration QA | `6386151` | Harness captures the wide settings dialog at 920x640 / 1150x800, full matrix regenerated and dimension/blankness validated, docs synced. |
+| Cutover & production release | `b36c481`, `58f8c75`, `4c2bd4c`, `b44fb34` | Removed the legacy Tk UI and tests, dropped `customtkinter`/`tkinterdnd2`/`pywinstyles`, excluded Tcl/Tk from the spec, and built/verified the v0.9.0 frozen app, installer and portable zip. |
 
 Resolved parity items:
 
@@ -226,9 +240,13 @@ Resolved parity items:
   settings is 920x640 at 100% and 1150x800 at 125%. Latest run: 57/57 at 100%
   and 56/56 at 125%, every image the expected size and non-blank. Reproduce with
   `tools/capture_qt_screens.py`.
-- Frozen build validated with PySide6 6.12.0 + PyInstaller 6.22.x + Inno Setup 7.
-  Post-cutover artifact sizes are measured by the release build, not assumed.
-  `--quick-patch` errors remain headless.
+- Frozen build validated with PySide6 6.12.0 + PyInstaller 6.22.3 + Inno Setup 7.1.0.
+  Post-cutover sizes are measured, not assumed: `dist` 322,911,139 B, installer
+  88,042,955 B, zip 122,845,436 B. Payload check found zero Tcl/Tk, CustomTkinter,
+  TkinterDnD2 or pywinstyles files and `platforms/qwindows.dll` present.
+  The exe stayed alive for 8 s with isolated `APPDATA` and closed cleanly.
+  Frozen `--quick-patch` with no target printed usage to stderr and exited 2
+  without Qt initialisation. `--quick-patch` errors remain headless.
 
 ### Known gaps / limitations
 

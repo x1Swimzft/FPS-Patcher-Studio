@@ -83,6 +83,29 @@ then the 6 s launch smoke test, then Inno Setup (`installer.iss` copies
 hidden imports; `tkinter`, `_tkinter`, `customtkinter`, `tkinterdnd2` and
 `pywinstyles` are explicit `excludes`. `ui/assets` (Qt icons/fonts) stays bundled.
 
+## Frozen artifact sizes (v0.9.0)
+
+Built from `ui/pyside6` (`b44fb34`) on 2026-10-25 with PySide6 6.12.0,
+PyInstaller 6.22.3 and Inno Setup 7.1.0:
+
+| Artifact | Exact size | SHA-256 |
+|---|---:|---|
+| `dist/FPSPatcherStudio/` (183 files) | 322,911,139 B | n/a (directory) |
+| `release/FPSPatcherStudio-v0.9.0-Setup.exe` | 88,042,955 B | `28e7a7d4a14fe9c617271a5645953bd5af0dd6849e67a37ef7154c6f823f84bc` |
+| `release/FPSPatcherStudio-v0.9.0-win64.zip` | 122,845,436 B | `43a8dd6f4d4e8ea43658e8858d8987a387d8bc2e89876c75e3a43dee0667a4b1` |
+
+Size comparison:
+
+| Measure | v0.9.0 | Pre-Qt baseline | Dual-UI build |
+|---|---:|---:|---:|
+| `dist` | 322,911,139 B | 259,439,922 B (+63,471,217 / +24.46%) | 335,047,577 B (-12,136,438 / -3.62%) |
+| `Setup.exe` | 88,042,955 B | 72,730,731 B (+15,312,224 / +21.05%) | 91,420,605 B (-3,377,650 / -3.69%) |
+
+Payload audit: no `tcl8*`, `tk8*`, `tcl86t.dll`, `tk86t.dll`, `customtkinter`,
+`tkinterdnd2` or `pywinstyles` files; `platforms/qwindows.dll` is present.
+`PIL/_imagingtk.cp311-win_amd64.pyd` (14 KB) is an unused Pillow shim that
+imports no Tcl/Tk DLLs.
+
 ### Checking a frozen build
 
 ```powershell
@@ -118,8 +141,9 @@ frozen one-folder build:
 - Mica/Acrylic is unverified on real Windows 11 hardware here; this session ran
   on a Windows build without a visual desktop check. `qoffscreen` proves startup,
   not the visual result.
-- No installer size comparison is stored in the repository; the release build
-  records the measured post-cutover `dist`/`Setup.exe` bytes.
+- Installer / `dist` sizes are recorded in the v0.9.0 table above. Re-measure them
+  on later builds; `lzma2` solid compression means installer growth does not track
+  raw `dist` growth linearly.
 - `--ui tk` is deprecated and launches Qt; Tcl/Tk is not part of the frozen build.
 - macOS backdrop and macOS frozen launch are untested on this Windows machine.
 - The settings window still accepts the legacy Tk geometry key; it is ignored by
