@@ -175,6 +175,33 @@ but do not add it to the frozen Qt build unless actually imported.
 
 ## Implementation status (packages 0–9)
 
+### Phase 2/3 completion
+
+| Phase | Commits | Outcome |
+|---|---|---|
+| Phase 2 — visual parity | `594f7eb`, `0e5bb50`, `aea8e56`, `efbb2a3`, `584fd1d` | Default Crimson preset and shared polish strings/QSS, forensic repair/export parity, wide settings dialog, queue thumbnails + rich empty state + override card, empty-state icon spacing. |
+| Phase 3 — integration QA | this commit (`test(ui_qt): wide settings screenshots and integration QA`) | Harness captures the wide settings dialog at 920x640 / 1150x800, full matrix regenerated and dimension/blankness validated, docs synced. |
+
+Resolved parity items:
+
+- Settings dialog is a two-column **920x640** layout with a search field, aligned
+  footer (`Reset to Defaults` / `Cancel` / `Apply` / `OK`) and carded sections;
+  at 125% it captures **1150x800** with the same layout (right column scrolls).
+- Queue rows render FFmpeg thumbnails asynchronously; failures fall back to the
+  play glyph. The hero image uses real 2-second generated clips, so thumbnails
+  are visible rather than placeholders.
+- Empty state is a rich drop card (icon, title, hint, `Add Files`/`Add Folder`,
+  extension chips, active-profile summary); the bobbing icon keeps reserved
+  space so it never overlaps the title at 100/125%.
+- Inspector exposes a per-item override card (switch, item timescale, item
+  preset, Set Override / Clear, active/inactive caption).
+- Forensic dialog covers repair and report export actions, matching the legacy
+  Tk surface.
+- Crimson Gamer is the default preset; console and queue retranslate on
+  language change.
+
+**Platform baseline:**
+
 - New UI lives in `src/fps_patcher/ui_qt/`; the legacy `src/fps_patcher/ui/` is
   untouched and still launches with `--ui tk`.
 - `python -m fps_patcher` / `FPSPatcherStudio.exe` now defaults to Qt;
@@ -184,11 +211,14 @@ but do not add it to the frozen Qt build unless actually imported.
 - Theme tokens, QSS, QPalette, seven presets, density, SegmentedControl, Switch,
   setup cards, queue model/delegate, console drawer, settings dialog, motion and
   DWM helpers are implemented.
-- `pytest -q`: **406 passed**. `ruff check .`: clean. `mypy src/fps_patcher`:
+- `pytest -q`: **428 passed**. `ruff check .`: clean. `mypy src/fps_patcher`:
   clean. New Qt tests live in `tests/test_ui_qt_*.py`.
 - Screenshot matrix: **113 PNGs** in `images/after-qt/` (7 presets x light/dark
-  x en/th x 100/125, main 1120x760 and settings 740x580, plus one rich-queue
-  hero). Reproduce with `tools/capture_qt_screens.py`.
+  x en/th = 56 combinations; 56 main + 56 settings at 100/125, plus one
+  rich-queue hero at 100%). Main is 1120x760 at 100% and 1400x950 at 125%;
+  settings is 920x640 at 100% and 1150x800 at 125%. Latest run: 57/57 at 100%
+  and 56/56 at 125%, every image the expected size and non-blank. Reproduce with
+  `tools/capture_qt_screens.py`.
 - Frozen build (PyInstaller 6.22.3 + PySide6 6.12.0 + Inno Setup 7):
   `dist/FPSPatcherStudio` grew from 259,439,922 to 335,045,829 bytes;
   `Setup.exe` grew from 72,730,731 to 91,420,605 bytes. The frozen qwindows

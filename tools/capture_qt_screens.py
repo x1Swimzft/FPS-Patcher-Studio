@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -31,7 +32,7 @@ PRESETS = (
 MODES = ("light", "dark")
 LANGUAGES = ("en", "th")
 MAIN_SIZE = (1120, 760)
-SETTINGS_SIZE = (740, 580)
+SETTINGS_SIZE = (920, 640)
 OUTPUT_DIR = Path(__file__).resolve().parents[1] / "images" / "after-qt"
 BIN_DIR = Path(__file__).resolve().parents[1] / "bin"
 # The offscreen platform plugin does not expose installed system fonts. Load a
@@ -197,6 +198,24 @@ def _fake_video_info(path: Path, *, fps: int, duration: float, size_mb: int):
     )
 
 
+def _make_clip(path: Path, color: str) -> None:
+    """Write a real short clip so the rich-queue hero shows real thumbnails."""
+    ffmpeg = BIN_DIR / "ffmpeg.exe"
+    if ffmpeg.is_file():
+        subprocess.run(
+            [
+                str(ffmpeg), "-hide_banner", "-loglevel", "error", "-y",
+                "-f", "lavfi", "-i", f"color=c={color}:s=320x180:d=2",
+                "-c:v", "mpeg4", str(path),
+            ],
+            check=False,
+            timeout=60,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    if not path.is_file():
+        path.write_bytes(b"\0" * 1024)
+
+
 def _capture_rich_queue(window_cls, scale: float, root: Path) -> Path:
     from PySide6.QtTest import QTest
 
@@ -205,10 +224,11 @@ def _capture_rich_queue(window_cls, scale: float, root: Path) -> Path:
     media = root / "media"
     media.mkdir(parents=True, exist_ok=True)
     names = ("ranked_finals_60fps.mp4", "boss_fight_120fps.mp4", "victory_screen_60fps.mp4")
+    colors = ("navy", "darkgreen", "maroon")
     paths = []
-    for name in names:
+    for name, color in zip(names, colors, strict=True):
         path = media / name
-        path.write_bytes(b"\0" * 1024)
+        _make_clip(path, color)
         paths.append(path)
 
     _clear_queue_file()
@@ -240,10 +260,15 @@ def _capture_rich_queue(window_cls, scale: float, root: Path) -> Path:
 
     window.controller.items = queue
     window.controller.queue = queue.paths()
+    # Show the inspector override card in its active state on the focused row.
+    queue.set_override(paths[0], timescale=60000, strategy="bxd-mobile")
     window.queue_view.refresh()
-    window._sync_focused_item()
+    window.queue_view._focus_row(0, open_player=False)
     window._refresh_readiness()
-    QTest.qWait(150)
+    for _ in range(80):
+        if all(window.queue_view.thumbnail(item.item_id) for item in queue.items):
+            break
+        QTest.qWait(100)
 
     target = OUTPUT_DIR / f"crimson-gamer-dark-en-{round(scale * 100)}-main-queue.png"
     _grab(window, target)
@@ -308,8 +333,11 @@ def main() -> int:
     for stale in OUTPUT_DIR.glob(f"*-{scale_tag}-*.png"):
         stale.unlink()
 
-    expected_main = (round(1120 * args.scale), round(760 * args.scale))
-    expected_settings = (round(740 * args.scale), round(580 * args.scale))
+    expected_main = (round(MAIN_SIZE[0] * args.scale), round(MAIN_SIZE[1] * args.scale))
+    expected_settings = (
+        round(SETTINGS_SIZE[0] * args.scale),
+        round(SETTINGS_SIZE[1] * args.scale),
+    )
 
     captured: list[tuple[str, Path]] = []
     try:
