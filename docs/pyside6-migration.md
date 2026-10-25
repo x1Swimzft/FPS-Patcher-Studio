@@ -20,7 +20,7 @@ they describe Tk modules or "still needed" work, read that as pre-cutover contex
 | Test binding | `pytest-qt==4.5.0` |
 | Windows packaging | PyInstaller one-folder + Inno Setup (`lzma2`, solid) |
 
-Measured v0.9.0 release build (`ui/pyside6`, `67be740`, 2026-10-25):
+Measured v0.9.0 release build (`ui/pyside6`, `976550c`, 2026-10-25):
 
 | Artifact | Exact size | Delta vs pre-Qt baseline |
 |---|---:|---:|
@@ -201,7 +201,7 @@ sufficient and no third-party backdrop package ships.
 |---|---|---|
 | Phase 2 — visual parity | `594f7eb`, `0e5bb50`, `aea8e56`, `efbb2a3`, `584fd1d` | Default Crimson preset and shared polish strings/QSS, forensic repair/export parity, wide settings dialog, queue thumbnails + rich empty state + override card, empty-state icon spacing. |
 | Phase 3 — integration QA | `6386151` | Harness captures the wide settings dialog at 920x640 / 1150x800, full matrix regenerated and dimension/blankness validated, docs synced. |
-| Cutover & production release | `b36c481`, `58f8c75`, `4c2bd4c`, `b44fb34`, `67be740` | Removed the legacy Tk UI and tests, dropped `customtkinter`/`tkinterdnd2`/`pywinstyles`, excluded Tcl/Tk from the spec, added the final Crimson migration/custom-FPS polish, and built/verified the v0.9.0 frozen app, installer and portable zip. |
+| Cutover & production release | `b36c481`, `58f8c75`, `4c2bd4c`, `b44fb34`, `976550c` | Removed the legacy Tk UI and tests, dropped `customtkinter`/`tkinterdnd2`/`pywinstyles`, excluded Tcl/Tk from the spec, added the final Crimson migration/custom-FPS polish, and built/verified the v0.9.0 frozen app, installer and portable zip. |
 
 Resolved parity items:
 

@@ -85,7 +85,7 @@ hidden imports; `tkinter`, `_tkinter`, `customtkinter`, `tkinterdnd2` and
 
 ## Frozen artifact sizes (v0.9.0)
 
-Built from `ui/pyside6` (`67be740`) on 2026-10-25 with PySide6 6.12.0,
+Built from `ui/pyside6` (`976550c`) on 2026-10-25 with PySide6 6.12.0,
 PyInstaller 6.22.3 and Inno Setup 7.1.0:
 
 | Artifact | Exact size | SHA-256 |
