@@ -1,7 +1,6 @@
 """Qt design tokens, density metrics, fonts and Windows DWM helpers.
 
-This module deliberately does not import the legacy ``ui.theme`` module: that
-one pulls in customtkinter. Everything Qt-facing here only needs PySide6.
+Everything Qt-facing here only needs PySide6.
 """
 
 from __future__ import annotations

@@ -203,10 +203,7 @@ def generate_markdown_report(
     timestamp = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
 
     metadata_known = {
-        "customtkinter": ("MIT", "Modern UI widgets theme engine built on Tkinter"),
         "pillow": ("HPND / Historical", "Imaging library for icons, thumbs, preview decoding"),
-        "pywinstyles": ("MIT", "Windows 11 DWM titlebar & backdrop styling (Mica/Acrylic)"),
-        "tkinterdnd2": ("MIT", "Native drag-and-drop support for file inputs"),
         "cairosvg": ("LGPL-3.0", "SVG icon rasterizer to PNG / high-DPI icons"),
         "mypy": ("MIT", "Static type checker for Python"),
         "pytest": ("MIT", "Unit and integration test runner"),
@@ -217,12 +214,11 @@ def generate_markdown_report(
         "cffi": ("MIT", "Foreign Function Interface for Python (cairocffi)"),
         "colorama": ("BSD-3-Clause", "Cross-platform colored terminal text (pytest)"),
         "cssselect2": ("BSD-3-Clause", "CSS3 selectors for ElementTree (cairosvg)"),
-        "darkdetect": ("BSD-3-Clause", "OS appearance detector (customtkinter)"),
         "defusedxml": ("Python-2.0", "XML bomb protection for XML/SVG parsing (cairosvg)"),
         "iniconfig": ("MIT", "Brain-dead simple config-ini parsing (pytest)"),
         "librt": ("MIT", "Runtime library support (mypy)"),
         "mypy-extensions": ("MIT", "Experimental type system extensions for mypy"),
-        "packaging": ("Apache-2.0", "Core packaging utilities (customtkinter, pytest)"),
+        "packaging": ("Apache-2.0", "Core packaging utilities (pytest)"),
         "pathspec": ("MPL-2.0", "Gitignore-style pattern matching (mypy)"),
         "pluggy": ("MIT", "Plugin and hook calling mechanism (pytest)"),
         "pycparser": ("BSD-3-Clause", "C parser in Python (cffi)"),

@@ -15,7 +15,7 @@ from pathlib import Path
 from fps_patcher.app.queue_model import InputQueue
 from fps_patcher.app.watcher import FolderWatcher
 from fps_patcher.core.colr import sanitize
-from fps_patcher.ui import thumbnails
+from fps_patcher.ui_qt import thumbnails
 
 
 def _box(typ: bytes, payload: bytes) -> bytes:
