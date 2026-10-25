@@ -787,7 +787,8 @@ class SettingsDialog(QDialog):
 
     def _on_language(self, value: str) -> None:
         self._draft.language = "th" if "th" in value else "en"
-        self.setWindowTitle(self._title())
+        self._harvest()
+        self._rebuild()
 
     # ----------------------------------------------------------------- about
     def _build_about(self) -> None:
