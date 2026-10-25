@@ -35,6 +35,12 @@ class VideoInfo:
     bit_rate: int | None = None
     audio_sample_rate: int | None = None
     audio_channels: int | None = None
+    format_name: str | None = None
+    color_primaries: str | None = None
+    color_transfer: str | None = None
+    color_space: str | None = None
+    pix_fmt: str | None = None
+    file_size_bytes: int | None = None
 
     @property
     def fps(self) -> float:

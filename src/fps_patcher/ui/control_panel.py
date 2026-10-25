@@ -12,6 +12,7 @@ import customtkinter as ctk
 from ..app.queue_model import QueueItem
 from ..config import Settings
 from ..core.models import FPS_PRESETS
+from ..core.platform_profiles import PLATFORM_PROFILES, get_profile
 from ..core.strategies import UI_PRESETS, migrate_strategy_name
 from .icons import get_icon
 from .option_menu import MacOptionMenu
@@ -52,6 +53,7 @@ class ControlPanel(ctk.CTkFrame):
         on_cancel: Callable[[], None],
         on_strategy_change: Callable[[], None] | None = None,
         on_override_change: Callable[[Path, int | None, str | None], None] | None = None,
+        on_profile_change: Callable[[], None] | None = None,
         footer_master: Any = None,
     ) -> None:
         self.settings = settings
@@ -71,6 +73,7 @@ class ControlPanel(ctk.CTkFrame):
         self._on_cancel = on_cancel
         self._on_strategy_change = on_strategy_change
         self._on_override_change = on_override_change
+        self._on_profile_change = on_profile_change
         self._label_to_strategy = {s.label: s.name for s in UI_PRESETS.values()}
         self._strategy_to_label = {s.name: s.label for s in UI_PRESETS.values()}
         self._can_patch = False
@@ -162,6 +165,53 @@ class ControlPanel(ctk.CTkFrame):
         self.strategy.set(current.label if current else labels[0])
         self.strategy.grid(row=1, column=1, sticky="ew", padx=(5, 0))
         self.strategy_menu = self.strategy
+
+        # -- Platform profile / readiness selector --
+        self.profile_label = ctk.CTkLabel(
+            self.grid_two_col,
+            text=t("platform_profile_lbl", lang),
+            font=font_caption(fsize),
+            text_color=tokens.text2,
+            anchor="w",
+        )
+        self.profile_label.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(8, 3))
+
+        self._profile_label_to_id = {
+            t(profile.label_key, lang): profile.profile_id
+            for profile in PLATFORM_PROFILES.values()
+        }
+        self.profile = MacOptionMenu(
+            self.grid_two_col,
+            height=32,
+            corner_radius=8,
+            border_width=1,
+            border_color=tokens.border,
+            values=list(self._profile_label_to_id),
+            command=self._profile_selected,
+            fg_color=tokens.surface_raised,
+            button_color=tokens.surface_raised,
+            button_hover_color=tokens.surface_hover,
+            text_color=tokens.text,
+            dropdown_fg_color=tokens.surface,
+            dropdown_hover_color=tokens.surface_hover,
+            dropdown_text_color=tokens.text,
+            font=font_caption(fsize),
+            dynamic_resizing=False,
+        )
+        self.profile.set(t(get_profile(settings.platform_profile).label_key, lang))
+        self.profile.grid(row=3, column=0, columnspan=2, sticky="ew")
+        self.profile_menu = self.profile
+
+        self.profile_disclaimer = ctk.CTkLabel(
+            self.grid_two_col,
+            text=t("readiness_disclaimer", lang),
+            font=font_caption(fsize),
+            text_color=tokens.muted,
+            anchor="w",
+            justify="left",
+            wraplength=255,
+        )
+        self.profile_disclaimer.grid(row=4, column=0, columnspan=2, sticky="ew", pady=(3, 0))
 
         # ── 2b. Amber Warning Callout (shown only for "X1T For PC") ──
         self.pc_warn_frame = ctk.CTkFrame(
@@ -568,6 +618,16 @@ class ControlPanel(ctk.CTkFrame):
             text_color=tokens.text2,
             font=font_caption(fsize),
         )
+        self.profile_label.configure(
+            text=t("platform_profile_lbl", lang),
+            text_color=tokens.text2,
+            font=font_caption(fsize),
+        )
+        self.profile_disclaimer.configure(
+            text=t("readiness_disclaimer", lang),
+            text_color=tokens.muted,
+            font=font_caption(fsize),
+        )
         self.output_lbl.configure(
             text=t("output_lbl", lang),
             text_color=tokens.text2,
@@ -604,6 +664,20 @@ class ControlPanel(ctk.CTkFrame):
             corner_radius=8,
             font=font_caption(fsize),
         )
+        self.profile.configure(
+            fg_color=tokens.surface_raised,
+            button_color=tokens.surface_raised,
+            button_hover_color=tokens.surface_hover,
+            border_color=tokens.border,
+            border_width=1,
+            text_color=tokens.text,
+            dropdown_fg_color=tokens.surface,
+            dropdown_hover_color=tokens.surface_hover,
+            dropdown_text_color=tokens.text,
+            corner_radius=8,
+            font=font_caption(fsize),
+        )
+        self._refresh_profile_menu()
         self.pc_warn_frame.configure(
             fg_color=STATUS_WARNING_BG,
             border_color=STATUS_WARNING_BORDER,
@@ -951,6 +1025,29 @@ class ControlPanel(ctk.CTkFrame):
         self._update_pc_warn_visibility(strategy)
         if self._on_strategy_change:
             self._on_strategy_change()
+
+    def _refresh_profile_menu(self) -> None:
+        lang = self.settings.language
+        self._profile_label_to_id = {
+            t(profile.label_key, lang): profile.profile_id
+            for profile in PLATFORM_PROFILES.values()
+        }
+        self.profile.configure(values=list(self._profile_label_to_id))
+        self.profile.set(
+            t(get_profile(self.settings.platform_profile).label_key, lang)
+        )
+
+    def set_profile(self, profile_id: str) -> None:
+        """Sync the selector after settings were applied elsewhere."""
+        self.settings.platform_profile = get_profile(profile_id).profile_id
+        self._refresh_profile_menu()
+
+    def _profile_selected(self, value: str) -> None:
+        profile_id = self._profile_label_to_id.get(value, self.settings.platform_profile)
+        self.settings.platform_profile = profile_id
+        self.settings.save_async()
+        if self._on_profile_change:
+            self._on_profile_change()
 
     def _options_changed(self) -> None:
         self.settings.overwrite = bool(self.overwrite_check.get())

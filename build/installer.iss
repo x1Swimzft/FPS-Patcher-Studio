@@ -1,6 +1,6 @@
 ; Inno Setup script for FPS Patcher Studio. Build via build\release.ps1 (passes /DAppVersion=x.y.z).
 #ifndef AppVersion
-  #define AppVersion "0.7.0"
+  #define AppVersion "0.9.0"
 #endif
 #ifndef AppPublisher
   #define AppPublisher "FPS Patcher Studio"
@@ -28,6 +28,7 @@ OutputBaseFilename=FPSPatcherStudio-v{#AppVersion}-Setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+InfoBeforeFile=..\docs\PRIVACY.md
 SetupIconFile=app.ico
 UninstallDisplayIcon={app}\app.ico
 SetupLogging=yes

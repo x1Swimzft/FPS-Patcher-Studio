@@ -203,6 +203,7 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
             on_cancel=self._handle_cancel,
             on_strategy_change=self._refresh_state,
             on_override_change=self._on_item_override_changed,
+            on_profile_change=self._on_profile_changed,
             footer_master=self.inspector_footer,
         )
         self.controls.grid(row=0, column=0, sticky="ew", padx=6, pady=(4, 2))
@@ -219,6 +220,8 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
                 self.controller.queue = restored.paths()
                 self.input_list.render()
                 self._sync_info_panel()
+
+        self._cleanup_stale_preflight()
 
         # Bottom row: Activity Console drawer
         self.console = LogConsole(self, on_repair_mobile=self._repair_for_mobile_from_console)
@@ -863,10 +866,15 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
         self._init_ffmpeg()
         self._sync_watcher()
         self._sync_explorer_menu()
+        self.controls.set_profile(settings.platform_profile)
+        self.input_list.render()
+        self._sync_info_panel()
 
     def _sync_watcher(self) -> None:
         if self._watcher is not None:
-            self._watcher.stop()
+            # Never join on the Tk thread: a scan on a slow network share can
+            # block for seconds. The watcher only pushes to a thread-safe queue.
+            self._watcher.stop(wait=False)
             self._watcher = None
         if not self.settings.watch_folder_enabled:
             return
@@ -877,6 +885,23 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
         self._watcher = FolderWatcher(folder, self._watch_inbox.put)
         self._watcher.start()
         self.console.append(f"Watching folder: {folder}", "INFO")
+
+    def _cleanup_stale_preflight(self) -> None:
+        """Best-effort startup sweep, off the Tk thread; only marked temps are touched."""
+        from ..core.preflight import cleanup_stale_preflight
+
+        folders: set[Path] = {i.path.parent for i in self.controller.items.items}
+        if self.settings.output_dir:
+            folders.add(Path(self.settings.output_dir))
+        if self.settings.watch_folder_enabled and self.settings.watch_folder:
+            folders.add(Path(self.settings.watch_folder))
+        if folders:
+            threading.Thread(
+                target=cleanup_stale_preflight,
+                args=(folders,),
+                daemon=True,
+                name="fps-preflight-cleanup",
+            ).start()
 
     def _sync_explorer_menu(self) -> None:
         try:
@@ -899,6 +924,9 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
                 break
         if not paths:
             return
+        # A restart can leave one in-flight scan from the retired watcher; it may
+        # emit a path the replacement watcher also emits. Never patch it twice.
+        paths = list(dict.fromkeys(paths))
         self.controller.add_files(paths, select=False)
         self.input_list.render()
         self.console.append(f"Watch folder: patching {len(paths)} file(s)", "INFO")
@@ -1012,6 +1040,10 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
         )
         self.input_list.render()
         self._sync_info_panel(item_path)
+
+    def _on_profile_changed(self) -> None:
+        self.input_list.render()
+        self._sync_info_panel()
 
     def _on_queue_focus_changed(self, item_path: Path | None) -> None:
         if item_path is None:
@@ -1442,7 +1474,7 @@ class MainWindow(ctk.CTk, TkinterDnD.DnDWrapper):
 
     def _on_close(self) -> None:
         if self._watcher is not None:
-            self._watcher.stop()
+            self._watcher.stop(wait=False)
             self._watcher = None
         if self._focus_debounce_timer is not None:
             with contextlib.suppress(Exception):

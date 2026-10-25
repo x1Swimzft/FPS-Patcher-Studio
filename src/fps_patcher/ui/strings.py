@@ -41,6 +41,31 @@ STRINGS: dict[str, dict[str, str]] = {
         "target_fps": "Target FPS",
         "timescale_lbl": "Timescale",
         "strategy_lbl": "Preset",
+        "platform_profile_lbl": "Platform Profile",
+        "profile_generic": "Generic (No Platform)",
+        "profile_tiktok": "X1T — TikTok (No Compress)",
+        "profile_instagram": "X1T — Instagram Reels",
+        "profile_youtube": "X1T — YouTube Shorts",
+        "readiness_ready": "Ready",
+        "readiness_review": "Review",
+        "readiness_issues": "Issues",
+        "readiness_unknown": "Unknown",
+        "readiness_badge": "{profile} {status} {score}%",
+        "readiness_badge_ready": "{profile} Ready {score}%",
+        "readiness_unknown_badge": "{profile} Unknown",
+        "readiness_tip": "Click for readiness details",
+        "check_status_pass": "Pass",
+        "check_status_warning": "Warning",
+        "check_status_error": "Error",
+        "check_status_unknown": "Unknown",
+        "readiness_disclaimer": (
+            "Readiness is a local metadata heuristic, not an official platform score. "
+            "It cannot guarantee that a platform will skip re-compression. "
+            "Click a readiness badge for details."
+        ),
+        "readiness_log_title": "[READINESS] {profile}: {score}/100 — {status}",
+        "readiness_log_check": "[READINESS] {check}: {status} — {detail}",
+        "readiness_log_recommend": "[READINESS]   Recommendation: {recommendation}",
         "warn_high_bitrate": (
             "High bitrate detected ({mbps:.1f} Mbps > 25 Mbps). Bypassed videos stream "
             "at source quality on TikTok; bitrates >20 Mbps may cause buffering for "
@@ -289,6 +314,31 @@ STRINGS: dict[str, dict[str, str]] = {
         "target_fps": "เป้าหมาย FPS",
         "timescale_lbl": "Timescale",
         "strategy_lbl": "พรีเซ็ต (Preset)",
+        "platform_profile_lbl": "โปรไฟล์แพลตฟอร์ม",
+        "profile_generic": "ทั่วไป (ไม่ระบุแพลตฟอร์ม)",
+        "profile_tiktok": "X1T — TikTok (ไม่บีบอัด)",
+        "profile_instagram": "X1T — Instagram Reels",
+        "profile_youtube": "X1T — YouTube Shorts",
+        "readiness_ready": "พร้อม",
+        "readiness_review": "ควรตรวจสอบ",
+        "readiness_issues": "มีปัญหา",
+        "readiness_unknown": "ไม่ทราบ",
+        "readiness_badge": "{profile} {status} {score}%",
+        "readiness_badge_ready": "{profile} พร้อม {score}%",
+        "readiness_unknown_badge": "{profile} ไม่ทราบ",
+        "readiness_tip": "คลิกเพื่อดูรายละเอียดความพร้อม",
+        "check_status_pass": "ผ่าน",
+        "check_status_warning": "คำเตือน",
+        "check_status_error": "ข้อผิดพลาด",
+        "check_status_unknown": "ไม่ทราบ",
+        "readiness_disclaimer": (
+            "คะแนนความพร้อมคำนวณจากข้อมูลไฟล์ในเครื่องเท่านั้น ไม่ใช่คะแนนอย่างเป็นทางการ "
+            "และไม่รับประกันว่าแพลตฟอร์มจะไม่บีบอัดวิดีโออีกครั้ง "
+            "คลิกที่ป้ายความพร้อมเพื่อดูรายละเอียด"
+        ),
+        "readiness_log_title": "[READINESS] {profile}: {score}/100 — {status}",
+        "readiness_log_check": "[READINESS] {check}: {status} — {detail}",
+        "readiness_log_recommend": "[READINESS]   คำแนะนำ: {recommendation}",
         "warn_high_bitrate": (
             "ตรวจพบบิตเรตสูง ({mbps:.1f} Mbps > 25 Mbps) วิดีโอที่ใช้ bypass "
             "จะเล่นด้วยบิตเรตต้นฉบับบน TikTok หากเกิน 20 Mbps อาจทำให้ผู้ชมบนมือถือหมุนค้าง "

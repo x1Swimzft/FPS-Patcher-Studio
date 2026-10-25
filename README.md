@@ -57,8 +57,16 @@ FPS Patcher Studio is 100% open-source software built reproducibly from source. 
 
 ### Understanding False Positives & Code Signing
 - **Heuristic False Positives**: PyInstaller packages Python applications by embedding a compressed archive inside a PE wrapper. Automated machine-learning heuristics occasionally misclassify new, unrated PyInstaller binaries. Over 66 tier-1 vendors report 0 detections.
-- **Authenticode Signature**: The installer is signed via Authenticode using project code signing (`CN=FPS Patcher Studio (Dev)`) with an RFC 3161 timestamp (`http://timestamp.digicert.com`).
+- **Authenticode Signature**: The current v0.9.0 release is unsigned while the project applies for free code signing through SignPath Foundation. Historical v0.7.0 builds used a project self-signed developer certificate (`CN=FPS Patcher Studio (Dev)`) and are not trusted by public certificate roots.
 - **Formal Dispute Dossier**: Active vendor whitelisting disputes and templates are documented in [docs/FALSE_POSITIVE_DISPUTES.md](docs/FALSE_POSITIVE_DISPUTES.md).
+
+### Code signing policy
+Free code signing provided by SignPath.io, certificate by SignPath Foundation (application pending).
+
+- Committers and reviewers: [`@x1Swimzft`](https://github.com/x1Swimzft)
+- Approvers: [`@x1Swimzft`](https://github.com/x1Swimzft)
+- Full policy: [docs/CODE_SIGNING_POLICY.md](docs/CODE_SIGNING_POLICY.md)
+- Privacy policy: [docs/PRIVACY.md](docs/PRIVACY.md)
 
 ### How to Verify Downloaded Binaries
 Open PowerShell and verify the SHA-256 hash before running:
@@ -72,6 +80,8 @@ Get-FileHash -Path "FPSPatcherStudio-v0.7.0-win64.zip" -Algorithm SHA256
 
 ### Security & Compliance Resources
 - 🔒 **[SECURITY.md](SECURITY.md)**: Vulnerability disclosure policy, response SLA, and safe harbor.
+- 🔏 **[docs/CODE_SIGNING_POLICY.md](docs/CODE_SIGNING_POLICY.md)**: Code signing policy and SignPath Foundation attribution.
+- 🔐 **[docs/PRIVACY.md](docs/PRIVACY.md)**: Local data handling and network access disclosure.
 - 🏗️ **[BUILDING.md](BUILDING.md)**: Reproducible step-by-step build instructions from source.
 - 📜 **[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)**: Licenses for bundled components, Inter font, and FFmpeg LGPL/GPL compliance.
 - 📑 **[docs/FALSE_POSITIVE_DISPUTES.md](docs/FALSE_POSITIVE_DISPUTES.md)**: Complete vendor dispute dossier and email templates.

@@ -36,6 +36,21 @@ def _to_int(value: Any) -> int | None:
         return None
 
 
+def _to_str(value: Any) -> str | None:
+    """Return a meaningful ffprobe string; 'unknown' is treated as unavailable."""
+    if value in (None, ""):
+        return None
+    text = str(value).strip()
+    return None if text.lower() in ("", "unknown", "none") else text
+
+
+def _file_size(path: Path) -> int | None:
+    try:
+        return path.stat().st_size
+    except OSError:
+        return None
+
+
 def parse_probe(path: Path, data: dict[str, Any]) -> VideoInfo:
     streams: list[dict[str, Any]] = data.get("streams", [])
     video = next((s for s in streams if s.get("codec_type") == "video"), None)
@@ -87,6 +102,12 @@ def parse_probe(path: Path, data: dict[str, Any]) -> VideoInfo:
         bit_rate=bit_rate,
         audio_sample_rate=audio_sample_rate,
         audio_channels=audio_channels,
+        format_name=_to_str(fmt.get("format_name")),
+        color_primaries=_to_str(video.get("color_primaries")),
+        color_transfer=_to_str(video.get("color_transfer")),
+        color_space=_to_str(video.get("color_space")),
+        pix_fmt=_to_str(video.get("pix_fmt")),
+        file_size_bytes=_file_size(path),
     )
 
 
@@ -324,6 +345,7 @@ def probe_direct(path: Path) -> VideoInfo:
         stream_count=stream_count,
         audio_codec=audio_codec,
         bit_rate=bit_rate,
+        file_size_bytes=len(data),
     )
 
 

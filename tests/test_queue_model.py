@@ -3,6 +3,8 @@ from __future__ import annotations
 from fractions import Fraction
 from pathlib import Path
 
+import pytest
+
 from fps_patcher.app.queue_model import InputQueue
 from fps_patcher.core.models import VideoInfo
 
@@ -72,6 +74,35 @@ def test_item_id_stable(tmp_path: Path) -> None:
     q.add([a])
     it = q.get(a)
     assert it and len(it.item_id) == 10 and it.item_id[3] == "_"
+
+
+def test_add_resolves_each_path_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fps_patcher.app.queue_model import short_id
+
+    calls: list[Path] = []
+    original = Path.resolve
+
+    def counting(self: Path, strict: bool = False) -> Path:
+        calls.append(self)
+        return original(self, strict=strict)
+
+    monkeypatch.setattr(Path, "resolve", counting)
+    q = InputQueue()
+    a, b = _mk(tmp_path, "a.mp4"), _mk(tmp_path, "b.mp4")
+
+    assert q.add([a, b]).added == [a, b]
+    assert len(calls) == 2  # one per newly added path, no duplicate work
+    calls.clear()
+
+    assert q.add([a]).duplicates == [a]
+    assert len(calls) == 1  # duplicate check resolves the new path only
+
+    item = q.get(a)
+    assert item is not None
+    assert item.resolved == a.resolve()
+    assert item.item_id == short_id(a)
 
 
 def test_queue_lock_skipping(tmp_path: Path) -> None:

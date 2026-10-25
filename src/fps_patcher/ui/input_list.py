@@ -15,7 +15,8 @@ import customtkinter as ctk
 
 from ..app.controller import AppController
 from ..app.queue_model import QueueItem
-from ..core.models import SUPPORTED_EXTENSIONS
+from ..core.models import SUPPORTED_EXTENSIONS, LogEvent, LogLevel
+from ..core.platform_profiles import ReadinessReport, evaluate_readiness, get_profile
 from .drop_zone import DropZone
 from .icons import get_icon
 from .strings import t
@@ -577,6 +578,7 @@ class InputList(ctk.CTkFrame):
             is_focused,
             self._window_focused,
             self.settings.language,
+            self.settings.platform_profile,
             self.settings.radius_style,
             self.settings.font_size,
         )
@@ -817,7 +819,21 @@ class InputList(ctk.CTkFrame):
         )
         lbl_meta.grid(row=0, column=3, sticky="e", padx=(0, 10), pady=10)
 
-        # 5. Status Pill Badge
+        # 5. Platform Readiness Badge
+        readiness_text, readiness_cfg = self._readiness_display(item)
+        readiness_badge = ctk.CTkLabel(
+            row,
+            text=readiness_text,
+            font=font_caption(fsize),
+            corner_radius=RADIUS_PILL,
+            padx=8,
+            height=22,
+            cursor="hand2",
+            **readiness_cfg,
+        )
+        readiness_badge.grid(row=0, column=4, sticky="e", padx=(0, 6), pady=10)
+
+        # 6. Status Pill Badge
         status_badge = ctk.CTkLabel(
             row,
             text=self._tr(f"status_{item.status}"),
@@ -827,9 +843,9 @@ class InputList(ctk.CTkFrame):
             height=22,
             **status_cfg,
         )
-        status_badge.grid(row=0, column=4, sticky="e", padx=(0, 8), pady=10)
+        status_badge.grid(row=0, column=5, sticky="e", padx=(0, 8), pady=10)
 
-        # 6. Row Action / Remove Button (✕)
+        # 7. Row Action / Remove Button (✕)
         btn_remove = ctk.CTkButton(
             row,
             text="✕",
@@ -843,7 +859,7 @@ class InputList(ctk.CTkFrame):
             border_width=0,
             command=lambda p=item.path: self._remove_item(p),
         )
-        btn_remove.grid(row=0, column=5, sticky="e", padx=(0, 12), pady=10)
+        btn_remove.grid(row=0, column=6, sticky="e", padx=(0, 12), pady=10)
         if self._busy:
             btn_remove.configure(state="disabled")
 
@@ -866,6 +882,8 @@ class InputList(ctk.CTkFrame):
         row.res_badge = lbl_meta
         row._fps_badge = lbl_meta
         row.fps_badge = lbl_meta
+        row._readiness_badge = readiness_badge
+        row.readiness_badge = readiness_badge
         row._status_badge = status_badge
         row.status_badge = status_badge
         row._btn_remove = btn_remove
@@ -1054,6 +1072,15 @@ class InputList(ctk.CTkFrame):
                 if hasattr(meta_w, "_draw"):
                     meta_w._draw(no_color_updates=False)
 
+        readiness_w = getattr(row, "_readiness_badge", None)
+        if readiness_w:
+            readiness_text, readiness_cfg = self._readiness_display(item)
+            readiness_w.configure(
+                text=readiness_text,
+                font=font_caption(fsize),
+                **readiness_cfg,
+            )
+
         status_w = getattr(row, "_status_badge", None)
         if status_w:
             status_w.configure(
@@ -1074,6 +1101,93 @@ class InputList(ctk.CTkFrame):
         row.is_focused = is_focused
         row._is_selected = is_focused
         row.is_selected = is_focused
+
+    def _readiness_display(self, item: QueueItem) -> tuple[str, dict[str, Any]]:
+        report = evaluate_readiness(item.info, self.settings.platform_profile)
+        profile = get_profile(self.settings.platform_profile)
+        lang = self.settings.language
+        if report.status == "unknown":
+            text = t("readiness_unknown_badge", lang, profile=profile.short_name)
+        elif report.status == "ready":
+            text = t(
+                "readiness_badge_ready",
+                lang,
+                profile=profile.short_name,
+                score=report.score,
+            )
+        else:
+            text = t(
+                "readiness_badge",
+                lang,
+                profile=profile.short_name,
+                status=t(f"readiness_{report.status}", lang),
+                score=report.score,
+            )
+        return text, self._readiness_style(report)
+
+    def _readiness_style(self, report: ReadinessReport) -> dict[str, Any]:
+        if report.status == "ready":
+            return {"fg_color": STATUS_SUCCESS_BG, "text_color": STATUS_SUCCESS_TEXT}
+        if report.status == "issues":
+            return {"fg_color": STATUS_DANGER_BG, "text_color": STATUS_DANGER_TEXT}
+        if report.status == "review":
+            return {"fg_color": STATUS_WARNING_BG, "text_color": STATUS_WARNING_TEXT}
+        return {"fg_color": STATUS_MUTED_BG, "text_color": STATUS_MUTED_TEXT}
+
+    def _log_readiness(self, path: Path) -> None:
+        item = self.controller.items.get(path)
+        if item is None:
+            return
+        report = evaluate_readiness(item.info, self.settings.platform_profile)
+        profile = get_profile(self.settings.platform_profile)
+        lang = self.settings.language
+        status_text = t(f"readiness_{report.status}", lang)
+        level: LogLevel = (
+            "ERROR"
+            if report.status == "issues"
+            else "WARN"
+            if report.status in ("review", "unknown")
+            else "OK"
+        )
+        self.controller.emit(
+            LogEvent(
+                t(
+                    "readiness_log_title",
+                    lang,
+                    profile=profile.short_name,
+                    score=report.score,
+                    status=status_text,
+                ),
+                level,
+            )
+        )
+        for check in report.checks:
+            if check.status == "pass":
+                continue
+            measured = f" ({check.measured})" if check.measured else ""
+            self.controller.emit(
+                LogEvent(
+                    t(
+                        "readiness_log_check",
+                        lang,
+                        check=check.label,
+                        status=t(f"check_status_{check.status}", lang),
+                        detail=f"{check.detail}{measured}",
+                    ),
+                    "WARN" if check.status in ("warning", "error") else "INFO",
+                )
+            )
+            if check.recommendation:
+                self.controller.emit(
+                    LogEvent(
+                        t(
+                            "readiness_log_recommend",
+                            lang,
+                            recommendation=check.recommendation,
+                        ),
+                        "INFO",
+                    )
+                )
 
     def _status_style(
         self,
@@ -1298,6 +1412,19 @@ class InputList(ctk.CTkFrame):
                 bind_tree(child)
 
         bind_tree(row)
+
+        # Readiness badge keeps its detail action in addition to row focus.
+        readiness = getattr(row, "_readiness_badge", None)
+        if readiness is not None:
+            def on_readiness_click(_event: Any, p: Path = path) -> None:
+                self._log_readiness(p)
+
+            def bind_readiness(w: Any) -> None:
+                w.bind("<Button-1>", on_readiness_click, add="+")
+                for child in w.winfo_children():
+                    bind_readiness(child)
+
+            bind_readiness(readiness)
 
     def _popup_context_menu(self, event: Any, path: Path) -> None:
         from ..core.strategies import UI_PRESETS

@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import hashlib
+import shutil
 import struct
+import subprocess
 from pathlib import Path
 
 import pytest
 
 from fps_patcher.core.colr import ColrError, sanitize
+from fps_patcher.core.ffmpeg_locator import FFmpegPaths
 
 
 def _box(typ: bytes, payload: bytes) -> bytes:
@@ -339,6 +342,21 @@ def test_chunk_offset_outside_every_mdat_is_rejected(tmp_path: Path) -> None:
     assert path.read_bytes() == before
 
 
+def test_chunk_offset_before_moov_must_point_into_an_mdat(tmp_path: Path) -> None:
+    ftyp = _box(b"ftyp", b"isom\0\0\0\0isom")
+    media = b"z" * 64
+    # Offset 8 points into ftyp, not into the mdat that precedes moov.
+    moov = _moov(8, color=None, hdr_box=False, metadata=True)
+    path = tmp_path / "early-bad.mp4"
+    path.write_bytes(ftyp + _box(b"mdat", media) + moov)
+    before = path.read_bytes()
+
+    with pytest.raises(ColrError, match="outside every mdat"):
+        sanitize(path, fix_color=True, scrub_metadata=True)
+
+    assert path.read_bytes() == before
+
+
 def test_rejects_non_video_extension(tmp_path: Path) -> None:
     bad = tmp_path / "notes.txt"
     bad.write_text("not a video")
@@ -363,3 +381,192 @@ def test_pipeline_part_suffix_is_supported(tmp_path: Path) -> None:
 
     assert result.status == "patched"
     assert b"nclx" in part.read_bytes()
+
+
+def _moov_entries(entries: list[bytes], offset: int, *, metadata: bool = False) -> bytes:
+    stsd = _full(b"stsd", struct.pack(">I", len(entries)) + b"".join(entries))
+    stco = _full(b"stco", _chunk_payload([offset], co64=False))
+    stbl = _box(b"stbl", stsd + stco)
+    minf = _box(b"minf", stbl)
+    hdlr = _full(b"hdlr", b"\0\0\0\0" + b"vide" + b"\0" * 12)
+    mdia = _box(b"mdia", hdlr + minf)
+    trak = _box(b"trak", mdia)
+    extra = b""
+    if metadata:
+        extra = _box(b"udta", _box(b"meta", b"\0\0\0\0" + b"editor"))
+    return _box(b"moov", trak + extra)
+
+
+def _build_with_entries(
+    path: Path, entries: list[bytes], *, metadata: bool = False
+) -> tuple[Path, str]:
+    ftyp = _box(b"ftyp", b"isom\0\0\0\0isom")
+    media = b"MEDIA-PAYLOAD-" * 64
+    placeholder = _moov_entries(entries, 0, metadata=metadata)
+    offset = len(ftyp) + len(placeholder) + 8
+    moov = _moov_entries(entries, offset, metadata=metadata)
+    assert len(moov) == len(placeholder)
+    path.write_bytes(ftyp + moov + _box(b"mdat", media))
+    return path, hashlib.sha256(media).hexdigest()
+
+
+def test_only_unsupported_sample_entry_is_skipped_and_preserved(tmp_path: Path) -> None:
+    # AudioSampleEntry layout is not VisualSampleEntry; the parser must not assume 78 bytes.
+    unsupported = _box(b"mp4a", b"\0" * 28 + _box(b"esds", b"\0" * 12))
+    path, media_hash = _build_with_entries(
+        tmp_path / "unsupported.mp4", [unsupported], metadata=False
+    )
+    before = path.read_bytes()
+
+    result = sanitize(path, fix_color=True, scrub_metadata=False)
+
+    after = path.read_bytes()
+    assert result.status == "skipped"
+    assert "unsupported sample entry" in result.reason
+    assert after == before
+    assert _mdat_payload_sha(after) == media_hash
+
+
+def test_mixed_supported_and_unsupported_entries_tag_only_supported(tmp_path: Path) -> None:
+    # Shaped like VisualSampleEntry, but not on the allowlist: its tail must stay opaque.
+    unsupported = _box(b"mp4a", b"\0" * 78 + _box(b"udta", b"KEEP"))
+    supported = _sample_entry(b"")
+    path, media_hash = _build_with_entries(
+        tmp_path / "mixed.mp4", [unsupported, supported], metadata=False
+    )
+
+    result = sanitize(path, fix_color=True, scrub_metadata=True)
+
+    after = path.read_bytes()
+    assert result.status == "patched"
+    assert "unsupported sample entry" in result.reason
+    assert unsupported in after  # unsupported entry bytes survive verbatim
+    assert b"KEEP" in after  # scrubber did not descend into the unsupported entry
+    assert after.count(b"nclx") == 1
+    assert _mdat_payload_sha(after) == media_hash
+    assert _first_stco_offset(after) == _top(after)[b"mdat"][0] + 8
+
+
+def _decoded_video_frames(ff: FFmpegPaths, path: Path) -> int:
+    proc = subprocess.run(
+        [
+            str(ff.ffprobe),
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-count_frames",
+            "-show_entries",
+            "stream=nb_read_frames",
+            "-of",
+            "default=nw=1:nk=1",
+            str(path),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=60,
+    )
+    return int(proc.stdout.strip() or 0)
+
+
+def _assert_real_roundtrip(ff: FFmpegPaths, src: Path, path: Path) -> None:
+    shutil.copyfile(src, path)
+    before = path.read_bytes()
+    before_shas = _mdat_payload_shas(before)
+    assert before_shas
+
+    result = sanitize(path, fix_color=True, scrub_metadata=True)
+
+    after = path.read_bytes()
+    assert result.status == "patched"
+    assert _mdat_payload_shas(after) == before_shas
+    ranges = _mdat_ranges(after)
+    offsets = _chunk_offsets(after)
+    assert offsets
+    assert b"stco" in after or b"co64" in after
+    assert all(any(start <= offset < end for start, end in ranges) for offset in offsets)
+    assert b"nclx" in after
+    assert _decoded_video_frames(ff, path) > 0
+
+
+def test_real_mp4_roundtrip_keeps_mdat_and_decodes(
+    ff: FFmpegPaths, clip30: Path, tmp_path: Path
+) -> None:
+    _assert_real_roundtrip(ff, clip30, tmp_path / "real.mp4")
+
+
+def test_real_mov_roundtrip_keeps_mdat_and_decodes(
+    ff: FFmpegPaths, clip5994: Path, tmp_path: Path
+) -> None:
+    _assert_real_roundtrip(ff, clip5994, tmp_path / "real.mov")
+
+
+def test_real_mdat_before_moov_keeps_offsets(
+    ff: FFmpegPaths, clip30: Path, tmp_path: Path
+) -> None:
+    path = tmp_path / "hybrid.mp4"
+    subprocess.run(
+        [
+            str(ff.ffmpeg),
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-i",
+            str(clip30),
+            "-c",
+            "copy",
+            "-movflags",
+            "+hybrid_fragmented",
+            str(path),
+        ],
+        check=True,
+        timeout=60,
+    )
+    before = path.read_bytes()
+    assert before.find(b"mdat") < before.find(b"moov")
+    assert b"moof" not in before
+    before_offsets = _chunk_offsets(before)
+    before_shas = _mdat_payload_shas(before)
+
+    result = sanitize(path, fix_color=True, scrub_metadata=True)
+
+    after = path.read_bytes()
+    assert result.status == "patched"
+    assert _chunk_offsets(after) == before_offsets
+    assert _mdat_payload_shas(after) == before_shas
+    assert _decoded_video_frames(ff, path) > 0
+
+
+def test_real_fragmented_mp4_is_skipped_untouched(
+    ff: FFmpegPaths, clip30: Path, tmp_path: Path
+) -> None:
+    path = tmp_path / "fragmented.mp4"
+    subprocess.run(
+        [
+            str(ff.ffmpeg),
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-i",
+            str(clip30),
+            "-c",
+            "copy",
+            "-movflags",
+            "frag_keyframe+empty_moov",
+            str(path),
+        ],
+        check=True,
+        timeout=60,
+    )
+    before = path.read_bytes()
+    assert b"moof" in before
+
+    result = sanitize(path, fix_color=True, scrub_metadata=True)
+
+    assert result.status == "skipped"
+    assert "fragmented" in result.reason
+    assert path.read_bytes() == before
+    assert _decoded_video_frames(ff, path) > 0

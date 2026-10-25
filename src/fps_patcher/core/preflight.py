@@ -6,9 +6,14 @@ unit-tested without ffmpeg. ``run_preflight`` performs the actual ffmpeg pass.
 
 from __future__ import annotations
 
+import json
+import os
+import secrets
+import socket
 import subprocess
 import threading
-from collections.abc import Callable, Sequence
+import time
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,6 +21,11 @@ from .errors import PatchError
 from .ffmpeg_locator import CREATE_NO_WINDOW, FFmpegPaths
 from .ffmpeg_runner import run_streaming
 from .models import LogEvent, VideoInfo
+
+_OWNER_TOOL = "fps-patcher-studio"
+_OWNER_SUFFIX = ".preflight-owner.json"
+_STALE_AGE_S = 24 * 3600.0
+_OWNER_HOST = socket.gethostname()
 
 TARGET_AUDIO_CODEC = "aac"
 TARGET_SAMPLE_RATE = 48000
@@ -138,8 +148,169 @@ def list_h264_encoders(ffmpeg: Path) -> list[str]:
     return names
 
 
-def preflight_output_path(src: Path) -> Path:
-    return src.with_name(f"{src.stem}.preflight{src.suffix}")
+def _owner_marker_path(dst: Path) -> Path:
+    return dst.with_name(f".{dst.name}{_OWNER_SUFFIX}")
+
+
+def _pid_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        import ctypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.OpenProcess.restype = ctypes.c_void_p
+        kernel32.OpenProcess.argtypes = [ctypes.c_uint32, ctypes.c_int, ctypes.c_uint32]
+        kernel32.GetExitCodeProcess.argtypes = [
+            ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_ulong),
+        ]
+        kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+        handle = kernel32.OpenProcess(0x1000, False, pid)
+        if not handle:
+            return False
+        try:
+            code = ctypes.c_ulong()
+            if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+                return False
+            return code.value == 259  # STILL_ACTIVE
+        finally:
+            kernel32.CloseHandle(handle)
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def _read_owner_marker(marker: Path) -> dict[str, object] | None:
+    try:
+        data = json.loads(marker.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict) or data.get("tool") != _OWNER_TOOL:
+        return None
+    if data.get("host") != _OWNER_HOST:
+        return None  # a PID from another machine cannot be checked safely
+    if not isinstance(data.get("pid"), int):
+        return None
+    temp = data.get("temp")
+    if not isinstance(temp, str) or Path(temp).name != temp or ".preflight" not in temp.lower():
+        return None
+    return data
+
+
+def _owner_is_stale(
+    marker: Path, temp: Path, info: dict[str, object], now: float, max_age_s: float
+) -> bool:
+    try:
+        age = now - marker.stat().st_mtime
+    except OSError:
+        return False
+    try:
+        # An orphan ffmpeg may outlive the app and still be writing.
+        if now - temp.stat().st_mtime < 60:
+            return False
+    except OSError:
+        pass  # temp already gone: the marker can still be swept
+    if age > max_age_s:
+        return True
+    pid = info["pid"]
+    if not isinstance(pid, int):
+        return True
+    # A dead PID is only trusted after a short grace period; PID reuse must not
+    # delete a temp that another live instance is still writing.
+    return age > 60 and not _pid_alive(pid)
+
+
+def cleanup_stale_preflight(
+    folders: Iterable[Path], *, max_age_s: float = _STALE_AGE_S, now: float | None = None
+) -> int:
+    """Delete stale preflight temps that carry our explicit ownership marker.
+
+    Files without a valid marker are never touched, even if they end in
+    ``.preflight``. Active markers (live PID, or younger than 60 s) are kept.
+    """
+    moment = time.time() if now is None else now
+    removed = 0
+    for folder in {Path(f) for f in folders}:
+        try:
+            markers = list(folder.glob(f".*{_OWNER_SUFFIX}"))
+        except OSError:
+            continue
+        for marker in markers:
+            info = _read_owner_marker(marker)
+            if info is None:
+                continue
+            temp = folder / str(info["temp"])
+            if not _owner_is_stale(marker, temp, info, moment, max_age_s):
+                continue
+            if temp.exists():
+                try:
+                    fd = os.open(temp, os.O_RDWR)
+                    os.close(fd)
+                except OSError:
+                    continue  # held exclusively or not writable: leave it alone
+            try:
+                temp.unlink(missing_ok=True)
+                marker.unlink(missing_ok=True)
+                removed += 1
+            except OSError:
+                continue
+    return removed
+
+
+def remove_preflight_temp(path: Path) -> None:
+    """Delete a preflight temp and its ownership marker after the job finishes."""
+    marker = _owner_marker_path(path)
+    try:
+        path.unlink(missing_ok=True)
+        info = _read_owner_marker(marker)
+        if info is not None and info.get("temp") == path.name:
+            marker.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def _claim_preflight_owner(src: Path, dst: Path, *, max_age_s: float = _STALE_AGE_S) -> Path:
+    """Create an exclusive marker, or refuse if another live process owns this temp."""
+    marker = _owner_marker_path(dst)
+    payload = json.dumps(
+        {
+            "tool": _OWNER_TOOL,
+            "host": _OWNER_HOST,
+            "pid": os.getpid(),
+            "created": time.time(),
+            "source": str(src),
+            "temp": dst.name,
+        }
+    ).encode("utf-8")
+    for attempt in (1, 2):
+        try:
+            fd = os.open(marker, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except FileExistsError:
+            info = _read_owner_marker(marker)
+            if info is not None and not _owner_is_stale(
+                marker, dst, info, time.time(), max_age_s
+            ):
+                raise PatchError(f"Pre-flight already running for {src.name}.") from None
+            try:
+                marker.unlink(missing_ok=True)
+            except OSError as exc:
+                raise PatchError(f"Cannot claim pre-flight temp for {src.name}: {exc}") from exc
+            if attempt == 2:
+                raise PatchError(f"Cannot claim pre-flight temp for {src.name}.") from None
+            continue
+        except OSError as exc:
+            raise PatchError(f"Cannot claim pre-flight temp for {src.name}: {exc}") from exc
+        try:
+            with os.fdopen(fd, "wb") as fh:
+                fh.write(payload)
+        except OSError as exc:
+            marker.unlink(missing_ok=True)
+            raise PatchError(f"Cannot write pre-flight marker for {src.name}: {exc}") from exc
+        return marker
+    raise PatchError(f"Cannot claim pre-flight temp for {src.name}.")
 
 
 def run_preflight(
@@ -150,40 +321,52 @@ def run_preflight(
     cancel_event: threading.Event | None = None,
 ) -> Path:
     """Run the pre-flight ffmpeg pass; return the temp file (caller deletes it)."""
-    dst = preflight_output_path(src)
-    dst.unlink(missing_ok=True)
+    # Unique per invocation so two jobs on the same source never share a temp.
+    dst = src.with_name(
+        f"{src.stem}.preflight-{os.getpid()}-{secrets.token_hex(6)}{src.suffix}"
+    )
+    cleanup_stale_preflight([src.parent])
+    marker = _claim_preflight_owner(src, dst)
+    released = False
+    try:
+        candidates: list[str | None]
+        if plan.cap_bitrate:
+            candidates = list(encoder_candidates(list_h264_encoders(paths.ffmpeg)))
+        else:
+            candidates = [None]
 
-    candidates: list[str | None]
-    if plan.cap_bitrate:
-        candidates = list(encoder_candidates(list_h264_encoders(paths.ffmpeg)))
-    else:
-        candidates = [None]
+        last_tail: list[str] = []
+        for encoder in candidates:
+            label = encoder or "audio only"
+            emit(LogEvent(f"[PREFLIGHT] ffmpeg pass ({label})"))
+            tail: list[str] = []
 
-    last_tail: list[str] = []
-    for encoder in candidates:
-        label = encoder or "audio only"
-        emit(LogEvent(f"[PREFLIGHT] ffmpeg pass ({label})"))
-        tail: list[str] = []
+            def on_stderr(line: str, _tail: list[str] = tail) -> None:
+                _tail.append(line)
+                del _tail[:-15]
 
-        def on_stderr(line: str, _tail: list[str] = tail) -> None:
-            _tail.append(line)
-            del _tail[:-15]
+            try:
+                code = run_streaming(
+                    paths.ffmpeg,
+                    build_preflight_args(src, dst, plan, encoder),
+                    lambda _line: None,
+                    on_stderr,
+                    cancel_event,
+                )
+            except Exception:
+                dst.unlink(missing_ok=True)  # cancel/error: never leave a partial preflight copy
+                raise
+            if code == 0 and dst.is_file() and dst.stat().st_size > 0:
+                # Keep the marker until the caller deletes the temp; a hard kill
+                # between here and there is then recoverable at startup.
+                released = True
+                return dst
+            dst.unlink(missing_ok=True)
+            last_tail = tail
+            emit(LogEvent(f"[PREFLIGHT] {label} failed (exit {code}); trying next option", "WARN"))
 
-        try:
-            code = run_streaming(
-                paths.ffmpeg,
-                build_preflight_args(src, dst, plan, encoder),
-                lambda _line: None,
-                on_stderr,
-                cancel_event,
-            )
-        except Exception:
-            dst.unlink(missing_ok=True)  # cancel/error: never leave a partial preflight copy
-            raise
-        if code == 0 and dst.is_file() and dst.stat().st_size > 0:
-            return dst
-        dst.unlink(missing_ok=True)
-        last_tail = tail
-        emit(LogEvent(f"[PREFLIGHT] {label} failed (exit {code}); trying next option", "WARN"))
-
-    raise PatchError("Pre-flight conversion failed.", last_tail)
+        raise PatchError("Pre-flight conversion failed.", last_tail)
+    finally:
+        if not released:
+            dst.unlink(missing_ok=True)
+            marker.unlink(missing_ok=True)

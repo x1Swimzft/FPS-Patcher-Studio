@@ -2,6 +2,50 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
+## [0.9.0] - 2026-10-25
+
+### Added: Phase 3 — Platform Profiles & Pre-Flight Readiness Score
+- **Platform profiles**: `Generic`, `X1T — TikTok (No Compress)`, `X1T — Instagram Reels`, and `X1T — YouTube Shorts`, stored as typed offline data in `core/platform_profiles.py`.
+- **Readiness reports**: deterministic 0–100 heuristic score with `Ready`/`Review`/`Issues`/`Unknown` status, stable check ids, severity, measured value, explanation, recommendation, and evidence label (`documented`/`recommended`/`heuristic`).
+- **Queue badges**: every queue card shows the selected profile's readiness and refreshes when a file is added, re-probed, or the profile changes. Clicking a badge writes the per-check reasons to the Activity Console.
+- **Global selector**: profile selection sits beside the patch preset in the inspector, persists in `settings.json`, and never changes the patch strategy or media by itself.
+- **Truth-in-labeling**: no unverified `ftyp`/`moov` rewriting; no claim of guaranteed zero recompression. The TikTok preset retains its requested label with a visible disclaimer.
+- **HDR-safe**: HDR/BT.2020 metadata is reported, never stripped or forced to Rec.709. Unknown color metadata is reported as unknown, not as SDR.
+- **Bitrate evidence**: per-profile heuristic thresholds only (TikTok 20 Mbps, Reels 25 Mbps). YouTube has no bitrate warning because YouTube documents that no bitrate limit is required.
+- **Localization**: English and Thai strings for the selector, readiness states, badge text, disclaimer, and detail log labels.
+- **Documentation**: `docs/PLATFORM_PRESETS.md` records the profile matrix, source URLs, evidence review date, scoring weights, limitations, and intentionally unimplemented behavior.
+- **SignPath Foundation readiness**: added `docs/CODE_SIGNING_POLICY.md`, `docs/PRIVACY.md`, and `docs/SIGNPATH_APPLICATION.md`; corrected stale Authenticode claims; the installer now displays the privacy policy before installation.
+
+### Notes
+- Scoring is read-only, offline, and reuses existing probe data; it does not add `ffprobe` calls or modify media.
+- Unknown critical fields cap the score at 70 and force `Review`; missing optional color metadata caps the score at 95. Missing data never produces a false `Ready 100%`.
+- Verification: 341 passed; `ruff check src tests` and `mypy src tests` clean (87 source/test files). PyInstaller one-folder build in a temporary output directory passed the 6-second launch smoke test; no release artifacts were replaced.
+
+## [0.8.0] - 2026-10-24
+
+### Hardened: Process Lifecycle, Concurrency & MP4 Safety
+- **FFmpeg descendants**: Windows Job Objects now own each ffmpeg/ffprobe run. Cancel and hard-kill terminate the tree; ffprobe timeouts are bounded and no longer leave the child running.
+- **Watcher shutdown**: `stop(wait=False)` no longer joins a slow scan on the Tk thread. A fresh stop event per run, delivery lock, and inbox dedupe prevent stale-thread delivery and double patches.
+- **Preflight temps**: unique per-run names plus exclusive, host-scoped ownership markers. Startup sweeps only marked, stale, writable temps, off the Tk thread.
+- **Same-destination writes**: per-destination thread lock plus Windows `Local\` named mutex. The final name is selected under the lock and held through `os.replace`; auto-rename is race-free.
+- **Queue add**: each path is resolved once instead of four times. Measured 2000-file add: 638.6 ms → 195.1 ms median (3.3×).
+- **MP4 `colr`**: only whitelisted visual sample entries are parsed/tagged; unsupported entries are preserved raw. Pre-`moov` chunk offsets are validated against every `mdat`, even when the `moov` size delta is zero.
+- **Mobile repair**: unique `.repair.tmp` name.
+- **Verification**: `321 passed`, ruff and mypy clean; real-media MP4/MOV roundtrip and packaged-EXE smoke checks passed.
+- **Known limits**: fragmented MP4 is skipped; unsupported sample entries are not tagged; cross-process locking is Windows-only; no real SMB/camera corpus was measured.
+
+## [0.7.1] - 2026-10-24
+
+### Fixed: UI Responsiveness, File Lifecycle & `colr` Integrity
+- **`colr` chunk offsets**: shifting is now per `stco`/`co64` entry instead of one global delta. `mdat → moov → mdat` layouts no longer corrupt earlier payloads; offsets inside `moov` or outside every `mdat` are rejected. Tests assert per-`mdat` payload SHA-256.
+- **Atomic output**: patch output is written to a unique temp beside the destination and swapped with `os.replace()`. Stale patcher temps are swept after 24 h; a failed patch no longer removes an existing output.
+- **Settings saves**: serialized and atomic. A crash mid-save can no longer truncate `settings.json`, and concurrent saves cannot interleave.
+- **Startup**: ffmpeg locate/version probes moved off the Tk thread; the window stays responsive and applies `ready`/`missing` when the worker finishes.
+- **Close**: the patch worker is cancelled and joined (5 s cap) before Tk teardown.
+- **Queue state**: late probe results no longer downgrade `done`/`failed` rows; `current` is cleared when the queue empties.
+- **Cleanup**: cancelled preflight runs remove their partial temp; removed queue rows prune thumbnail image/request caches; the thumbnail memory cache is bounded at 128 entries.
+- **Verification**: `286 passed`, ruff and mypy clean.
+
 ## [0.7.0] - 2026-10-24
 
 ### Added: Phase 2 — Watch Folder, Explorer Quick Patch, Color Guard

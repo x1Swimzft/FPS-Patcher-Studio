@@ -12,6 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from .core.platform_profiles import DEFAULT_PROFILE_ID, PLATFORM_PROFILES
 from .core.strategies import migrate_strategy_name
 
 log = logging.getLogger("fps_patcher")
@@ -152,6 +153,9 @@ class Settings:
     fix_color_tag: bool = False
     scrub_metadata: bool = False
 
+    # Phase 3: global platform profile for readiness checks (read-only)
+    platform_profile: str = DEFAULT_PROFILE_ID
+
     # Transient runtime notice (not persisted)
     migrated_strategy_from: str | None = field(default=None, init=False, repr=False, compare=False)
 
@@ -196,6 +200,8 @@ class Settings:
             self.notify_done = "none"
         if self.language not in LANGUAGES:
             self.language = "en"
+        if self.platform_profile not in PLATFORM_PROFILES:
+            self.platform_profile = DEFAULT_PROFILE_ID
 
         try:
             self.tint_strength = max(0, min(100, int(self.tint_strength)))

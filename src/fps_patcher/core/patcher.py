@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import tempfile
 import threading
@@ -14,7 +15,13 @@ from pathlib import Path
 from .atom_patcher import patch_video_track_timescale
 from .bxd_patcher import MethodBXDDirectPatch
 from .colr import ColrError, sanitize
-from .errors import FFmpegNotFoundError, OutputFileExistsError, PatchError, VerifyError
+from .errors import (
+    FFmpegNotFoundError,
+    OutputFileExistsError,
+    PatchCancelledError,
+    PatchError,
+    VerifyError,
+)
 from .ffmpeg_locator import FFmpegPaths
 from .ffmpeg_runner import run_streaming
 from .models import (
@@ -25,11 +32,12 @@ from .models import (
     PatchResult,
     ProgressEvent,
 )
-from .preflight import make_plan, run_preflight
+from .preflight import make_plan, remove_preflight_temp, run_preflight
 from .prober import probe
 from .strategies import get_strategy
 from .v4_patcher import MethodV4DirectPatch
 from .verifier import verify, verify_payload_integrity
+from .win_job import NamedMutex
 
 Emit = Callable[[LogEvent | ProgressEvent], None]
 
@@ -44,11 +52,16 @@ def validate_input(path: Path) -> None:
         )
 
 
-def output_path_for(req: PatchRequest) -> Path:
-    """<stem>_ts<timescale><ext>; adds (n) suffix unless overwrite or no auto_rename."""
+def output_base_for(req: PatchRequest) -> Path:
+    """Deterministic output name before collision handling."""
     is_x1t = req.strategy.startswith(("bxd-", "x1t-"))
     out_ext = ".mp4" if (is_x1t and req.src.suffix.lower() == ".mov") else req.src.suffix
-    base = req.out_dir / f"{req.src.stem}_ts{req.timescale}{out_ext}"
+    return req.out_dir / f"{req.src.stem}_ts{req.timescale}{out_ext}"
+
+
+def output_path_for(req: PatchRequest, base: Path | None = None) -> Path:
+    """<stem>_ts<timescale><ext>; adds (n) suffix unless overwrite or no auto_rename."""
+    base = base if base is not None else output_base_for(req)
     if req.overwrite or not base.exists():
         return base
     if not req.auto_rename:
@@ -61,6 +74,61 @@ def output_path_for(req: PatchRequest) -> Path:
         if not cand.exists():
             return cand
         n += 1
+
+
+_DEST_LOCKS: dict[str, threading.Lock] = {}
+_DEST_LOCKS_GUARD = threading.Lock()
+
+
+def _destination_key(final: Path) -> str:
+    try:
+        text = str(final.resolve())
+    except OSError:
+        text = str(final.absolute())
+    return text.casefold() if os.name == "nt" else text
+
+
+class _DestinationLock:
+    """Serialize writes to one destination across threads and app instances."""
+
+    def __init__(self, final: Path) -> None:
+        self._key = _destination_key(final)
+        with _DEST_LOCKS_GUARD:
+            self._thread_lock = _DEST_LOCKS.setdefault(self._key, threading.Lock())
+        self._mutex: NamedMutex | None = None
+        self._held = False
+
+    def acquire(self, cancel_event: threading.Event | None = None) -> None:
+        if self._held:
+            return
+        while not self._thread_lock.acquire(timeout=0.1):
+            if cancel_event is not None and cancel_event.is_set():
+                raise PatchCancelledError("Patch cancelled by user.")
+        try:
+            if os.name == "nt":
+                digest = hashlib.sha256(self._key.encode("utf-8")).hexdigest()[:24]
+                mutex = NamedMutex(f"Local\\fps-patcher-{digest}")
+                if mutex.available:
+                    while not mutex.acquire(100):
+                        if cancel_event is not None and cancel_event.is_set():
+                            mutex.close()
+                            raise PatchCancelledError("Patch cancelled by user.")
+                    self._mutex = mutex
+                else:
+                    mutex.close()
+        except BaseException:
+            self._thread_lock.release()
+            raise
+        self._held = True
+
+    def release(self) -> None:
+        if not self._held:
+            return
+        if self._mutex is not None:
+            self._mutex.close()
+            self._mutex = None
+        self._thread_lock.release()
+        self._held = False
 
 
 def _temp_output(final: Path) -> Path:
@@ -159,11 +227,9 @@ def patch(
             )
         )
 
-    final = output_path_for(req)
-    if final.resolve() == src.resolve():
-        raise PatchError(f"Output path equals source file ('{src}'); refusing to overwrite source.")
-    _cleanup_stale_temps(final)
-    tmp = _temp_output(final)
+    base = output_base_for(req)
+    dest_lock = _DestinationLock(base)
+    tmp: Path | None = None
 
     emit(LogEvent(f"Strategy: {strategy.label}"))
 
@@ -189,6 +255,14 @@ def patch(
         emit(LogEvent(line, "DEBUG"))
 
     try:
+        dest_lock.acquire(cancel_event)
+        final = output_path_for(req, base)
+        if final.resolve() == src.resolve():
+            raise PatchError(
+                f"Output path equals source file ('{src}'); refusing to overwrite source."
+            )
+        _cleanup_stale_temps(final)
+        tmp = _temp_output(final)
         if plan.needed:
             if paths is None:
                 emit(LogEvent("[PREFLIGHT] Skipped: FFmpeg is not configured.", "WARN"))
@@ -321,7 +395,8 @@ def patch(
         # could destroy the previous output.
         os.replace(tmp, final)
     except (PatchError, VerifyError) as exc:
-        tmp.unlink(missing_ok=True)
+        if tmp is not None:
+            tmp.unlink(missing_ok=True)
         try:
             from .diagnostic_logger import auto_save_diagnostic_log
 
@@ -334,7 +409,8 @@ def patch(
             pass
         raise
     except Exception as exc:
-        tmp.unlink(missing_ok=True)
+        if tmp is not None:
+            tmp.unlink(missing_ok=True)
         try:
             from .diagnostic_logger import auto_save_diagnostic_log
 
@@ -347,8 +423,11 @@ def patch(
             pass
         raise PatchError(str(exc), list(stderr_tail)) from exc
     finally:
-        if work_src != src:
-            work_src.unlink(missing_ok=True)
+        try:
+            if work_src != src:
+                remove_preflight_temp(work_src)
+        finally:
+            dest_lock.release()
 
     after = replace(after, path=final)
     elapsed = time.perf_counter() - start

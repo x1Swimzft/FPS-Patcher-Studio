@@ -102,15 +102,19 @@ When minimizing, restoring, maximizing, or Alt-Tabbing back to `FPS Patcher Stud
 
 ---
 
-### Phase 3: `v0.8.0` — Multi-Platform Bypass & Pre-Flight Score
+### Phase 3: `v0.9.0` — Multi-Platform Profiles & Pre-Flight Readiness Score
 **เป้าหมาย**: ขยายการรองรับจาก TikTok ไปยังแพลตฟอร์มวิดีโอสั้นอื่นๆ
+
+> Delivered in v0.9.0 as read-only platform profiles and readiness scoring. No
+> unverified `ftyp`/`moov` rewrites or platform-specific binary transforms were added.
 
 - **3.1 Platform-Specific X1T Presets**:
   - `X1T — TikTok (No Compress)`
-  - `X1T — Instagram Reels` (ปรับ `ftyp` และ `moov` ตามเกณฑ์ Ingest ของ Meta)
-  - `X1T — YouTube Shorts` (รองรับตารางเวลาของ YouTube Shorts Ingest)
-- **3.2 Visual TikTok Readiness Badge**:
-  - แสดงคะแนนความพร้อมบนการ์ดวิดีโอในคิว เช่น `🟢 TikTok Ready (100%)` หรือ `🟡 High Bitrate (35 Mbps)`
+  - `X1T — Instagram Reels`
+  - `X1T — YouTube Shorts`
+- **3.2 Visual Readiness Badge**:
+  - แสดงคะแนนความพร้อมบนการ์ดวิดีโอในคิว เช่น `TikTok Ready 100%`, `TikTok Review 88%`, หรือ `TikTok Issues 40%`
+  - คลิกที่ป้ายเพื่อดูเหตุผลรายข้อใน Activity Console
 
 ---
 

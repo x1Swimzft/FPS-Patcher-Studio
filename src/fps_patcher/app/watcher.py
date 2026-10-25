@@ -67,6 +67,7 @@ class FolderWatcher:
         self._processed: dict[Path, tuple[int, int]] = {}
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        self._deliver_lock = threading.RLock()
         self._is_locked = _is_locked
 
     @staticmethod
@@ -107,6 +108,13 @@ class FolderWatcher:
                 continue
             seen.add(path)
 
+            # Already emitted with the same signature: no pending bookkeeping
+            # and, importantly, no network O_RDWR probe on every later scan.
+            signature = (stat.st_size, stat.st_mtime_ns)
+            if self._processed.get(path) == signature:
+                self._pending.pop(path, None)
+                continue
+
             pending = self._pending.get(path)
             if (
                 pending is None
@@ -128,18 +136,16 @@ class FolderWatcher:
             if self._is_locked(path):
                 continue
 
-            signature = (stat.st_size, stat.st_mtime_ns)
-            if self._processed.get(path) == signature:
+            with self._deliver_lock:
+                if self._stop.is_set():
+                    continue  # a replacement watcher will rediscover the file
+                self._processed[path] = signature
                 self._pending.pop(path, None)
-                continue
-
-            self._processed[path] = signature
-            self._pending.pop(path, None)
-            ready.append(path)
-            try:
-                self.on_ready(path)
-            except Exception:
-                log.exception("Watch callback failed for %s", path)
+                ready.append(path)
+                try:
+                    self.on_ready(path)
+                except Exception:
+                    log.exception("Watch callback failed for %s", path)
 
         # Drop state for files that vanished; keeps long-running watchers bounded.
         for path in list(self._pending):
@@ -153,22 +159,35 @@ class FolderWatcher:
     def start(self) -> None:
         if self._thread is not None and self._thread.is_alive():
             return
-        self._stop.clear()
-        self._thread = threading.Thread(target=self._run, name="fps-folder-watcher", daemon=True)
+        # A fresh event per run: a non-blocking stop followed by start must not
+        # revive the old thread by clearing the event it is waiting on.
+        self._stop = threading.Event()
+        self._thread = threading.Thread(
+            target=self._run, args=(self._stop,), name="fps-folder-watcher", daemon=True
+        )
         self._thread.start()
 
-    def _run(self) -> None:
-        while not self._stop.wait(self.poll_interval):
+    def _run(self, stop: threading.Event) -> None:
+        while not stop.wait(self.poll_interval):
             try:
                 self.scan()
             except Exception:
                 log.exception("Watch scan failed")
 
-    def stop(self, timeout: float = 3.0) -> None:
+    def stop(self, timeout: float = 3.0, *, wait: bool = True) -> None:
+        """Signal the poll loop to exit. ``wait=False`` never blocks the caller.
+
+        The callback only pushes into a thread-safe queue, so a scan already in
+        flight may finish after a non-blocking stop without touching Tk.
+        """
         self._stop.set()
-        if self._thread is not None:
-            self._thread.join(timeout=timeout)
-            self._thread = None
+        # Wait only for an in-flight callback (queue.put), never for a scan.
+        with self._deliver_lock:
+            pass
+        thread = self._thread
+        self._thread = None
+        if wait and thread is not None and thread is not threading.current_thread():
+            thread.join(timeout=timeout)
 
     def __enter__(self) -> FolderWatcher:
         self.start()

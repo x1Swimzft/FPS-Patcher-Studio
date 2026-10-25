@@ -16,10 +16,14 @@ from ..core.models import SUPPORTED_EXTENSIONS, VideoInfo
 ItemStatus = Literal["pending", "probing", "ready", "patching", "done", "failed", "skipped"]
 
 
+def _id_for_resolved(resolved: Path) -> str:
+    digest = hashlib.sha256(str(resolved).encode("utf-8")).hexdigest()
+    return f"{digest[:3]}_{digest[3:9]}"
+
+
 def short_id(path: Path) -> str:
     """Stable short row id, e.g. ``7e6_d657f0`` (hash of resolved path)."""
-    digest = hashlib.sha256(str(path.resolve()).encode("utf-8")).hexdigest()
-    return f"{digest[:3]}_{digest[3:9]}"
+    return _id_for_resolved(path.resolve())
 
 
 @dataclass
@@ -34,12 +38,14 @@ class QueueItem:
     timescale: int | None = None
     strategy: str | None = None
     progress: float = 0.0
+    _resolved: Path | None = field(default=None, repr=False)
     item_id: str = field(init=False)
     resolved: Path = field(init=False)
 
     def __post_init__(self) -> None:
-        self.resolved = self.path.resolve()
-        self.item_id = short_id(self.path)
+        # add() already resolved the path; only resolve here for direct construction.
+        self.resolved = self._resolved if self._resolved is not None else self.path.resolve()
+        self.item_id = _id_for_resolved(self.resolved)
 
 
 @dataclass
@@ -76,18 +82,20 @@ class InputQueue:
     # ---------- add / remove ----------
     def add(self, paths: list[Path]) -> AddResult:
         res = AddResult()
-        known = {i.path.resolve() for i in self._items}
+        known = {i.resolved for i in self._items}
         for p in paths:
             if not p.is_file():
                 res.rejected.append((p, "file not found"))
             elif p.suffix.lower() not in SUPPORTED_EXTENSIONS:
                 res.rejected.append((p, f"unsupported type '{p.suffix}'"))
-            elif p.resolve() in known:
-                res.duplicates.append(p)
             else:
-                known.add(p.resolve())
-                self._items.append(QueueItem(path=p))
-                res.added.append(p)
+                resolved = p.resolve()
+                if resolved in known:
+                    res.duplicates.append(p)
+                else:
+                    known.add(resolved)
+                    self._items.append(QueueItem(path=p, _resolved=resolved))
+                    res.added.append(p)
         return res
 
     def remove_selected(self, locked_path: Path | None = None) -> int:

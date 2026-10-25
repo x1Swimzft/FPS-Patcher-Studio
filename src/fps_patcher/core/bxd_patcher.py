@@ -5,8 +5,10 @@ Isolation Hypothesis Generators (Phase 0: H1-H4), and Lossless Mobile Repair.
 from __future__ import annotations
 
 import hashlib
+import os
 import shutil
 import struct
+import tempfile
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -1629,7 +1631,11 @@ def repair_for_mobile(
 
     repaired_bytes = ftyp_bytes + final_moov + mdat.data + kept_post_boxes
     _check_disk_space(out, len(repaired_bytes))
-    tmp_out = out.with_name(out.name + ".repair_tmp")
+    fd, tmp_name = tempfile.mkstemp(
+        prefix=f".{out.name}.", suffix=".repair.tmp", dir=out.parent
+    )
+    os.close(fd)
+    tmp_out = Path(tmp_name)
     tmp_out.write_bytes(repaired_bytes)
 
     # Step 6c: Verify lossless real sample payload hashes & mobile compatibility

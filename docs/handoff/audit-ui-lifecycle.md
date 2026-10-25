@@ -4,6 +4,8 @@
 **Baseline**: `v0.7.0` working tree (phase 2 handoff, `docs/handoff/phase2.md`)  
 **Method**: code reading, targeted subagent review, reproduction tests, and `tools/bench_audit.py`. Every finding below is either reproduced by a test or measured; unverified suspicions are marked.
 
+> **Post-audit status (2026-10-24)**: M5, M7, M8, M9, L1 and L4 were addressed in the follow-up hardening pass. See `v0.7.1-hardening.md` for implementation, tests and updated measurements. This document remains the baseline audit; the numbers below are the original baseline.
+
 ---
 
 ## Severity ranking
@@ -60,39 +62,39 @@
 - Fix: FIFO bound of 128 entries and explicit pruning on row removal/empty queue.
 - Measured: 1000 inserts → 128 entries after the fix (previously 1000).
 
-**M5. `InputQueue.add()` resolves each path three times** (open, not fixed)
+**M5. `InputQueue.add()` resolves each path four times** (fixed post-audit: one resolve per path)
 - File: `src/fps_patcher/app/queue_model.py` — `add`, `QueueItem.__post_init__`
-- Measured: **1069 ms for 2000 files (535 µs/file)** on this machine; `remove_selected` for the same queue is 0.7 ms. `Path.resolve()` dominates.
-- Impact: adding thousands of files blocks the UI for ~1 s. Typical drops are tens of files (<50 ms), so this is not fixed in this pass. One-line fix when it matters: resolve once in `add()` and pass the resolved path into `QueueItem`.
+- Measured at audit time: **1069 ms for 2000 files (535 µs/file)** on this machine; `remove_selected` for the same queue is 0.7 ms. `Path.resolve()` dominates. An instrumented baseline showed four resolves per new path.
+- Impact: adding thousands of files blocked the UI for ~1 s. Post-audit fix: resolve once in `add()` and pass the resolved path into `QueueItem`; measured warm add is now ~195 ms for 2000 files.
 
 **M6. Watch-folder scan cost scales with file count** (measured, acceptable)
 - File: `src/fps_patcher/app/watcher.py` — `scan`
 - Measured: 2000 files → first scan 15.4 ms, settle scan 59.0 ms (the settle scan opens each candidate `O_RDWR` on Windows for the lock check).
 - 59 ms on a background thread at a 1 s interval is fine; no change.
 
-**M7. Watcher stop joins the Tk thread for up to 3 s** (open, unverified worst case)
+**M7. Watcher stop joins the Tk thread for up to 3 s** (fixed post-audit: non-blocking stop)
 - File: `src/fps_patcher/ui/main_window.py` — `_sync_watcher`; `watcher.py` — `stop`
-- `stop()` is called from the UI thread on settings apply and close. With a 1 s poll interval the typical join is ≤1 s, but a slow scan (network folder) can reach the 3 s cap and freeze the window.
-- Not fixed: needs a measured slow-folder reproduction before adding async teardown complexity.
+- `stop()` was called from the UI thread on settings apply and close. With a 1 s poll interval the typical join was ≤1 s, but a slow scan (network folder) could reach the 3 s cap and freeze the window.
+- Post-audit fix: `stop(wait=False)` from Tk, a fresh stop event per run, a delivery lock and inbox dedupe. A simulated slow-scan test covers the non-blocking path; no real SMB share was measured.
 
-**M8. Hard kill can orphan ffmpeg** (open)
+**M8. Hard kill can orphan ffmpeg** (fixed post-audit: Windows Job Object)
 - File: `src/fps_patcher/core/ffmpeg_runner.py` — `run_streaming`
-- Cancel kills the direct child, but there is no Job Object / parent-death handling, so killing the app (Task Manager, crash) can leave ffmpeg running.
-- Not fixed: requires a Windows Job Object and a real kill test; deferred.
+- Cancel killed only the direct child, with no Job Object / parent-death handling, so killing the app (Task Manager, crash) could leave ffmpeg running.
+- Post-audit fix: per-invocation `ProcessJob` with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, including ffprobe; hard-kill and cancel descendant tests added. POSIX still has no equivalent.
 
-**M9. No startup sweep for preflight temps** (open)
-- `patcher` now sweeps its own stale temps, but `.preflight` files from a previous crash are still only cleaned by the watcher ignore rules, not deleted.
-- Not fixed: sweeping beside arbitrary sources needs an ownership marker to avoid deleting another app's files.
+**M9. No startup sweep for preflight temps** (fixed post-audit: marked-temp sweep)
+- `patcher` sweeps its own stale temps, but `.preflight` files from a previous crash were only ignored by the watcher, not deleted.
+- Post-audit fix: unique preflight temps plus exclusive, host-scoped JSON ownership markers; a startup sweep deletes only marked, stale, writable temps, off the Tk thread.
 
 ### Low — correctness edges and accepted limits
 
-**L1. Concurrent patches to the same destination are last-writer-wins** — `os.replace` makes each result atomic and never corrupt, but one job's output is silently lost. No locking added (would need a cross-process lock and user-visible policy).
+**L1. Concurrent patches to the same destination are last-writer-wins** — `os.replace` makes each result atomic and never corrupt, but one job's output is silently lost. Post-audit: per-destination in-process lock plus Windows `Local\` named mutex; final-name selection is re-done under the lock. Cross-session/machine serialization is still out of scope.
 
 **L2. Thumbnail cache is FIFO, not LRU** — a hot thumbnail can be evicted by a burst of new ones. Cheap and bounded; accepted.
 
 **L3. `verify_payload_integrity` does not FAIL on bad chunk offsets** — each patch strategy validates offsets internally; the verifier reports non-standard payloads as `EXPERIMENTAL` because BXD presets legitimately produce them. Deliberately unchanged.
 
-**L4. Non-visual sample entries** — `colr` tagging assumes the 78-byte `VisualSampleEntry` layout. Vendor/non-visual entries that reuse a visual fourcc are refused by the `moov` round-trip guard rather than patched wrongly; no dedicated test for exotic entries.
+**L4. Non-visual sample entries** — `colr` tagging assumed the 78-byte `VisualSampleEntry` layout. Post-audit: only whitelisted visual fourccs are parsed and tagged; unsupported entries are preserved raw and never tagged. Unsupported-only and mixed-entry tests added.
 
 **L5. Fragmented MP4 is skipped** — `moof`/`trun` offset repair is not implemented; `sanitize` returns `skipped`.
 

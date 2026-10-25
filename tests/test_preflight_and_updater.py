@@ -208,7 +208,7 @@ def test_preflight_cancel_leaves_no_partial_temp(
     import threading
 
     from fps_patcher.core.errors import PatchCancelledError
-    from fps_patcher.core.preflight import PreflightPlan, preflight_output_path, run_preflight
+    from fps_patcher.core.preflight import PreflightPlan, run_preflight
 
     src = tmp_path / clip30.name
     shutil.copy2(clip30, src)
@@ -221,7 +221,8 @@ def test_preflight_cancel_leaves_no_partial_temp(
             lambda _evt: None, cancel,
         )
 
-    assert not preflight_output_path(src).exists()
+    assert not list(tmp_path.glob("*.preflight*"))
+    assert not list(tmp_path.glob(".*.preflight-owner.json"))
 
 
 def test_controller_check_for_updates_disabled(monkeypatch: pytest.MonkeyPatch) -> None:

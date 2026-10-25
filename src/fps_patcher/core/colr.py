@@ -61,6 +61,9 @@ class _Box:
 
 _CONTAINERS = {b"moov", b"trak", b"mdia", b"minf", b"stbl"}
 _VISUAL_ENTRY_FIELDS = 78  # SampleEntry(8) + VisualSampleEntry fields(70)
+# Only these sample entries are known to use the VisualSampleEntry layout that
+# ``_expand_stsd`` parses. Anything else is preserved verbatim and not tagged.
+_VISUAL_SAMPLE_ENTRIES = frozenset({b"avc1", b"avc3", b"hvc1", b"hev1", b"mp4v", b"av01", b"vp09"})
 _HDR_BOXES = {b"mdcv", b"clli", b"dvcC", b"dvvC"}
 _HDR_PRIMARIES = {9, 12}  # BT.2020, Display P3
 _HDR_TRANSFERS = {16, 18}  # PQ, HLG
@@ -114,14 +117,21 @@ def _child(box: _Box, typ: bytes) -> _Box | None:
     return next((c for c in box.children or [] if c.type == typ), None)
 
 
-def _expand_stsd(stsd: _Box) -> None:
+def _expand_stsd(stsd: _Box) -> bool:
+    """Parse known visual entries; return True when an unsupported entry was kept raw."""
     payload = stsd.payload
     if payload is None or len(payload) < 8:
         raise ColrError("invalid stsd box")
     children: list[_Box] = []
+    unsupported = False
     pos = 8
     while pos < len(payload):
         payload_start, box_end, typ, header = _box_bounds(payload, pos, len(payload))
+        if typ not in _VISUAL_SAMPLE_ENTRIES:
+            children.append(_Box(typ, payload=payload[payload_start:box_end], header=header))
+            unsupported = True
+            pos = box_end
+            continue
         # VisualSampleEntry: 8 (SampleEntry) + 70 visual fields = 78 bytes.
         if payload_start + _VISUAL_ENTRY_FIELDS > box_end:
             raise ColrError(f"truncated {typ!r} sample entry")
@@ -139,6 +149,7 @@ def _expand_stsd(stsd: _Box) -> None:
     stsd.children = children
     stsd.prefix = payload[:8]
     stsd.payload = None
+    return unsupported
 
 
 def _video_traks(moov: _Box) -> list[_Box]:
@@ -296,6 +307,8 @@ def _adjust_offsets(box: _Box, delta: int, layout: _Layout) -> None:
     for index in range(count):
         offset = struct.unpack_from(fmt, payload, 8 + index * step)[0]
         if offset < layout.moov_start:
+            if not any(start <= offset < end for start, end in layout.mdat_ranges):
+                raise ColrError(f"chunk offset {offset} is outside every mdat")
             continue  # media before moov: its bytes do not move
         if offset < layout.moov_end:
             raise ColrError(f"chunk offset {offset} points inside moov; refusing to guess")
@@ -379,6 +392,7 @@ def sanitize(
     reasons: list[str] = []
     if fix_color:
         statuses: list[ColorStatus] = []
+        unsupported_entries = False
         for mdia in _video_traks(moov):
             minf = _child(mdia, b"minf")
             stbl = _child(minf, b"stbl") if minf is not None else None
@@ -386,12 +400,16 @@ def sanitize(
             if stsd is None:
                 continue
             if stsd.payload is not None:
-                _expand_stsd(stsd)
+                unsupported_entries = _expand_stsd(stsd) or unsupported_entries
             for entry in stsd.children or []:
+                if entry.type not in _VISUAL_SAMPLE_ENTRIES:
+                    continue
                 statuses.append(_tag_entry(entry))
+        if unsupported_entries:
+            reasons.append("unsupported sample entry left untouched")
         if not statuses:
             color_status = "skipped"
-            reasons.append("no video sample entry")
+            reasons.append("no supported video sample entry")
         elif "patched" in statuses:
             color_status = "patched"
             reasons.append("Rec.709 nclx written")
@@ -413,11 +431,10 @@ def sanitize(
     new_moov = _serialize(moov)
     old_moov_size = layout.moov_end - layout.moov_start
     delta = len(new_moov) - old_moov_size
-    if delta:
-        _adjust_offsets(moov, delta, layout)
-        new_moov = _serialize(moov)
-        if len(new_moov) - old_moov_size != delta:
-            raise ColrError("moov size changed while shifting offsets")
+    _adjust_offsets(moov, delta, layout)
+    new_moov = _serialize(moov)
+    if len(new_moov) - old_moov_size != delta:
+        raise ColrError("moov size changed while shifting offsets")
 
     _write(path, layout, new_moov)
     return ColrResult(path, color_status, "; ".join(reasons), delta, removed)

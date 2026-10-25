@@ -116,6 +116,31 @@ def test_shutdown_cancels_and_joins_the_worker() -> None:
     assert not ctrl.busy
 
 
+def test_shutdown_returns_after_timeout_for_stuck_worker() -> None:
+    ctrl = AppController(Settings())
+    started = threading.Event()
+    release = threading.Event()
+
+    def stubborn() -> None:
+        started.set()
+        release.wait(10)  # ignores cancellation
+
+    ctrl._start(stubborn)
+    assert started.wait(2)
+
+    begin = time.perf_counter()
+    ctrl.shutdown(timeout=0.2)
+    elapsed = time.perf_counter() - begin
+
+    assert 0.1 <= elapsed < 1.5
+    assert ctrl.busy  # the worker is still alive, but close is not blocked
+
+    release.set()
+    assert ctrl._worker is not None
+    ctrl._worker.join(2)
+    assert not ctrl.busy
+
+
 def test_controller_batch_with_bad_file(clip30: Path, tmp_path: Path) -> None:
     ctrl = AppController(Settings(output_dir=str(tmp_path)))
     assert ctrl.init_ffmpeg() is not None
