@@ -173,6 +173,44 @@ on failure; never block startup for a cosmetic effect; use the `glass_mode` sett
 request, not a guarantee. `pywinstyles` may be removed if the native helper is sufficient,
 but do not add it to the frozen Qt build unless actually imported.
 
+## Implementation status (packages 0–9)
+
+- New UI lives in `src/fps_patcher/ui_qt/`; the legacy `src/fps_patcher/ui/` is
+  untouched and still launches with `--ui tk`.
+- `python -m fps_patcher` / `FPSPatcherStudio.exe` now defaults to Qt;
+  `--ui tk` or `FPS_PATCHER_UI=tk` selects the legacy UI.
+- `AppController` remains the worker owner. `ControllerBridge` drains its
+  `queue.Queue` on the Qt main thread; no worker touches a widget.
+- Theme tokens, QSS, QPalette, seven presets, density, SegmentedControl, Switch,
+  setup cards, queue model/delegate, console drawer, settings dialog, motion and
+  DWM helpers are implemented.
+- `pytest -q`: **405 passed**. `ruff check .`: clean. `mypy src/fps_patcher`:
+  clean. New Qt tests live in `tests/test_ui_qt_*.py`.
+- Screenshot matrix: **113 PNGs** in `images/after-qt/` (7 presets x light/dark
+  x en/th x 100/125, main 1120x760 and settings 740x580, plus one rich-queue
+  hero). Reproduce with `tools/capture_qt_screens.py`.
+- Frozen build (PyInstaller 6.22.3 + PySide6 6.12.0 + Inno Setup 7):
+  `dist/FPSPatcherStudio` grew from 259,439,922 to 335,045,829 bytes;
+  `Setup.exe` grew from 72,730,731 to 91,420,605 bytes. The frozen qwindows
+  build and the legacy `--ui tk` build both started; `--quick-patch` errors
+  remain headless.
+
+### Known gaps / limitations
+
+- Mica/Acrylic sets `DWMWA_SYSTEMBACKDROP_TYPE` plus the caption colour, but the
+  Qt client surfaces remain opaque, so the system material is mainly visible in
+  the native frame. A fully translucent client needs a per-widget alpha design.
+- macOS uses the solid surface fallback; no `NSVisualEffectView` implementation.
+- Explorer drag-and-drop and Explorer context-menu installation are not
+  automatable in this environment. The screenshot harness guards the registry,
+  but an earlier capture run may have removed a previously installed HKCU verb;
+  re-enable `explorer_menu` in Settings to restore it.
+- 100% and 125% were rendered with `QT_SCALE_FACTOR` offscreen; real 125%/150%
+  monitor DPI was not exercised.
+- Legacy `Settings.geometry` (Tk string) is intentionally ignored; Qt geometry
+  lives in `QSettings("FPSPatcherStudio", "QtUI")`.
+- The old customtkinter UI and its dependencies remain until removal approval.
+
 ## Risks
 
 - **Geometry persistence:** `Settings.geometry` stores a Tk string
