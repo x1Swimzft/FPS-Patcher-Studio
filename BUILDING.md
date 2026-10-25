@@ -107,7 +107,7 @@ dist\FPSPatcherStudio\
 
 ### Step 5.2: Smoke Test
 
-Launch the compiled executable to verify there are no missing runtime DLLs or Tkinter asset errors:
+Launch the compiled executable to verify there are no missing Qt plugins, DLLs, or bundled assets:
 ```powershell
 $proc = Start-Process -FilePath "dist\FPSPatcherStudio\FPSPatcherStudio.exe" -PassThru
 Start-Sleep -Seconds 6
@@ -182,5 +182,5 @@ Get-Content "release\FPSPatcherStudio-v0.7.0.sha256"
 |---|---|---|
 | `ISCC.exe not found` | Inno Setup not installed or not in default path | Install Inno Setup 6 or 7, or pass path directly to `release.ps1`. |
 | `signtool.exe not found` | Windows SDK not installed | Install Windows SDK or run without `-Sign` flag. |
-| `TclError: Can't find a usable tk.tcl` | Missing Tk runtime during headless test | Ensure standard CPython 3.11 with Tcl/Tk is installed, or run tests with GUI support. |
+| `This application failed to start because no Qt platform plugin could be initialized` | `qwindows.dll` missing from the PyInstaller output | Rebuild with `build/fps_patcher.spec`; confirm `_internal\PySide6\plugins\platforms\qwindows.dll`. |
 | `version_info.txt out of sync` | Version in `version_info.txt` does not match `__version__` | Update `build/version_info.txt` to match `src/fps_patcher/__init__.py`. |

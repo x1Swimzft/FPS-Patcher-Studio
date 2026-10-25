@@ -1,8 +1,8 @@
 # Qt Platform Notes — Windows / macOS
 
-Scope: the PySide6 (`ui_qt`) shell introduced on branch `ui/pyside6`. Core patching,
-`--quick-patch`, queue persistence and shell integration are toolkit-independent and
-unchanged.
+Scope: the PySide6 (`ui_qt`) shell on branch `ui/pyside6`, now the only UI. Core
+patching, `--quick-patch`, queue persistence and shell integration are
+toolkit-independent and unchanged.
 
 ## Entry points
 
@@ -10,14 +10,12 @@ unchanged.
 |---|---|---|
 | `FPSPatcherStudio.exe` | Qt (`ui_qt.app.run(Settings.load())`) | Default. |
 | `FPSPatcherStudio.exe --ui qt` | Qt | Explicit selection; `--ui` is removed from `argv` first. |
-| `FPSPatcherStudio.exe --ui tk` | Legacy CustomTkinter `ui.main_window.MainWindow` | Kept for comparison only. |
-| `FPS_PATCHER_UI=tk` | Legacy Tk | `--ui` overrides the environment variable. |
-| `FPSPatcherStudio.exe --quick-patch <video>` | Headless | No Qt/Tk import; unchanged. |
+| `FPSPatcherStudio.exe --ui tk` | Qt | Deprecated: logs a warning and launches Qt. |
+| `FPS_PATCHER_UI=tk` | Qt | Deprecated alias; `--ui` overrides the environment variable. |
+| `FPSPatcherStudio.exe --quick-patch <video>` | Headless | No Qt import; unchanged. |
 
 Qt 6 manages per-monitor DPI itself, so the entry point does **not** call
-`SetProcessDpiAwareness` before Qt. The legacy Tk path still calls it (Tk needs
-DPI awareness before its first window). The Windows AppUserModelID call is shared
-by both paths.
+`SetProcessDpiAwareness`. The Windows AppUserModelID call remains.
 
 ## Backdrop: Mica / Acrylic / fallback
 
@@ -81,8 +79,9 @@ uv run --with pyinstaller pyinstaller build/fps_patcher.spec --noconfirm
 `build/release.ps1` needs no dependency changes: it already runs that command,
 then the 6 s launch smoke test, then Inno Setup (`installer.iss` copies
 `dist\FPSPatcherStudio\*`, so a one-folder build needs no script changes).
-`customtkinter`/`tkinterdnd2` data and hidden imports remain until the legacy UI
-is removed, so the frozen app can still be launched with `--ui tk`.
+`build/fps_patcher.spec` no longer collects `customtkinter`/`tkinterdnd2` data or
+hidden imports; `tkinter`, `_tkinter`, `customtkinter`, `tkinterdnd2` and
+`pywinstyles` are explicit `excludes`. `ui/assets` (Qt icons/fonts) stays bundled.
 
 ### Checking a frozen build
 
@@ -102,7 +101,7 @@ fallback style but logs a warning.
 
 Drag-and-drop is implemented natively in `ui_qt/queue_view.py` (`setAcceptDrops`,
 `dragEnterEvent`, `dragMoveEvent`, `dropEvent`, `collect_urls`). It uses Qt's
-file URL MIME data; there is no `tkinterdnd2` dependency on the Qt path.
+file URL MIME data; TkinterDnD2 and Tcl/Tk are no longer shipped.
 
 Explorer drag-and-drop cannot be automated from this environment (it needs an
 interactive desktop session and a real Explorer drag source). Manual check on a
@@ -119,10 +118,9 @@ frozen one-folder build:
 - Mica/Acrylic is unverified on real Windows 11 hardware here; this session ran
   on a Windows build without a visual desktop check. `qoffscreen` proves startup,
   not the visual result.
-- No installer size comparison is stored in the repository; see the build report
-  for measured `dist`/`Setup.exe` bytes.
-- `--ui tk` keeps the old UI runnable but the frozen build carries both toolkits,
-  so it is not the size-optimized release shape.
+- No installer size comparison is stored in the repository; the release build
+  records the measured post-cutover `dist`/`Setup.exe` bytes.
+- `--ui tk` is deprecated and launches Qt; Tcl/Tk is not part of the frozen build.
 - macOS backdrop and macOS frozen launch are untested on this Windows machine.
 - The settings window still accepts the legacy Tk geometry key; it is ignored by
   Qt rather than migrated.

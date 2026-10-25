@@ -90,23 +90,26 @@ Get-FileHash -Path "FPSPatcherStudio-v0.7.0-win64.zip" -Algorithm SHA256
 
 ## ✨ Key Features
 
-### 🖥️ Apple macOS HIG Desktop Interface & Zero-Flicker Architecture
-- **Bundled Inter Typography**: Inter (`Regular`, `Medium`, `SemiBold`, `Bold`) loaded privately at startup via Win32 GDI with seamless Thai fallback (`Noto Sans Thai`, `Segoe UI Variable`).
+### 🖥️ Qt Desktop Interface & Zero-Flicker Architecture
+- **Bundled Inter Typography**: Inter (`Regular`, `Medium`, `SemiBold`, `Bold`) loaded privately at startup through `QFontDatabase.addApplicationFont` with seamless Thai fallback (`Noto Sans Thai`, `Segoe UI Variable`).
 - **Semantic Color Palette**: 100% opaque surfaces with Apple HIG semantic colors (`#1D1D1F`/`#D9D9DC` primary text, `#007AFF`/`#0A84FF` system blue, `#34C759`/`#30D158` system green, `#FF9500`/`#FF9F0A` system amber, `#FF3B30`/`#FF453A` system red, and crisp 1px hairline borders).
-- **Zero-Flicker Window Restore**: Pure solid dark surface with native Windows 10/11 dark title bar (`DWMWA_USE_IMMERSIVE_DARK_MODE` + `DWMWA_CAPTION_COLOR`) and recursive Win32 GDI composite repaint (`RDW_ALLCHILDREN`), eliminating black boxes and canvas flashing on Alt-Tab.
-- **Vector-Crisp Dual-Tone Icons**: Clean 32x32 @2x (1.5px stroke) Phosphor/Lucide-style PNG icons loaded dynamically via `CTkImage` replacing all emoji/ASCII glyphs.
-- **Animated Sliding Pill Controls**: Custom `MacSegmentedControl` (`60 / 120 / Custom`) with smooth 200ms cubic ease-out sliding capsule thumb (`1 - (1 - t)**3`) and `reduce_motion` instant snap support.
+- **Zero-Flicker Window Restore**: Qt double-buffered rendering with a solid dark surface and native Windows 10/11 dark title bar (`DWMWA_USE_IMMERSIVE_DARK_MODE` + `DWMWA_CAPTION_COLOR`), eliminating black boxes and flashing on Alt-Tab.
+- **Vector-Crisp Dual-Tone Icons**: Clean 32x32 @2x (1.5px stroke) Phosphor/Lucide-style PNG icons loaded as `QIcon`/`QPixmap` replacing all emoji/ASCII glyphs.
+- **Animated Sliding Pill Controls**: Qt `SegmentedControl` (`60 / 120 / Custom`) with a smooth 200ms cubic ease-out sliding capsule thumb (`1 - (1 - t)**3`) and `reduce_motion` instant snap support.
 - **Animated Activity Console Drawer**: Smooth 200ms ease-out expand/collapse drawer (`40px` <-> `210px`) with primary action cluster (`FFmpeg logs`, `Copy`, `Clear`, `Save Log`) and overflow menu.
 - **Window Focus-Aware Queue Selection**: Selected queue cards fill solid Accent Blue (`#007AFF`/`#0A84FF`) with white text when window is active, automatically transitioning to macOS Unfocused Grey (`#3A3A3C`/`#D1D1D6`) when window loses OS focus.
-- **Keyboard Focus Rings**: 2px System Blue highlight border on `<FocusIn>` / `<FocusOut>` across all interactive controls.
+- **Keyboard Focus Rings & Accessibility**: 2px System Blue focus border, accessible names on interactive controls, and contrast-checked light/dark palettes.
+- **Seven Color Presets**: Crimson Gamer is the default for new installs; light/dark and English/Thai are switchable at runtime.
 
 ### ⚡ Batch Processing Queue & Automation
-- Drag-and-drop multiple video clips or directories (`tkinterdnd2`).
+- Drag-and-drop multiple video clips or directories using Qt's native file drop events.
+- Queue rows render FFmpeg thumbnails asynchronously.
+- Inline per-item overrides (timescale, preset) in the inspector, alongside the batch preset.
 - Per-item selection checkboxes: patch only selected clips or the entire batch.
 - Real-time probe status, duration, resolution, and FPS detection.
 - **Watch Folder Auto-Intake**: Monitors designated creator render directories, automatically staging clips upon export completion.
 - **Windows Explorer Shell Integration**: Right-click any video or folder to patch instantly via system context menu.
-- Pinned inspector footer: progress bars and action buttons remain pinned so Source Metadata (`InfoPanel`) is never pushed below the fold.
+- Pinned inspector footer: progress bars and action buttons remain pinned so Source Metadata is never pushed below the fold.
 
 ### 🛡️ 6-Gate Bit-Exact Verifier & Streaming Engine
 Automated pre-patch and post-patch validation covering:
@@ -173,7 +176,7 @@ uv run fps-patcher-studio
 
 Run quality gates:
 ```powershell
-# Run unit & integration test suite (286 tests)
+# Run the full Qt test suite
 uv run pytest -q
 
 # Run static type checking
@@ -184,7 +187,7 @@ uv run ruff check src tests
 ```
 
 ### Building Standalone Distributable
-To compile PyInstaller one-folder portable package and Inno Setup installer:
+To compile the PySide6 PyInstaller one-folder portable package and Inno Setup installer:
 ```powershell
 powershell -ExecutionPolicy Bypass -File build\release.ps1
 ```

@@ -5,11 +5,8 @@ description = "High-precision MP4/MOV container timing patcher (X1T PC, Mobile, 
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "customtkinter>=6.0.0",
     "pillow>=13.0.0",
     "pyside6==6.12.0",
-    "pywinstyles>=1.8",
-    "tkinterdnd2>=0.6.3",
 ]
 
 [project.scripts]
@@ -44,10 +41,6 @@ python_version = "3.11"
 strict = true
 mypy_path = "src"
 packages = ["fps_patcher"]
-
-[[tool.mypy.overrides]]
-module = ["customtkinter.*", "tkinterdnd2.*", "pywinstyles.*"]
-ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["fps_patcher.ui.*"]

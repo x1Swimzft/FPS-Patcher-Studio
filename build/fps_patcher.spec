@@ -4,15 +4,9 @@
 import importlib.util
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_data_files
-
 ROOT = Path(SPECPATH).parent  # noqa: F821 (SPECPATH injected by PyInstaller)
 
-datas = (
-    collect_data_files("customtkinter")
-    + collect_data_files("tkinterdnd2")
-    + [(str(ROOT / "src" / "fps_patcher" / "ui" / "assets"), "fps_patcher/ui/assets")]
-)
+datas = [(str(ROOT / "src" / "fps_patcher" / "ui" / "assets"), "fps_patcher/ui/assets")]
 binaries = [(str(p), "bin") for p in (ROOT / "bin").glob("*.exe")]
 
 # Qt plugins the widgets app needs. Do not collect the whole PySide6 tree: the
@@ -58,10 +52,15 @@ a = Analysis(  # noqa: F821
     pathex=[str(ROOT / "src")],
     datas=datas,
     binaries=binaries,
-    hiddenimports=["tkinterdnd2", "pywinstyles"],
     excludes=[
         "unittest",
         "test",
+        # Tk is not imported by the Qt runtime; keep Tcl/Tk and its addons out of the build.
+        "tkinter",
+        "_tkinter",
+        "customtkinter",
+        "tkinterdnd2",
+        "pywinstyles",
         # PySide6 addons/WebEngine are not imported; exclude them so hooks cannot
         # pull their DLLs or plugin trees into the one-folder build.
         "PySide6.QtWebEngineCore",

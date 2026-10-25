@@ -2,6 +2,16 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
+## [Unreleased]
+
+### Changed: PySide6 UI cutover
+- Qt/PySide6 is the sole UI runtime; the legacy Tk/CustomTkinter UI and its tests were removed.
+- `--ui tk` and `FPS_PATCHER_UI=tk` are deprecated: they log a warning and launch Qt.
+- Crimson Gamer is the default theme preset for new installs; existing settings are kept.
+- Wide Settings dialog at 920x640 (1150x800 at 125%), queue thumbnails, inline per-item overrides, full Forensic parity, and accessibility/contrast work.
+- Removed `customtkinter`, `tkinterdnd2` and `pywinstyles` dependencies and mypy overrides.
+- PyInstaller spec excludes Tcl/Tk, CustomTkinter, TkinterDnD2 and pywinstyles; only `ui/assets` is collected. Post-cutover artifact sizes are measured by the release build.
+
 ## [0.9.0] - 2026-10-25
 
 ### Added: Phase 3 — Platform Profiles & Pre-Flight Readiness Score

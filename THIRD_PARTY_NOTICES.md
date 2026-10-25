@@ -10,14 +10,15 @@
 |---|---|---|---|
 | [Python](https://www.python.org/) | Python Software Foundation | PSF License 2.0 | CPython 3.11 Runtime |
 | [PySide6 / Qt 6](https://doc.qt.io/qtforpython-6/) | The Qt Company / Qt Project | GNU LGPL v3 (Qt Company LGPL exception) | Qt 6 widget UI shell and Qt platform/style/image plugins |
-| [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter) | Tom Schimansky | Creative Commons Zero v1.0 / MIT | Legacy desktop UI framework |
-| [TkinterDnD2](https://github.com/petasis/tkinterdnd2) | Georgios Petasis & Michael Lange | MIT License | Drag-and-drop file support |
-| [pywinstyles](https://github.com/Akash-Bora/pywinstyles) | Akash Bora | MIT License | Windows 10/11 Acrylic, Mica & title bar theming |
 | [Pillow](https://python-pillow.org/) | Alex Clark and Contributors | HPND License | Image loading, thumbnail resizing, icon processing |
 | [Inter Font](https://rsms.me/inter/) | Rasmus Andersson | SIL Open Font License 1.1 | macOS HIG typography |
 | [Inno Setup](https://jrsoftware.org/isinfo.php) | Jordan Russell and Martijn Laan | Inno Setup License (Modified BSD) | Windows installer compilation |
 | [FFmpeg / FFprobe](https://ffmpeg.org/) | FFmpeg Developers | GNU LGPL v2.1+ / GPL v2.0+ | Optional video thumbnailing & metadata probing |
 | [PyInstaller](https://pyinstaller.org/) | PyInstaller Development Team | GNU GPL v2.0 with Bootloader Exception | Standalone binary packaging |
+
+> **Removed with the PySide6 cutover:** CustomTkinter, TkinterDnD2 and pywinstyles
+> were used by the legacy Tk UI. They are no longer dependencies and are not
+> bundled or shipped in current builds.
 
 ---
 
@@ -60,100 +61,7 @@ PYTHON SOFTWARE FOUNDATION LICENSE VERSION 2
 
 ---
 
-## 2. CustomTkinter
-
-- **Author**: Tom Schimansky
-- **Website**: https://github.com/TomSchimansky/CustomTkinter
-- **License**: Creative Commons Zero v1.0 Universal / MIT License
-
-```text
-MIT License
-
-Copyright (c) 2023 Tom Schimansky
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-## 3. TkinterDnD2
-
-- **Author**: Georgios Petasis, Michael Lange
-- **Website**: https://github.com/petasis/tkinterdnd2
-- **License**: MIT License
-
-```text
-Copyright (c) 2010-2020 Georgios Petasis
-Copyright (c) 2007-2009 Michael Lange
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-## 4. pywinstyles
-
-- **Author**: Akash Bora
-- **Website**: https://github.com/Akash-Bora/pywinstyles
-- **License**: MIT License
-
-```text
-Copyright (c) 2023-2024 Akash Bora
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-## 5. Pillow (PIL Fork)
+## 2. Pillow (PIL Fork)
 
 - **Author**: Alex Clark and Contributors (originally Fredrik Lundh and Contributors)
 - **Website**: https://python-pillow.org/
@@ -194,7 +102,7 @@ PERFORMANCE OF THIS SOFTWARE.
 
 ---
 
-## 6. Inter Font Family
+## 3. Inter Font Family
 
 - **Author**: Rasmus Andersson
 - **Website**: https://rsms.me/inter/
@@ -255,7 +163,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 
 ---
 
-## 7. Inno Setup
+## 4. Inno Setup
 
 - **Author**: Jordan Russell, Martijn Laan
 - **Website**: https://jrsoftware.org/
@@ -294,7 +202,7 @@ following conditions are met:
 
 ---
 
-## 8. FFmpeg & FFprobe (LGPL v2.1 / GPL v2.0 Compliance Notice)
+## 5. FFmpeg & FFprobe (LGPL v2.1 / GPL v2.0 Compliance Notice)
 
 - **Website**: https://ffmpeg.org/
 - **License**: GNU Lesser General Public License (LGPL) version 2.1 or later / GNU General Public License (GPL) version 2.0 or later (depending on the build configuration of FFmpeg used).
@@ -307,7 +215,7 @@ following conditions are met:
 
 ---
 
-## 9. PyInstaller
+## 6. PyInstaller
 
 - **Author**: PyInstaller Development Team
 - **Website**: https://pyinstaller.org/
@@ -330,7 +238,7 @@ the source code of the bootloader.
 
 ---
 
-## 10. PySide6 / Qt 6 (LGPL v3 Compliance Notice)
+## 7. PySide6 / Qt 6 (LGPL v3 Compliance Notice)
 
 - **Project**: Qt for Python (PySide6) and the Qt 6 libraries
 - **Website**: https://doc.qt.io/qtforpython-6/ and https://www.qt.io/
