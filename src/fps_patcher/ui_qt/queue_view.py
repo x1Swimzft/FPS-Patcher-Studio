@@ -183,7 +183,7 @@ class DropCard(QWidget):
         layout.addWidget(self.center_card, 0, Qt.AlignmentFlag.AlignHCenter)
 
         self.icon_holder = QWidget(self.center_card)
-        self.icon_holder.setFixedHeight(44)
+        self.icon_holder.setFixedSize(40, 44)
         self.icon_label = QLabel(self.icon_holder)
         self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.icon_label.setFixedSize(40, 40)
