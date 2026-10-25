@@ -51,6 +51,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QListView,
     QMenu,
@@ -65,6 +66,7 @@ from PySide6.QtWidgets import (
 from ..app.queue_model import QueueItem
 from ..core.models import SUPPORTED_EXTENSIONS
 from ..core.platform_profiles import ReadinessReport, evaluate_readiness
+from ..core.strategies import UI_PRESETS
 from ..ui.strings import t
 from .icons import get_icon
 from .motion import animate
@@ -1122,6 +1124,17 @@ class QueueView(QWidget):
         open_output.setEnabled(item.output is not None and item.output.exists())
         copy_path = menu.addAction(self.tr("copy_path"))
         menu.addSeparator()
+        set_fps = menu.addAction(self.tr("set_fps"))
+        preset_menu = menu.addMenu(self.tr("set_strategy"))
+        preset_actions = {
+            preset_menu.addAction(preset.label): key
+            for key, preset in UI_PRESETS.items()
+        }
+        clear_override = menu.addAction(self.tr("override_clear_btn"))
+        clear_override.setEnabled(
+            item.timescale is not None or item.strategy is not None
+        )
+        menu.addSeparator()
         move_up = menu.addAction(self.tr("move_up"))
         move_down = menu.addAction(self.tr("move_down"))
         move_up.setEnabled(not self._busy)
@@ -1139,6 +1152,33 @@ class QueueView(QWidget):
         elif chosen is copy_path:
             QApplication.clipboard().setText(str(item.path))
             self.status_message.emit(self.tr("copied_flash"))
+        elif chosen is set_fps:
+            value, accepted = QInputDialog.getInt(
+                self,
+                self.tr("set_fps"),
+                self.tr("timescale_lbl"),
+                item.timescale or 60000,
+                1,
+                2_147_483_647,
+            )
+            if accepted:
+                self.controller.items.set_override(
+                    item.path, timescale=value, strategy=item.strategy
+                )
+                self.model.refresh()
+                self.selection_changed.emit()
+        elif chosen in preset_actions:
+            self.controller.items.set_override(
+                item.path,
+                timescale=item.timescale,
+                strategy=preset_actions[chosen],
+            )
+            self.model.refresh()
+            self.selection_changed.emit()
+        elif chosen is clear_override:
+            self.controller.items.set_override(item.path, timescale=None, strategy=None)
+            self.model.refresh()
+            self.selection_changed.emit()
         elif chosen is move_up:
             self._move_item(item.path, -1)
         elif chosen is move_down:

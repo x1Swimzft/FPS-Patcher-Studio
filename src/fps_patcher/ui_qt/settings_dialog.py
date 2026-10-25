@@ -765,7 +765,10 @@ class SettingsDialog(QDialog):
             lambda _value: None,
         )
 
-        self._language_labels = ["English (en)", "ไทย (th)"]
+        self._language_labels = [
+            f"{self._tr('language_en')} (en)",
+            f"{self._tr('language_th')} (th)",
+        ]
         self._language = self._combo(
             layout,
             "language_choice",

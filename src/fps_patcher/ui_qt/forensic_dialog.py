@@ -89,13 +89,13 @@ class ForensicDialog(QDialog):
         layout.setSpacing(theme.outer)
 
         self.original_edit = self._add_path_row(
-            layout, "Original file", theme, self._browse_original
+            layout, t("forensic_original", lang), theme, self._browse_original
         )
         self.patched_edit = self._add_path_row(
-            layout, "Patched / target file", theme, self._browse_patched
+            layout, t("forensic_patched", lang), theme, self._browse_patched
         )
 
-        self.analyze_button = QPushButton("Analyze")
+        self.analyze_button = QPushButton(t("forensic_analyze", lang))
         self.analyze_button.setProperty("variant", "primary")
         self.analyze_button.setMinimumHeight(theme.primary_height)
         self.analyze_button.clicked.connect(self._analyze)
@@ -135,14 +135,14 @@ class ForensicDialog(QDialog):
 
     def _browse_original(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
-            self, "Select original MP4", "", _VIDEO_FILTER
+            self, t("forensic_original", self.settings.language), "", _VIDEO_FILTER
         )
         if path:
             self.original_edit.setText(path)
 
     def _browse_patched(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
-            self, "Select patched MP4", "", _VIDEO_FILTER
+            self, t("forensic_patched", self.settings.language), "", _VIDEO_FILTER
         )
         if path:
             self.patched_edit.setText(path)
