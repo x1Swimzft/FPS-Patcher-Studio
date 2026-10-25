@@ -234,12 +234,10 @@ def test_body_text_contrast_meets_wcag_aa() -> None:
                         getattr(tokens, foreground)[index], getattr(tokens, background)[index]
                     )
                     assert ratio >= 4.5, f"{name} {mode} {foreground}/{background} = {ratio:.2f}"
-            muted_report.append(
-                f"{name} {mode}: muted/bg {_contrast(tokens.muted[index], tokens.bg[index]):.2f}, "
-                f"muted/surface {_contrast(tokens.muted[index], tokens.surface[index]):.2f}"
-            )
-    # Muted text is tertiary and may sit below the body-text floor; report only.
-    print("\n".join(muted_report))
+            for background in ("bg", "surface"):
+                ratio = _contrast(tokens.muted[index], getattr(tokens, background)[index])
+                muted_report.append(f"{name} {mode} muted/{background} = {ratio:.2f}")
+                assert ratio >= 4.5, f"{name} {mode} muted/{background} = {ratio:.2f}"
 
 
 def test_hex_to_colorref() -> None:
