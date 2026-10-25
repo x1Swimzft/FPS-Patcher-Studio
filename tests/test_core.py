@@ -52,6 +52,10 @@ def test_locate_missing_raises_detailed_error(
     monkeypatch.setattr(
         "fps_patcher.core.ffmpeg_locator._bundled_bin_dirs", lambda: [tmp_path / "bin"]
     )
+    monkeypatch.setattr(
+        "fps_patcher.core.ffmpeg_locator.managed_bin_dir",
+        lambda: tmp_path / "managed",
+    )
     with pytest.raises(FFmpegNotFoundError) as exc_info:
         locate(tmp_path / "custom")
     msg = str(exc_info.value)
