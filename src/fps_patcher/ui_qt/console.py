@@ -7,7 +7,7 @@ import os
 import time
 from pathlib import Path
 
-from PySide6.QtCore import QParallelAnimationGroup, QPoint, Qt, Signal
+from PySide6.QtCore import QPoint, Qt, QVariantAnimation, Signal
 from PySide6.QtGui import QColor, QFont, QPalette, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import (
     QApplication,
@@ -86,7 +86,7 @@ class ConsolePanel(QWidget):
         self._theme = theme_manager.theme
         self._expanded = False
         self._animated = False
-        self._height_anim: QParallelAnimationGroup | None = None
+        self._height_anim: QVariantAnimation | None = None
         self._show_ffmpeg = bool(settings.show_ffmpeg_output)
         self._entries: list[tuple[str, str, str]] = []  # (timestamp, text, tag)
         self._lines: list[str] = []
@@ -456,6 +456,8 @@ class ConsolePanel(QWidget):
         )
 
     def _finish_drawer(self, expanded: bool) -> None:
+        # The animation group deletes itself on finished; drop our reference
+        # before applying the final state so it is not stopped/deleted twice.
         self._height_anim = None
         if expanded == self._expanded:
             self._apply_expanded(expanded)

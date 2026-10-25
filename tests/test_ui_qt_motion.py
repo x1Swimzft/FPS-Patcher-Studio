@@ -93,13 +93,20 @@ def test_console_height_animates_to_expanded(qtbot: Any) -> None:
     settings = Settings(reduce_motion=False)
     console = ConsolePanel(settings, ThemeManager(settings))
     qtbot.addWidget(console)
+    console.resize(800, 36)
+    console.show()
+    qtbot.wait(20)
     console.set_animated(True)
 
     console.set_expanded(True)
 
     assert console._height_anim is not None
     qtbot.waitUntil(
-        lambda: console.minimumHeight() == 180 and console.maximumHeight() == 180,
+        lambda: (
+            console.minimumHeight() == 180
+            and console.maximumHeight() == 180
+            and console._height_anim is None
+        ),
         timeout=2000,
     )
     assert console.minimumHeight() == console.maximumHeight() == 180

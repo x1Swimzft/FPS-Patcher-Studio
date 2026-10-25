@@ -12,7 +12,6 @@ from PySide6.QtCore import (
     QEasingCurve,
     QEvent,
     QObject,
-    QParallelAnimationGroup,
     QPropertyAnimation,
     QRectF,
     Qt,
@@ -87,16 +86,19 @@ def animate_height(
     ms: int,
     reduce_motion: bool,
     on_finished: Callable[[], None] | None = None,
-) -> QParallelAnimationGroup:
+) -> QVariantAnimation:
     """Slide minimum/maximum height together; the end state is always committed."""
-    group = QParallelAnimationGroup(widget)
-    for prop in (b"minimumHeight", b"maximumHeight"):
-        animation = QPropertyAnimation(widget, prop, group)
-        animation.setEasingCurve(EASE_OUT_CUBIC)
-        animation.setStartValue(int(start))
-        animation.setEndValue(int(end))
-        animation.setDuration(0 if reduce_motion else max(0, int(ms)))
-        group.addAnimation(animation)
+    animation = QVariantAnimation(widget)
+    animation.setStartValue(0.0)
+    animation.setEndValue(1.0)
+    animation.setEasingCurve(EASE_OUT_CUBIC)
+    animation.setDuration(0 if reduce_motion else max(0, int(ms)))
+
+    def step(value: object) -> None:
+        progress = float(cast(float, value))
+        height = round(int(start) + (int(end) - int(start)) * progress)
+        widget.setMinimumHeight(height)
+        widget.setMaximumHeight(height)
 
     def settle() -> None:
         widget.setMinimumHeight(int(end))
@@ -104,13 +106,13 @@ def animate_height(
         if on_finished is not None:
             on_finished()
 
+    animation.valueChanged.connect(step)
     if reduce_motion or ms <= 0 or start == end:
         settle()
-        return group
-    group.finished.connect(settle)
-    group.finished.connect(lambda: group.deleteLater())
-    group.start()
-    return group
+        return animation
+    animation.finished.connect(settle)
+    animation.start()
+    return animation
 
 
 def fade(

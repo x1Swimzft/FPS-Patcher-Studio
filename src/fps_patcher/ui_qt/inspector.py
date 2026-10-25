@@ -6,7 +6,6 @@ from typing import cast
 
 from PySide6.QtCore import (
     QEasingCurve,
-    QParallelAnimationGroup,
     QPropertyAnimation,
     QSize,
     Qt,
@@ -99,7 +98,7 @@ class Inspector(QWidget):
         self._progress_total = 0
         self._preset = self._initial_preset()
         self._custom_visible = False
-        self._custom_anim: QParallelAnimationGroup | None = None
+        self._custom_anim: QVariantAnimation | None = None
         self._custom_fade: QPropertyAnimation | None = None
         self._glow: QGraphicsDropShadowEffect | None = None
         self._glow_anim: QVariantAnimation | None = None
