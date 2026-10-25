@@ -291,10 +291,13 @@ class ConsolePanel(QWidget):
 
         chevron = "chevron_down" if self._expanded else "chevron_right"
         self._chevron.setIcon(get_icon(chevron, True))
-        self._chevron.setToolTip(t("activity_console", lang))
-        self._chevron.setAccessibleName(t("activity_console", lang))
+        title = t("activity_console", lang)
+        self._title.setText(title)
+        self._chevron.setToolTip(title)
+        self._chevron.setAccessibleName(title)
         self._more.setToolTip(t("more_actions", lang))
         self._more.setAccessibleName(t("more_actions", lang))
+        self._update_status()
         self._apply_expanded(self._expanded)
 
     def _build_formats(self) -> None:

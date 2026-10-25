@@ -92,6 +92,21 @@ def test_thai_language_constructs(qtbot: Any, monkeypatch: Any, tmp_path: Path) 
     window.close()
 
 
+def test_language_switch_retranslates_live(
+    qtbot: Any, monkeypatch: Any, tmp_path: Path
+) -> None:
+    from qt_support import make_main_window
+
+    window = make_main_window(qtbot, monkeypatch, tmp_path, language="en")
+    window.settings.language = "th"
+    window.theme_manager.apply(window.settings)
+
+    assert window.inspector.start_btn.text() == t("start_patch", "th")
+    assert window.console._title.text() == t("activity_console", "th")
+    assert window.queue_view.add_files_button.text() == t("add_files_btn", "th")
+    window.close()
+
+
 @pytest.mark.parametrize("preset", THEME_PRESETS)
 def test_all_seven_presets_construct(
     qtbot: Any, monkeypatch: Any, tmp_path: Path, preset: str

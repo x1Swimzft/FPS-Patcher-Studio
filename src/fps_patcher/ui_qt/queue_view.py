@@ -750,6 +750,13 @@ class QueueView(QWidget):
     def set_theme(self, theme: Theme) -> None:
         self._theme = theme
         self.drop_card.set_theme(theme)
+        self.add_files_button.setText(self.tr("add_files_btn"))
+        self.add_folder_button.setText(self.tr("add_folder_btn"))
+        self.retry_button.setText(self.tr("retry_failed"))
+        self.clear_selection_button.setText(self.tr("clear_selection"))
+        self.clear_all_button.setText(self.tr("clear_all"))
+        self.apply_button.setText(self.tr("apply_selected"))
+        self.refresh()
         self.preview_switch.set_theme(theme)
         self.delegate.set_theme(theme)
         self._divider.setStyleSheet(f"background: {theme.color('border')}; border: none;")
