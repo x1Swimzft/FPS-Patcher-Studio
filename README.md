@@ -69,12 +69,27 @@ Get-Content FPSPatcherStudio-v1.0.0.sha256
 - **Formal dispute dossier**: vendor whitelisting disputes and templates are documented in [docs/FALSE_POSITIVE_DISPUTES.md](docs/FALSE_POSITIVE_DISPUTES.md).
 
 ### Code signing policy
-Free code signing provided by SignPath.io, certificate by SignPath Foundation (application pending).
+Free code signing provided by SignPath.io, certificate by SignPath Foundation.
+The certificate is issued to SignPath Foundation, not to the maintainer. Releases
+are signed only after a manual approval of the signing request; the v1.0.0
+artifacts predate that approval and remain unsigned.
 
-- Committers and reviewers: [`@x1Swimzft`](https://github.com/x1Swimzft)
-- Approvers: [`@x1Swimzft`](https://github.com/x1Swimzft)
-- Full policy: [docs/CODE_SIGNING_POLICY.md](docs/CODE_SIGNING_POLICY.md)
+| Role | Member |
+|---|---|
+| **Committer** | [`@x1Swimzft`](https://github.com/x1Swimzft) |
+| **Reviewer** | [`@x1Swimzft`](https://github.com/x1Swimzft) |
+| **Approver** | [`@x1Swimzft`](https://github.com/x1Swimzft) |
+
+- Signing policy: [docs/CODE_SIGNING_POLICY.md](docs/CODE_SIGNING_POLICY.md)
+- SignPath integration and signing process: [docs/CODE_SIGNING_SIGNPATH.md](docs/CODE_SIGNING_SIGNPATH.md)
 - Privacy policy: [docs/PRIVACY.md](docs/PRIVACY.md)
+
+### Privacy & network access
+No telemetry, analytics, or crash reporting. Media files are processed locally
+and never uploaded. The app makes network requests only when (1) the optional
+startup update check contacts GitHub release metadata, and (2) you explicitly
+request an FFmpeg download, which fetches a BtbN build from GitHub. No other
+network access occurs. Full policy: [docs/PRIVACY.md](docs/PRIVACY.md).
 
 ### How to Verify Downloaded Binaries
 Open PowerShell and verify the SHA-256 hash before running:

@@ -10,6 +10,11 @@ All notable changes to FPS Patcher Studio are documented in this file.
 - `ruff check src tests tools` and `mypy src tests tools` pass again (30 pre-existing test/tool typing errors fixed); `pytest -q` 372 passed.
 - `build/release.ps1` produced the v1.0.0 installer, portable zip, SHA-256 files, JSON manifest (with `sbom_path`) and CycloneDX SBOM. Artifacts are unsigned.
 
+### Added: SignPath Foundation release readiness
+- `.github/workflows/release.yml` builds unsigned artifacts on `workflow_dispatch` and `v*` tags, uploads them, and conditionally submits them to SignPath when `SIGNPATH_ENABLED=true`.
+- `build/signpath-artifact-configuration.xml` and `docs/CODE_SIGNING_SIGNPATH.md` document the artifact configuration, GitHub variables/secret, application answers, and signed-release limitations.
+- README, SECURITY and the code-signing policy now state the SignPath roles (`@x1Swimzft` as Committer, Reviewer and Approver) and the local/network privacy boundary.
+
 ### Added: Headless CLI (roadmap 4.2)
 - `fps-patcher-studio --cli patch INPUT... [--preset 60|120] [--timescale N] [--strategy NAME] [--output DIR] [--normalize-audio] [--cap-bitrate] [--tag-bt709] [--scrub-metadata] [--overwrite|--auto-rename] [--json]`.
 - `--cli probe INPUT` and `--cli score INPUT --profile generic|tiktok|instagram|youtube`.

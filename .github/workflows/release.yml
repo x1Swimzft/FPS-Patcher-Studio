@@ -1,0 +1,153 @@
+name: Release Build
+
+# Builds the Windows release artifacts on a tag (v*) or on demand.
+#
+# UNSIGNED BY DEFAULT: with repository variable SIGNPATH_ENABLED unset or set to
+# "false", this workflow builds and uploads the unsigned Setup EXE, portable ZIP,
+# checksums, SBOM and manifest. That is the expected state while the SignPath
+# Foundation application is under review, so the workflow passes either way.
+#
+# SIGNED MODE: set SIGNPATH_ENABLED=true plus SIGNPATH_ORG_ID and the
+# SIGNPATH_API_TOKEN secret (see docs/CODE_SIGNING_SIGNPATH.md). The unsigned
+# artifact is then submitted to SignPath, and only the returned signed files are
+# uploaded as a second artifact. No GitHub Release is created automatically.
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  UV_LINK_MODE: copy
+
+jobs:
+  build:
+    name: Build Windows release artifacts
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python 3.11
+        run: uv python install 3.11
+
+      - name: Sync Dependencies from Lockfile
+        run: uv sync --frozen
+
+      - name: Automated Test Suite (Pytest)
+        run: uv run pytest -q
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          $candidates = @(
+            "$env:ProgramFiles\Inno Setup 7\ISCC.exe",
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+            "${env:ProgramFiles(x86)}\Inno Setup 7\ISCC.exe",
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          ) | Where-Object { Test-Path $_ }
+          if (-not $candidates) {
+            $candidates = Get-ChildItem "$env:ProgramFiles", "${env:ProgramFiles(x86)}" `
+              -Filter ISCC.exe -Recurse -ErrorAction SilentlyContinue |
+              Select-Object -ExpandProperty FullName
+          }
+          $iscc = $candidates | Select-Object -First 1
+          if (-not $iscc) { throw "ISCC.exe not found after installing Inno Setup." }
+          Split-Path -Parent $iscc | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      # Matches local releases: build/fps_patcher.spec bundles bin/*.exe.
+      # Set repository variable BUNDLE_FFMPEG=false to build without FFmpeg.
+      - name: Bundle FFmpeg
+        if: vars.BUNDLE_FFMPEG != 'false'
+        shell: pwsh
+        env:
+          FFMPEG_URL: https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP "ffmpeg.zip"
+          $binDir = Join-Path (Get-Location).Path "bin"
+          Invoke-WebRequest -Uri $env:FFMPEG_URL -OutFile $zip
+          New-Item -ItemType Directory -Force $binDir | Out-Null
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [System.IO.Compression.ZipFile]::OpenRead($zip)
+          try {
+            foreach ($name in "ffmpeg.exe", "ffprobe.exe") {
+              $entry = $archive.Entries |
+                Where-Object { $_.FullName -match "[\\/]bin[\\/]$([regex]::Escape($name))$" } |
+                Select-Object -First 1
+              if (-not $entry) { throw "$name not found in FFmpeg archive." }
+              [System.IO.Compression.ZipFileExtensions]::ExtractToFile(
+                $entry, (Join-Path $binDir $name), $true)
+            }
+          } finally {
+            $archive.Dispose()
+            Remove-Item $zip -Force -ErrorAction SilentlyContinue
+          }
+
+      # Must run before release.ps1 so the JSON manifest records sbom_path.
+      - name: Generate CycloneDX SBOM
+        run: uv run python tools/generate_sbom.py
+
+      # ruff/mypy/pytest already run in security-audit.yml on main and pytest in
+      # this workflow, so -SkipChecks only avoids a duplicate pass.
+      - name: Build Release (unsigned)
+        run: powershell -ExecutionPolicy Bypass -File build/release.ps1 -SkipChecks
+
+      - name: Upload Unsigned Release Artifacts
+        id: upload-unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: fps-patcher-studio-unsigned-release
+          path: |
+            release/FPSPatcherStudio-*-Setup.exe
+            release/FPSPatcherStudio-*-win64.zip
+            release/*.sha256
+            release/*.cdx.json
+            release/*.manifest.json
+          if-no-files-found: error
+
+      # Skipped unless the SignPath project is configured. See
+      # docs/CODE_SIGNING_SIGNPATH.md for the required variables and secret.
+      - name: Submit Signing Request to SignPath
+        if: vars.SIGNPATH_ENABLED == 'true'
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORG_ID }}
+          project-slug: fps-patcher-studio
+          signing-policy-slug: release-signing-policy
+          artifact-configuration-slug: release-files
+          github-artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: release-signed
+
+      # Checksums/manifest in release-signed/ are pre-signing copies. Remove
+      # them so the signed artifact cannot be published with stale hashes.
+      - name: Remove stale pre-signing checksums
+        if: vars.SIGNPATH_ENABLED == 'true'
+        shell: pwsh
+        run: |
+          if (Test-Path release-signed) {
+            Get-ChildItem release-signed -Recurse -File -Include *.sha256,*.manifest.json |
+              Remove-Item -Force
+          }
+
+      - name: Upload Signed Release Artifacts
+        if: vars.SIGNPATH_ENABLED == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: fps-patcher-studio-signed-release
+          path: release-signed/**
+          if-no-files-found: error

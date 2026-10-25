@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SignPath artifact configuration for .github/workflows/release.yml.
+
+  Input artifact: the ZIP produced by actions/upload-artifact@v4 from release/*,
+  so its root contains the Setup EXE, the portable ZIP and the sidecar files.
+
+  Wildcards match exactly one file each (SignPath's default max-matches is 1).
+
+  Limitation: the FPSPatcherStudio.exe copy embedded inside the Setup EXE is not
+  deep-signed by this initial configuration; only the installer file itself gets a
+  signature. See docs/CODE_SIGNING_SIGNPATH.md.
+-->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <zip-file>
+    <pe-file path="FPSPatcherStudio-*-Setup.exe" product-name="FPS Patcher Studio">
+      <authenticode-sign/>
+    </pe-file>
+    <zip-file path="FPSPatcherStudio-*-win64.zip">
+      <pe-file path="FPSPatcherStudio/FPSPatcherStudio.exe" product-name="FPS Patcher Studio">
+        <authenticode-sign/>
+      </pe-file>
+    </zip-file>
+  </zip-file>
+</artifact-configuration>

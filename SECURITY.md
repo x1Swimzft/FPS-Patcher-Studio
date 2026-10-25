@@ -110,8 +110,9 @@ Get-AuthenticodeSignature -FilePath "FPSPatcherStudio-v1.0.0-Setup.exe"
 #### Understanding Signature Status:
 - **Current release (v1.0.0)**: unsigned while the project applies for free code signing through SignPath Foundation.
 - **Historical v0.7.0 builds**: signed using an internal project certificate (`CN=FPS Patcher Studio (Dev)`). That certificate is not rooted in a public Certificate Authority, so Windows SmartScreen and VirusTotal may report an untrusted root (`invalid-signature`). This indicates an unverified root CA, **not** that the binary is compromised or corrupt.
-- **SignPath Foundation**: when approved, the certificate is issued to SignPath Foundation, not to the project maintainer. SignPath Foundation is the publisher of signed builds. See [`docs/CODE_SIGNING_POLICY.md`](docs/CODE_SIGNING_POLICY.md).
+- **SignPath Foundation**: when approved, the certificate is issued to SignPath Foundation, not to the project maintainer. SignPath Foundation is the publisher of signed builds. See [`docs/CODE_SIGNING_POLICY.md`](docs/CODE_SIGNING_POLICY.md). Signing requests are approved manually by the project **Approver** ([`@x1Swimzft`](https://github.com/x1Swimzft)), who is also the sole **Committer** and **Reviewer**. Signing workflow and build provenance: [`docs/CODE_SIGNING_SIGNPATH.md`](docs/CODE_SIGNING_SIGNPATH.md).
 - **Commercial EV Code Signing** is not currently used; the SignPath application is the active path.
+- **Privacy**: no telemetry, media stays local, and network access is limited to the optional startup update check and user-initiated FFmpeg download (both GitHub-hosted). See [`docs/PRIVACY.md`](docs/PRIVACY.md).
 
 ---
 

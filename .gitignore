@@ -13,6 +13,7 @@ build/*
 !build/version_info.txt
 !build/fps_patcher.manifest
 !build/sign_binaries.ps1
+!build/signpath-artifact-configuration.xml
 *.pfx
 bin/*.exe
 *.part
