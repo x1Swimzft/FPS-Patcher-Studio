@@ -11,7 +11,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from PySide6.QtCore import (
     Property,
@@ -20,6 +20,7 @@ from PySide6.QtCore import (
     QEvent,
     QModelIndex,
     QObject,
+    QPersistentModelIndex,
     QPoint,
     QPropertyAnimation,
     QRectF,
@@ -100,16 +101,16 @@ def _blend_color(start: QColor, end: QColor, phase: float) -> QColor:
 def _format_meta(item: QueueItem) -> str:
     info = item.info
     if info is None:
-        return "â€”"
+        return "—"
     parts: list[str] = []
     if info.width and info.height:
-        parts.append(f"{info.width}Ã—{info.height}")
+        parts.append(f"{info.width}×{info.height}")
     if info.duration_s:
         parts.append(_format_duration(info.duration_s))
     if info.fps:
         fps = f"{info.fps:.2f}".rstrip("0").rstrip(".")
         parts.append(f"{fps} fps")
-    return " Â· ".join(parts) if parts else "â€”"
+    return " · ".join(parts) if parts else "—"
 
 
 class DropCard(QWidget):
@@ -131,9 +132,9 @@ class DropCard(QWidget):
         self._scale = 1.0
         self._bob = 0.0
         self.reduce_motion = False
-        self._breath_anim = None
-        self._bob_anim = None
-        self._scale_anim = None
+        self._breath_anim: QPropertyAnimation | None = None
+        self._bob_anim: QPropertyAnimation | None = None
+        self._scale_anim: QPropertyAnimation | None = None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(theme.inner, theme.inner, theme.inner, theme.inner)
@@ -173,7 +174,7 @@ class DropCard(QWidget):
     def dragActive(self) -> bool:  # noqa: N802 - Qt property name
         return self._drag_active
 
-    @dragActive.setter
+    @dragActive.setter  # type: ignore[no-redef]
     def dragActive(self, active: bool) -> None:  # noqa: N802 - Qt property name
         self.set_drag_active(active)
 
@@ -181,7 +182,7 @@ class DropCard(QWidget):
     def breath_phase(self) -> float:  # noqa: N802 - Qt property name
         return self._breath_phase
 
-    @breath_phase.setter
+    @breath_phase.setter  # type: ignore[no-redef]
     def breath_phase(self, value: float) -> None:  # noqa: N802 - Qt property name
         self._breath_phase = float(value)
         self.update()
@@ -190,7 +191,7 @@ class DropCard(QWidget):
     def scale(self) -> float:  # noqa: N802 - Qt property name
         return self._scale
 
-    @scale.setter
+    @scale.setter  # type: ignore[no-redef]
     def scale(self, value: float) -> None:  # noqa: N802 - Qt property name
         self._scale = float(value)
         self.update()
@@ -199,7 +200,7 @@ class DropCard(QWidget):
     def bob(self) -> float:  # noqa: N802 - Qt property name
         return self._bob
 
-    @bob.setter
+    @bob.setter  # type: ignore[no-redef]
     def bob(self, value: float) -> None:  # noqa: N802 - Qt property name
         self._bob = float(value)
         self._place_icon()
@@ -350,10 +351,16 @@ class QueueModel(QAbstractListModel):
         self._owner = owner
         self._items: list[QueueItem] = []
 
-    def rowCount(self, parent: QModelIndex = _INVALID_INDEX) -> int:
+    def rowCount(
+        self, parent: QModelIndex | QPersistentModelIndex = _INVALID_INDEX
+    ) -> int:
         return 0 if parent.isValid() else len(self._items)
 
-    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+    def data(
+        self,
+        index: QModelIndex | QPersistentModelIndex,
+        role: int = Qt.ItemDataRole.DisplayRole,
+    ) -> Any:
         if not index.isValid() or not 0 <= index.row() < len(self._items):
             return None
         item = self._items[index.row()]
@@ -363,7 +370,7 @@ class QueueModel(QAbstractListModel):
             return str(item.path)
         return None
 
-    def flags(self, index: QModelIndex) -> Qt.ItemFlag:
+    def flags(self, index: QModelIndex | QPersistentModelIndex) -> Qt.ItemFlag:
         base = super().flags(index)
         return base | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
 
@@ -477,7 +484,11 @@ class QueueDelegate(QStyledItemDelegate):
         size = 22.0
         return QRectF(row.right() - 10 - size, row.center().y() - size / 2, size, size)
 
-    def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex) -> QSize:
+    def sizeHint(
+        self,
+        option: QStyleOptionViewItem,
+        index: QModelIndex | QPersistentModelIndex,
+    ) -> QSize:
         return QSize(0, ROW_HEIGHT)
 
     # ---------- painting ----------
@@ -497,7 +508,12 @@ class QueueDelegate(QStyledItemDelegate):
             self._colors[key] = cached
         return cached
 
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex) -> None:
+    def paint(
+        self,
+        painter: QPainter,
+        option: QStyleOptionViewItem,
+        index: QModelIndex | QPersistentModelIndex,
+    ) -> None:
         model = index.model()
         item = model.item_at(index.row()) if isinstance(model, QueueModel) else None
         if item is None:
@@ -612,7 +628,7 @@ class QueueDelegate(QStyledItemDelegate):
             painter.drawRoundedRect(remove, radius, radius)
             painter.setFont(self.font_caption)
             painter.setPen(self.color("muted"))
-            painter.drawText(remove, int(Qt.AlignmentFlag.AlignCenter), "âœ•")
+            painter.drawText(remove, int(Qt.AlignmentFlag.AlignCenter), "✕")
 
         painter.restore()
 
@@ -682,10 +698,7 @@ class QueueView(QWidget):
         self._readiness_cache: dict[str, tuple[int, str, ReadinessReport]] = {}
 
         self._storage = QSettings("FPSPatcherStudio", "QtUI")
-        stored_preview = getattr(settings, "preview_player", None)
-        if stored_preview is None:
-            stored_preview = self._storage.value("ui/preview_player", False, type=bool)
-        self._preview_on = bool(stored_preview)
+        self._preview_on = bool(settings.preview_player)
         settings.preview_player = self._preview_on
 
         self.setObjectName("QueueView")
@@ -693,7 +706,7 @@ class QueueView(QWidget):
         self._build_ui()
         self._theme_manager.changed.connect(self.set_theme)
         app = QApplication.instance()
-        if app is not None:
+        if isinstance(app, QApplication):
             app.applicationStateChanged.connect(self._on_app_state)
         self.set_theme(self._theme)
         self.refresh()
@@ -759,9 +772,8 @@ class QueueView(QWidget):
 
     def _update_drop_motion(self) -> None:
         app = QApplication.instance()
-        active = (
-            app is None
-            or app.applicationState() == Qt.ApplicationState.ApplicationActive
+        active = not isinstance(app, QApplication) or (
+            app.applicationState() == Qt.ApplicationState.ApplicationActive
         )
         visible = self.drop_card.isVisible()
         self.drop_card.set_breathing(active and visible)
@@ -794,7 +806,7 @@ class QueueView(QWidget):
     def busy(self) -> bool:
         return self._busy
 
-    def tr(self, key: str, **kwargs: object) -> str:
+    def tr(self, key: str, **kwargs: object) -> str:  # type: ignore[override]
         return t(key, getattr(self.settings, "language", "en"), **kwargs)
 
     def is_focused(self, item: QueueItem) -> bool:
@@ -1137,7 +1149,7 @@ class QueueView(QWidget):
             return
         try:
             if hasattr(os, "startfile"):
-                os.startfile(str(path))  # type: ignore[attr-defined]
+                os.startfile(str(path))
             elif sys.platform == "darwin":
                 subprocess.Popen(["open", str(path)])
             else:
@@ -1157,18 +1169,18 @@ class QueueView(QWidget):
             return super().eventFilter(watched, event)
         kind = event.type()
         if kind == QEvent.Type.MouseMove:
-            self._update_hover(event.position().toPoint())
+            self._update_hover(cast(QMouseEvent, event).position().toPoint())
         elif kind == QEvent.Type.Leave:
             self.hover_row = -1
             self.hover_remove = -1
             self.list_view.viewport().setCursor(Qt.CursorShape.ArrowCursor)
             self.list_view.viewport().update()
         elif kind == QEvent.Type.MouseButtonPress:
-            mouse = event
+            mouse = cast(QMouseEvent, event)
             if mouse.button() == Qt.MouseButton.LeftButton:
                 return self._handle_click(mouse.position().toPoint())
         elif kind == QEvent.Type.MouseButtonDblClick:
-            mouse = event
+            mouse = cast(QMouseEvent, event)
             if mouse.button() == Qt.MouseButton.LeftButton:
                 index = self.list_view.indexAt(mouse.position().toPoint())
                 item = self.model.item_at(index.row()) if index.isValid() else None

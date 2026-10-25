@@ -11,7 +11,7 @@ from dataclasses import fields
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QSignalBlocker, Qt, Signal
+from PySide6.QtCore import QPropertyAnimation, QSignalBlocker, Qt, Signal
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -66,22 +66,6 @@ QStackedWidget { background: transparent; }
 """
 
 
-class _WidgetTheme:
-    """Adapter for widgets.py's old ``*_radius`` names until that module catches up."""
-
-    # shortcut: widgets.py still asks for *_radius; remove when it uses card/control.
-
-    def __init__(self, theme: Theme) -> None:
-        self._theme = theme
-
-    def __getattr__(self, name: str) -> Any:
-        if name == "card_radius":
-            return self._theme.card
-        if name == "control_radius":
-            return self._theme.control
-        return getattr(self._theme, name)
-
-
 class SettingsDialog(QDialog):
     """Settings modal built on a cloned draft so Cancel can discard edits."""
 
@@ -115,7 +99,7 @@ class SettingsDialog(QDialog):
         self._swatches: list[tuple[QPushButton, str]] = []
         self._ff_status: QLabel | None = None
         self._ff_status_token = "muted"
-        self._fade_anim = None
+        self._fade_anim: QPropertyAnimation | None = None
 
         self.setObjectName("SettingsDialog")
         self.setWindowTitle(self._title())
@@ -123,6 +107,7 @@ class SettingsDialog(QDialog):
         self.setMinimumSize(700, 520)
         self.setSizeGripEnabled(True)
         self.setModal(True)
+        self.setWindowOpacity(max(0.85, min(1.0, float(settings.window_alpha))))
 
         self._root = QVBoxLayout(self)
         self._build_ui()
@@ -133,7 +118,7 @@ class SettingsDialog(QDialog):
         return t(key, self._draft.language, **kwargs)
 
     def _title(self) -> str:
-        return f"{self._tr('settings_btn')} — {self._tr('app_title')}"
+        return f"{self._tr('settings_title')} — {self._tr('app_title')}"
 
     # -------------------------------------------------------------- assembly
     def _build_ui(self) -> None:
@@ -159,7 +144,7 @@ class SettingsDialog(QDialog):
         self._select_tab("appearance")
 
     def _build_rail(self, theme: Theme) -> Card:
-        rail = Card(_WidgetTheme(theme))
+        rail = Card(theme)
         rail.setObjectName("SettingsRail")
         rail.setFixedWidth(theme.icon_button_size * 7)
         self._themed_widgets.append(rail)
@@ -168,18 +153,19 @@ class SettingsDialog(QDialog):
         layout.setSpacing(theme.outer)
         rail.body.addLayout(layout)
 
-        title = QLabel(self._tr("settings_btn"))
+        title = QLabel(self._tr("settings_title"))
         title.setProperty("role", "title")
         title.setWordWrap(True)
         layout.addWidget(title)
 
         for key, label_key in self._TABS:
-            button = QPushButton(self._tr(label_key))
+            label = self._tr(label_key)
+            button = QPushButton(label.replace("&", "&&"))
             button.setProperty("variant", "ghost")
             button.setStyleSheet("text-align: left;")
             button.setCursor(Qt.CursorShape.PointingHandCursor)
             button.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-            button.setAccessibleName(button.text())
+            button.setAccessibleName(label)
             button.clicked.connect(lambda _checked=False, k=key: self._select_tab(k))
             layout.addWidget(button)
             self._nav_buttons[key] = button
@@ -187,7 +173,7 @@ class SettingsDialog(QDialog):
         return rail
 
     def _build_body(self, theme: Theme) -> Card:
-        body = Card(_WidgetTheme(theme))
+        body = Card(theme)
         body.setObjectName("SettingsBody")
         body.body.setContentsMargins(theme.inner, theme.inner, theme.inner, theme.inner)
         self._themed_widgets.append(body)
@@ -327,7 +313,7 @@ class SettingsDialog(QDialog):
     ) -> SegmentedControl:
         theme = self._theme_manager.theme
         label = self._field_label(layout, key)
-        control = SegmentedControl(items, _WidgetTheme(theme))
+        control = SegmentedControl(items, theme)
         control.set_reduce_motion(bool(self._draft.reduce_motion))
         if current in items:
             control.set_value(current)
@@ -344,7 +330,7 @@ class SettingsDialog(QDialog):
         label = QLabel(self._tr(key))
         label.setWordWrap(True)
         label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        switch = Switch(_WidgetTheme(theme))
+        switch = Switch(theme)
         switch.setChecked(checked)
         switch.setAccessibleName(label.text())
         switch.setToolTip(label.text())
@@ -464,6 +450,9 @@ class SettingsDialog(QDialog):
         )
         self._tint = self._slider(layout, "tint_strength", draft.tint_strength, 0, 100)
         self._alpha = self._slider(layout, "window_alpha", round(draft.window_alpha * 100), 85, 100)
+        self._alpha.valueChanged.connect(
+            lambda value: self.setWindowOpacity(max(0.85, min(1.0, value / 100.0)))
+        )
         self._radius = self._segmented(
             layout,
             "radius_style",
@@ -878,7 +867,7 @@ class SettingsDialog(QDialog):
         self.setStyleSheet(build_qss(theme) + _SCROLL_QSS)
         for widget in self._themed_widgets:
             with contextlib.suppress(Exception):
-                widget.set_theme(_WidgetTheme(theme))
+                widget.set_theme(theme)
         for button, color in self._swatches:
             self._style_swatch(button, color)
         self._root.setContentsMargins(theme.inner, theme.inner, theme.inner, theme.inner)
@@ -900,6 +889,8 @@ class SettingsDialog(QDialog):
     def _clear_layout(self, layout: QLayout) -> None:
         while layout.count():
             item = layout.takeAt(0)
+            if item is None:
+                continue
             widget = item.widget()
             if widget is not None:
                 widget.setParent(None)
@@ -987,6 +978,9 @@ class SettingsDialog(QDialog):
         for field in fields(Settings):
             if field.init:
                 setattr(self._settings, field.name, getattr(self._draft, field.name))
+        self.setWindowOpacity(
+            max(0.85, min(1.0, float(self._settings.window_alpha)))
+        )
         self._settings.save()
         self._draft = copy.deepcopy(self._settings)
         self._theme_manager.apply(self._settings)
@@ -1022,7 +1016,7 @@ class SettingsDialog(QDialog):
             self._fade_anim.deleteLater()
             self._fade_anim = None
         if self.graphicsEffect() is not None:
-            self.setGraphicsEffect(None)
+            self.setGraphicsEffect(None)  # type: ignore[arg-type]
 
     def showEvent(self, event) -> None:  # type: ignore[no-untyped-def]
         super().showEvent(event)

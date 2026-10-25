@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from PySide6.QtCore import Property, QPoint, QRectF, QSize, Qt, Signal
+from PySide6.QtCore import Property, QPoint, QPropertyAnimation, QRectF, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPaintEvent, QPen
 from PySide6.QtWidgets import (
     QAbstractButton,
@@ -244,7 +244,7 @@ class SegmentedControl(QWidget):
         self._theme = theme
         self._hover = -1
         self._thumb = 0.0
-        self._thumb_anim = None
+        self._thumb_anim: QPropertyAnimation | None = None
         self.reduce_motion = False
         self.setFixedHeight(theme.segmented_height)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
@@ -260,7 +260,7 @@ class SegmentedControl(QWidget):
     def thumbPosition(self) -> float:  # noqa: N802 - Qt property name
         return self._thumb
 
-    @thumbPosition.setter
+    @thumbPosition.setter  # type: ignore[no-redef]
     def thumbPosition(self, position: float) -> None:  # noqa: N802 - Qt property name
         self._thumb = float(position)
         self.update()
@@ -351,13 +351,11 @@ class SegmentedControl(QWidget):
         painter.setFont(font)
         for index, item in enumerate(self._items):
             area = QRectF(rect.left() + width * index, rect.top(), width, rect.height())
-            painter.setPen(
-                QColor(
-                    theme.color("accent_light")
-                    if index == self._index
-                    else theme.color("text2")
-                )
-            )
+            if index == self._index:
+                selected = theme.color("accent") if not theme.is_dark else theme.color("text")
+            else:
+                selected = theme.color("text2")
+            painter.setPen(QColor(selected))
             painter.drawText(area, Qt.AlignmentFlag.AlignCenter, item)
 
         if self.hasFocus():

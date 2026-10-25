@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import cast
 
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
@@ -20,6 +21,7 @@ def run(settings: Settings) -> int:
     app = QApplication.instance()
     if app is None:
         app = QApplication(sys.argv)
+    app = cast(QApplication, app)
 
     app.setApplicationName(APP_NAME)
     app.setOrganizationName("FPSPatcherStudio")

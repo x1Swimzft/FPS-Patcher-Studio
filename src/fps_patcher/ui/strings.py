@@ -276,6 +276,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "update_failed": "Update failed: {error}",
         "update_sha256_failed": "Update package failed SHA-256 verification and was discarded.",
         # Compact Qt shell additions
+        "settings_title": "Settings",
         "layout_density": "Layout density",
         "density_compact": "Compact",
         "density_comfortable": "Comfortable",
@@ -558,6 +559,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "update_failed": "การอัปเดตล้มเหลว: {error}",
         "update_sha256_failed": "ไฟล์อัปเดตไม่ผ่านการตรวจสอบความถูกต้อง SHA-256 จึงถูกลบออก",
         # Compact Qt shell additions
+        "settings_title": "ตั้งค่า",
         "layout_density": "ความหนาแน่นเลย์เอาต์",
         "density_compact": "กะทัดรัด",
         "density_comfortable": "สบายตา",

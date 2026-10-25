@@ -133,6 +133,7 @@ class Settings:
     extra_ffmpeg_args: str = ""
 
     # V2 Console & Logs
+    preview_player: bool = False
     console_font_size: int = 12
     max_log_lines: int = 2000
     log_timestamps: bool = True

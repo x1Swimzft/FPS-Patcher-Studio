@@ -7,7 +7,7 @@ import os
 import time
 from pathlib import Path
 
-from PySide6.QtCore import QPoint, Qt, Signal
+from PySide6.QtCore import QParallelAnimationGroup, QPoint, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QPalette, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import (
     QApplication,
@@ -86,7 +86,7 @@ class ConsolePanel(QWidget):
         self._theme = theme_manager.theme
         self._expanded = False
         self._animated = False
-        self._height_anim = None
+        self._height_anim: QParallelAnimationGroup | None = None
         self._show_ffmpeg = bool(settings.show_ffmpeg_output)
         self._entries: list[tuple[str, str, str]] = []  # (timestamp, text, tag)
         self._lines: list[str] = []
@@ -96,6 +96,7 @@ class ConsolePanel(QWidget):
         self._time_format = QTextCharFormat()
 
         self.setObjectName("Console")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self._build()
         self.set_theme(self._theme)
         theme_manager.subscribe(self.set_theme)
@@ -110,6 +111,8 @@ class ConsolePanel(QWidget):
         root.setSpacing(0)
 
         self._header = QWidget(self)
+        self._header.setObjectName("ConsoleHeader")
+        self._header.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self._header.setFixedHeight(max(1, theme.console_collapsed_height - 1))
         self._header_layout = QHBoxLayout(self._header)
         self._header_layout.setContentsMargins(theme.inner, 0, theme.outer, 0)
@@ -219,6 +222,9 @@ class ConsolePanel(QWidget):
             "QWidget#Console {"
             f"background: {self._console_color('console_bg')};"
             f"border-top: 1px solid {self._console_color('console_border')};"
+            "}"
+            "QWidget#ConsoleHeader {"
+            f"background: {self._console_color('console_bg')};"
             "}"
             "QPlainTextEdit#ConsoleLog {"
             f"background: {self._console_color('console_bg')};"
@@ -440,7 +446,7 @@ class ConsolePanel(QWidget):
             self._apply_expanded(expanded)
 
     def _drawer_height(self, expanded: bool) -> int:
-        return (
+        return int(
             self._theme.console_expanded_height
             if expanded
             else self._theme.console_collapsed_height

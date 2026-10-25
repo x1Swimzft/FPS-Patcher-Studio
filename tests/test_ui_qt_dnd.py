@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
@@ -13,8 +14,10 @@ from PySide6.QtCore import QMimeData, QPoint, Qt, QUrl  # noqa: E402
 from PySide6.QtGui import QDragEnterEvent, QDragLeaveEvent  # noqa: E402
 
 from fps_patcher.app.controller import AppController  # noqa: E402
+from fps_patcher.app.queue_model import QueueItem  # noqa: E402
 from fps_patcher.config import Settings  # noqa: E402
-from fps_patcher.ui_qt.queue_view import QueueView  # noqa: E402
+from fps_patcher.core.models import VideoInfo  # noqa: E402
+from fps_patcher.ui_qt.queue_view import QueueView, _format_meta  # noqa: E402
 from fps_patcher.ui_qt.theme import ThemeManager  # noqa: E402
 
 
@@ -22,6 +25,27 @@ def _touch(path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(b"not a real video")
     return path
+
+
+def test_queue_meta_uses_single_encoded_separators(tmp_path: Path) -> None:
+    item = QueueItem(path=tmp_path / "clip.mp4")
+    item.info = VideoInfo(
+        path=item.path,
+        codec="h264",
+        width=1920,
+        height=1080,
+        avg_fps=Fraction(60),
+        r_fps=Fraction(60),
+        duration_s=42,
+        timescale=60000,
+        nb_frames=2520,
+        has_audio=True,
+        stream_count=2,
+    )
+    meta = _format_meta(item)
+    assert "1920×1080" in meta
+    assert " · " in meta
+    assert "Ã" not in meta and "Â" not in meta and "â" not in meta
 
 
 def test_collect_urls_filters_recurses_and_dedupes(tmp_path: Path) -> None:

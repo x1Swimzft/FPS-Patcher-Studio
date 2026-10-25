@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtGui import QColor, QFont, QPalette
 from PySide6.QtWidgets import QApplication
 
@@ -42,6 +44,12 @@ def build_qss(theme: Theme) -> str:
     combo = theme.combo_height
     indicator = theme.indicator_size
     scrollbar = theme.scrollbar_thickness
+    chevron = (
+        Path(__file__).resolve().parent.parent
+        / "ui"
+        / "assets"
+        / f"chevron_down_{'dark' if theme.is_dark else 'light'}.png"
+    ).as_posix()
 
     return f"""
 * {{
@@ -225,7 +233,7 @@ QComboBox {{
     border-radius: {control}px;
     color: {c("text")};
     min-height: {combo}px;
-    padding: 0 {inner + spacing}px 0 {inner}px;
+    padding: 0 {inner + 14}px 0 {inner}px;
 }}
 QComboBox:hover {{
     border-color: {c("border_hover")};
@@ -236,9 +244,13 @@ QComboBox:disabled {{
 }}
 QComboBox::drop-down {{
     border: none;
-    border-left: 1px solid {c("border")};
-    width: {spacing}px;
+    width: {spacing + 8}px;
     margin: 1px;
+}}
+QComboBox::down-arrow {{
+    image: url("{chevron}");
+    width: 10px;
+    height: 10px;
 }}
 QComboBox QAbstractItemView {{
     background: {c("surface_raised")};

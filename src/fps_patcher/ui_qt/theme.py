@@ -565,7 +565,7 @@ def update_title_bar_theme(
                 handle, DWMWA_CAPTION_COLOR, ctypes.byref(color), ctypes.sizeof(color)
             )
             result = result or caption
-        return result == 0
+        return int(result) == 0
     except Exception:
         return False
 
@@ -574,7 +574,9 @@ def apply_backdrop(
     hwnd_or_widget: int | Any, settings: Settings, theme: Theme
 ) -> bool:
     """Apply Mica/Acrylic on Windows 11 22621+; False means caller uses solid."""
-    if _windows_build() < 22621:
+    if _windows_build() < 22621 or not getattr(settings, "glass", True):
+        return False
+    if getattr(settings, "glass_mode", "Solid") == "Solid":
         return False
     try:
         handle = _resolve_hwnd(hwnd_or_widget)
@@ -586,6 +588,6 @@ def apply_backdrop(
             handle, DWMWA_SYSTEMBACKDROP_TYPE, ctypes.byref(value), ctypes.sizeof(value)
         )
         update_title_bar_theme(handle, theme.is_dark, theme.color("toolbar_bg"))
-        return result == 0
+        return int(result) == 0
     except Exception:
         return False

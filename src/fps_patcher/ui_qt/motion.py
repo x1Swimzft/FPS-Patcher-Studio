@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
 from PySide6.QtCore import (
     Property,
@@ -18,7 +18,14 @@ from PySide6.QtCore import (
     Qt,
     QVariantAnimation,
 )
-from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPainterPath, QPaintEvent
+from PySide6.QtGui import (
+    QColor,
+    QLinearGradient,
+    QMouseEvent,
+    QPainter,
+    QPainterPath,
+    QPaintEvent,
+)
 from PySide6.QtWidgets import (
     QApplication,
     QGraphicsOpacityEffect,
@@ -117,7 +124,7 @@ def fade(
     """Fade via a temporary opacity effect that is removed on finish."""
     if reduce_motion or ms <= 0:
         if isinstance(widget.graphicsEffect(), QGraphicsOpacityEffect):
-            widget.setGraphicsEffect(None)
+            widget.setGraphicsEffect(None)  # type: ignore[arg-type]
         if on_finished is not None:
             on_finished()
         return None
@@ -136,7 +143,7 @@ def fade(
 
     def finish() -> None:
         effect.setEnabled(False)
-        widget.setGraphicsEffect(None)
+        widget.setGraphicsEffect(None)  # type: ignore[arg-type]
         if on_finished is not None:
             on_finished()
         animation.deleteLater()
@@ -175,12 +182,12 @@ class MotionProgressBar(QProgressBar):
     def offset(self) -> float:  # noqa: N802 - Qt property name
         return self._offset
 
-    @offset.setter
+    @offset.setter  # type: ignore[no-redef]
     def offset(self, value: float) -> None:  # noqa: N802 - Qt property name
         self._set_offset(value)
 
     def _set_offset(self, value: object) -> None:
-        self._offset = float(value)
+        self._offset = float(cast(float, value))
         if self._busy and not self._reduce_motion:
             self.update()
 
@@ -328,15 +335,15 @@ class MotionController(QObject):
         self._restore_buttons()
         app = QApplication.instance()
         groups: list[QObject] = [self]
-        if app is not None:
+        if isinstance(app, QApplication):
             groups.append(app)
         for group in groups:
             for animation in group.findChildren(QAbstractAnimation):
                 animation.stop()
-        if app is not None:
+        if isinstance(app, QApplication):
             for widget in app.allWidgets():
                 if isinstance(widget.graphicsEffect(), QGraphicsOpacityEffect):
-                    widget.setGraphicsEffect(None)
+                    widget.setGraphicsEffect(None)  # type: ignore[arg-type]
 
     def _restore_buttons(self) -> None:
         for button, state in list(self._states.items()):
@@ -371,21 +378,23 @@ class MotionController(QObject):
             border = color("border_hover") if state == "hover" else color("border")
             return QColor(background), QColor(border), QColor(color("text"))
         if variant == "ghost":
-            background = {
-                "normal": _TRANSPARENT,
+            ghost_bg = {
+                "normal": QColor(_TRANSPARENT),
                 "hover": QColor(color("surface_hover")),
                 "pressed": QColor(color("surface_raised")),
             }[state]
-            text = color("text") if state != "normal" else color("text2")
-            return background, _TRANSPARENT, QColor(text)
+            ghost_text = color("text") if state != "normal" else color("text2")
+            return ghost_bg, QColor(_TRANSPARENT), QColor(ghost_text)
         if variant == "icon":
-            background = {
-                "normal": _TRANSPARENT,
+            icon_bg = {
+                "normal": QColor(_TRANSPARENT),
                 "hover": QColor(color("surface_hover")),
                 "pressed": QColor(color("surface_raised")),
             }[state]
-            border = _TRANSPARENT if state == "normal" else QColor(color("border"))
-            return background, border, QColor(color("text"))
+            icon_border = (
+                QColor(_TRANSPARENT) if state == "normal" else QColor(color("border"))
+            )
+            return icon_bg, icon_border, QColor(color("text"))
         return None
 
     def _stylesheet(self, background: QColor, border: QColor, text: QColor) -> str:
@@ -446,7 +455,7 @@ class MotionController(QObject):
         state.target = target
 
         def step(value: object) -> None:
-            progress = float(value)
+            progress = float(cast(float, value))
             background = self._blend(start[0], colors[0], progress)
             border = self._blend(start[1], colors[1], progress)
             text = self._blend(start[2], colors[2], progress)
@@ -505,7 +514,7 @@ class MotionController(QObject):
                 state.pressed = False
                 self._animate_button(watched, state, "normal")
         elif kind == QEvent.Type.MouseButtonPress:
-            if event.button() != Qt.MouseButton.LeftButton:
+            if cast(QMouseEvent, event).button() != Qt.MouseButton.LeftButton:
                 return False
             if state is None:
                 state = _ButtonState(base=watched.styleSheet())
@@ -513,7 +522,10 @@ class MotionController(QObject):
             state.pressed = True
             self._animate_button(watched, state, "pressed")
         elif kind == QEvent.Type.MouseButtonRelease:
-            if event.button() != Qt.MouseButton.LeftButton or state is None:
+            if (
+                cast(QMouseEvent, event).button() != Qt.MouseButton.LeftButton
+                or state is None
+            ):
                 return False
             state.pressed = False
             self._animate_button(watched, state, "hover" if state.hovered else "normal")

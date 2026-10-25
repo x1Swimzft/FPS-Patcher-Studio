@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import queue
@@ -340,6 +341,7 @@ class MainWindow(QMainWindow):
         self.settings_button.setIcon(get_icon("settings", theme.is_dark))
         self._set_ffmpeg_state(self._ff_state, self._ff_detail)
         self._update_title_bar()
+        self._apply_window_opacity()
         if self.isVisible():
             apply_backdrop(self, self.settings, theme)
 
@@ -347,6 +349,10 @@ class MainWindow(QMainWindow):
         update_title_bar_theme(
             self, self.theme.is_dark, self.theme.color("toolbar_bg")
         )
+
+    def _apply_window_opacity(self) -> None:
+        with contextlib.suppress(Exception):
+            self.setWindowOpacity(max(0.85, min(1.0, float(self.settings.window_alpha))))
 
     def _toggle_appearance(self) -> None:
         self.settings.appearance = (
@@ -361,6 +367,7 @@ class MainWindow(QMainWindow):
     def showEvent(self, event: QShowEvent) -> None:
         super().showEvent(event)
         self._update_title_bar()
+        self._apply_window_opacity()
         apply_backdrop(self, self.settings, self.theme_manager.theme)
 
     # --------------------------------------------------------------- ffmpeg UI
@@ -372,20 +379,24 @@ class MainWindow(QMainWindow):
 
         if state == "ready":
             text = t("ffmpeg_ok", lang)
-            color = theme.color("success")
-            background = theme.color("accent_light")
+            color = theme.color("text")
+            background = theme.color("accent_dim")
+            border = theme.color("success")
         elif state == "missing":
             text = t("ffmpeg_not_found", lang)
-            color = theme.color("danger")
+            color = theme.color("text")
             background = theme.color("surface_raised")
+            border = theme.color("danger")
         elif state == "downloading":
             text = detail or t("ffmpeg_downloading", lang, percent=0)
             color = theme.color("text2")
             background = theme.color("surface_raised")
+            border = theme.color("border")
         else:
             text = t("checking_ffmpeg", lang)
             color = theme.color("text2")
             background = theme.color("surface_raised")
+            border = theme.color("border")
 
         self.ffmpeg_button.setText(text)
         self.ffmpeg_button.setToolTip(text)
@@ -394,7 +405,7 @@ class MainWindow(QMainWindow):
             "QPushButton {"
             f"background: {background};"
             f"color: {color};"
-            f"border: 1px solid {theme.color('border')};"
+            f"border: 1px solid {border};"
             f"border-radius: {RADIUS_PILL}px;"
             f"padding: 0 {theme.inner}px;"
             f"font-size: {theme.fonts.caption}px;"
@@ -421,6 +432,10 @@ class MainWindow(QMainWindow):
         menu.exec(anchor)
 
     def _init_ffmpeg(self) -> None:
+        if not self.settings.check_ffmpeg_on_start and not self.settings.ffmpeg_dir:
+            self._set_ffmpeg_state("missing")
+            self._refresh_readiness()
+            return
         if self._ff_state == "downloading" or self.controller.ffmpeg_downloading:
             return
         if self._ff_init_thread is not None and self._ff_init_thread.is_alive():

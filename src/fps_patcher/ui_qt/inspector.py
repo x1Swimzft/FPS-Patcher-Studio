@@ -2,7 +2,17 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import QEasingCurve, Qt, QVariantAnimation, Signal
+from typing import cast
+
+from PySide6.QtCore import (
+    QEasingCurve,
+    QParallelAnimationGroup,
+    QPropertyAnimation,
+    QSize,
+    Qt,
+    QVariantAnimation,
+    Signal,
+)
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
     QComboBox,
@@ -30,6 +40,7 @@ from ..core.platform_profiles import (
 )
 from ..core.strategies import UI_PRESETS, migrate_strategy_name
 from ..ui.strings import t
+from .icons import get_icon
 from .motion import MotionProgressBar, animate_height, fade
 from .theme import UI_FONT_FAMILIES, Theme, ThemeManager
 from .widgets import Card, CardGroup, Popover, SegmentedControl, text_button
@@ -86,8 +97,8 @@ class Inspector(QWidget):
         self._progress_total = 0
         self._preset = self._initial_preset()
         self._custom_visible = False
-        self._custom_anim = None
-        self._custom_fade = None
+        self._custom_anim: QParallelAnimationGroup | None = None
+        self._custom_fade: QPropertyAnimation | None = None
         self._glow: QGraphicsDropShadowEffect | None = None
         self._glow_anim: QVariantAnimation | None = None
 
@@ -233,8 +244,10 @@ class Inspector(QWidget):
         self.readiness_label.setProperty("role", "caption")
         self.readiness_label.setWordWrap(True)
         readiness_layout.addWidget(self.readiness_label, 1)
-        self.info_btn = QPushButton("\u24d8")
+        self.info_btn = QPushButton()
         self.info_btn.setProperty("variant", "icon")
+        self.info_btn.setIcon(get_icon("info", theme.is_dark))
+        self.info_btn.setIconSize(QSize(14, 14))
         self.info_btn.setFixedSize(theme.icon_button_size, theme.icon_button_size)
         self.info_btn.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.info_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -313,6 +326,7 @@ class Inspector(QWidget):
         self.progress_group.set_theme(theme)
         self.readiness_card.set_theme(theme)
         self.segments.set_theme(theme)
+        self.info_btn.setIcon(get_icon("info", theme.is_dark))
         self.progress_bar.set_theme(theme)
         reduce_motion = self._reduce_motion()
         self.segments.set_reduce_motion(reduce_motion)
@@ -683,7 +697,7 @@ QWidget#Inspector QProgressBar::chunk {{
             self._custom_fade.deleteLater()
             self._custom_fade = None
         if isinstance(self.custom_row.graphicsEffect(), QGraphicsOpacityEffect):
-            self.custom_row.setGraphicsEffect(None)
+            self.custom_row.setGraphicsEffect(None)  # type: ignore[arg-type]
 
     def _sync_custom_height(self) -> None:
         if not self._custom_visible or self._custom_anim is not None:
@@ -735,7 +749,7 @@ QWidget#Inspector QProgressBar::chunk {{
     def _pulse_glow(self, value: object) -> None:
         if self._glow is None:
             return
-        phase = float(value)
+        phase = float(cast(float, value))
         color = QColor(self._theme.color("accent_light"))
         color.setAlphaF(0.18 + 0.42 * phase)
         self._glow.setColor(color)
@@ -747,7 +761,7 @@ QWidget#Inspector QProgressBar::chunk {{
             self._glow_anim.deleteLater()
             self._glow_anim = None
         if self._glow is not None:
-            self.start_btn.setGraphicsEffect(None)
+            self.start_btn.setGraphicsEffect(None)  # type: ignore[arg-type]
             self._glow = None
 
     def hideEvent(self, event) -> None:  # type: ignore[no-untyped-def]
