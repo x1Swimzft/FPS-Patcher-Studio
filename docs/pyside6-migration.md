@@ -184,7 +184,7 @@ but do not add it to the frozen Qt build unless actually imported.
 - Theme tokens, QSS, QPalette, seven presets, density, SegmentedControl, Switch,
   setup cards, queue model/delegate, console drawer, settings dialog, motion and
   DWM helpers are implemented.
-- `pytest -q`: **405 passed**. `ruff check .`: clean. `mypy src/fps_patcher`:
+- `pytest -q`: **406 passed**. `ruff check .`: clean. `mypy src/fps_patcher`:
   clean. New Qt tests live in `tests/test_ui_qt_*.py`.
 - Screenshot matrix: **113 PNGs** in `images/after-qt/` (7 presets x light/dark
   x en/th x 100/125, main 1120x760 and settings 740x580, plus one rich-queue
