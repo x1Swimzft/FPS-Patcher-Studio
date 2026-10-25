@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import inspect
 import logging
 import os
 import queue
@@ -275,6 +276,7 @@ class MainWindow(QMainWindow):
         self.queue_view.patch_requested.connect(self._start_patch)
         self.queue_view.focus_changed.connect(self._on_queue_focus_changed)
         self.queue_view.selection_changed.connect(self._refresh_readiness)
+        self.queue_view.forensic_requested.connect(self._open_forensic_for)
 
         self.inspector.patch_requested.connect(
             lambda timescale, strategy: self._start_patch(
@@ -284,6 +286,9 @@ class MainWindow(QMainWindow):
         self.inspector.cancel_requested.connect(self._handle_cancel)
         self.inspector.profile_changed.connect(self._on_profile_changed)
         self.inspector.strategy_changed.connect(self._refresh_readiness)
+        self.inspector.strategy_changed.connect(self.queue_view.refresh_profile)
+        self.inspector.target_changed.connect(self.queue_view.refresh_profile)
+        self.inspector.override_changed.connect(self._on_override_changed)
 
         self.console.repair_requested.connect(self._repair_for_mobile_from_console)
         self.console.expanded_changed.connect(self._on_console_expanded)
@@ -342,6 +347,7 @@ class MainWindow(QMainWindow):
         self._set_ffmpeg_state(self._ff_state, self._ff_detail)
         self._update_title_bar()
         self._apply_window_opacity()
+        self.queue_view.refresh_profile()
         if self.isVisible():
             apply_backdrop(self, self.settings, theme)
 
@@ -474,6 +480,7 @@ class MainWindow(QMainWindow):
         elif event.stage in ("ready", "done"):
             self._set_ffmpeg_state("ready")
             self._refresh_readiness()
+            self.queue_view.refresh()
             self._probe_pending_queue_items()
             if event.stage == "done":
                 self.console.append(t("ffmpeg_installed", lang), "OK")
@@ -704,13 +711,23 @@ class MainWindow(QMainWindow):
     def _sync_focused_item(self) -> None:
         path = self.queue_view.focused_path()
         item = self.controller.items.get(path) if path is not None else None
-        if item is None:
-            items = self.controller.items.items
-            if items:
-                item = next(
-                    (i for i in reversed(items) if i.info is not None), items[-1]
-                )
         self.inspector.set_focused_item(item)
+
+    def _on_override_changed(
+        self,
+        path: object,
+        timescale: int | None,
+        strategy: str | None,
+    ) -> None:
+        if path is None:
+            return
+        self.controller.items.set_override(
+            Path(str(path)), timescale=timescale, strategy=strategy
+        )
+        self.queue_view.refresh()
+        self.queue_view.refresh_profile()
+        self.inspector.refresh_readiness()
+        self.inspector.refresh_override()
 
     def _on_queue_focus_changed(self, item: object) -> None:
         if item is not None and not hasattr(item, "path"):
@@ -830,6 +847,7 @@ class MainWindow(QMainWindow):
         self._sync_explorer_menu()
         self._init_ffmpeg()
         self.queue_view.refresh()
+        self.queue_view.refresh_profile()
         self._sync_focused_item()
         self.inspector.refresh_readiness()
         self._refresh_readiness()
@@ -838,6 +856,20 @@ class MainWindow(QMainWindow):
 
     def _open_forensic(self) -> None:
         ForensicDialog(self.settings, self.theme_manager, self).exec()
+
+    def _open_forensic_for(self, path: object) -> None:
+        target = Path(str(path))
+        params = inspect.signature(ForensicDialog.__init__).parameters
+        if "preselected_path" in params:
+            dialog = ForensicDialog(
+                self.settings, self.theme_manager, self, preselected_path=target
+            )
+        else:
+            dialog = ForensicDialog(self.settings, self.theme_manager, self)
+            original_edit = getattr(dialog, "original_edit", None)
+            if original_edit is not None:
+                original_edit.setText(str(target))
+        dialog.exec()
 
     def _apply_always_on_top(self) -> None:
         wanted = bool(self.settings.always_on_top)

@@ -43,7 +43,7 @@ from ..ui.strings import t
 from .icons import get_icon
 from .motion import MotionProgressBar, animate_height, fade
 from .theme import UI_FONT_FAMILIES, Theme, ThemeManager
-from .widgets import Card, CardGroup, Popover, SegmentedControl, text_button
+from .widgets import Card, CardGroup, Popover, SegmentedControl, Switch, text_button
 
 CUSTOM_PRESET = "Custom"
 MAX_TIMESCALE = 2_147_483_647
@@ -76,6 +76,8 @@ class Inspector(QWidget):
     cancel_requested = Signal()
     profile_changed = Signal()
     strategy_changed = Signal()
+    target_changed = Signal()
+    override_changed = Signal(object, object, object)
 
     def __init__(
         self,
@@ -280,6 +282,89 @@ class Inspector(QWidget):
         progress_layout.addWidget(self.progress_bar)
         self.progress_group.body.addWidget(progress_content)
         self._body_layout.addWidget(self.progress_group)
+
+        # -- Per-item override ---------------------------------------------
+        self.override_group = CardGroup(t("inspector_override_title", lang), theme)
+        override_content = QWidget()
+        override_layout = QVBoxLayout(override_content)
+        override_layout.setContentsMargins(theme.inner, theme.inner, theme.inner, theme.inner)
+        override_layout.setSpacing(theme.outer)
+        self._override_layout = override_layout
+
+        self.override_empty = QLabel(t("inspector_override_no_selection", lang))
+        self.override_empty.setProperty("role", "muted")
+        self.override_empty.setWordWrap(True)
+        override_layout.addWidget(self.override_empty)
+
+        self.override_form = QWidget()
+        self._override_form_layout = QVBoxLayout(self.override_form)
+        self._override_form_layout.setContentsMargins(0, 0, 0, 0)
+        self._override_form_layout.setSpacing(theme.outer)
+
+        switch_row = QWidget()
+        switch_layout = QHBoxLayout(switch_row)
+        switch_layout.setContentsMargins(0, 0, 0, 0)
+        switch_layout.setSpacing(theme.outer)
+        self.override_enable_label = QLabel(t("inspector_override_enable", lang))
+        self.override_enable_label.setProperty("role", "caption")
+        switch_layout.addWidget(self.override_enable_label, 1)
+        self.override_switch = Switch(theme)
+        self.override_switch.setAccessibleName(t("inspector_override_enable", lang))
+        self.override_switch.toggled.connect(self._override_toggled)
+        switch_layout.addWidget(self.override_switch, 0, Qt.AlignmentFlag.AlignVCenter)
+        self._override_form_layout.addWidget(switch_row)
+
+        self.override_fps_label = QLabel(t("inspector_override_fps", lang))
+        self.override_fps_label.setProperty("role", "caption")
+        self._override_form_layout.addWidget(self.override_fps_label)
+        self.override_fps_edit = QLineEdit()
+        self.override_fps_edit.setFixedHeight(theme.entry_height)
+        self.override_fps_edit.setAccessibleName(t("inspector_override_fps", lang))
+        self.override_fps_edit.setPlaceholderText(t("inspector_override_fps", lang))
+        self._override_form_layout.addWidget(self.override_fps_edit)
+
+        self.override_preset_label = QLabel(t("inspector_override_preset", lang))
+        self.override_preset_label.setProperty("role", "caption")
+        self._override_form_layout.addWidget(self.override_preset_label)
+        self.override_preset_combo = QComboBox()
+        self.override_preset_combo.setFixedHeight(theme.combo_height)
+        self.override_preset_combo.setAccessibleName(t("inspector_override_preset", lang))
+        self.override_preset_combo.addItems(list(self._label_to_strategy))
+        self._override_form_layout.addWidget(self.override_preset_combo)
+
+        override_buttons = QWidget()
+        override_button_row = QHBoxLayout(override_buttons)
+        override_button_row.setContentsMargins(0, 0, 0, 0)
+        override_button_row.setSpacing(theme.outer)
+        self.override_apply_btn = text_button(
+            t("override_apply_btn", lang),
+            theme,
+            self._apply_override,
+            height=theme.button_height,
+        )
+        self.override_clear_btn = text_button(
+            t("override_clear_btn", lang),
+            theme,
+            self._clear_override,
+            height=theme.button_height,
+        )
+        override_button_row.addWidget(self.override_apply_btn)
+        override_button_row.addWidget(self.override_clear_btn)
+        override_button_row.addStretch(1)
+        self._override_form_layout.addWidget(override_buttons)
+
+        self.override_state = QLabel(t("inspector_override_inactive", lang))
+        self.override_state.setProperty("role", "caption")
+        self._override_form_layout.addWidget(self.override_state)
+        self.override_hint = QLabel(t("inspector_override_hint", lang))
+        self.override_hint.setProperty("role", "muted")
+        self.override_hint.setWordWrap(True)
+        self._override_form_layout.addWidget(self.override_hint)
+
+        self.override_form.setVisible(False)
+        override_layout.addWidget(self.override_form)
+        self.override_group.body.addWidget(override_content)
+        self._body_layout.addWidget(self.override_group)
         self._body_layout.addStretch(1)
 
         # -- Pinned footer -------------------------------------------------
@@ -325,7 +410,9 @@ class Inspector(QWidget):
         self.output_group.set_theme(theme)
         self.progress_group.set_theme(theme)
         self.readiness_card.set_theme(theme)
+        self.override_group.set_theme(theme)
         self.segments.set_theme(theme)
+        self.override_switch.set_theme(theme)
         self.info_btn.setIcon(get_icon("info", theme.is_dark))
         self.progress_bar.set_theme(theme)
         reduce_motion = self._reduce_motion()
@@ -362,6 +449,13 @@ class Inspector(QWidget):
             theme.inner, theme.inner, theme.inner, theme.inner
         )
         self._progress_layout.setSpacing(theme.outer)
+        self._override_layout.setContentsMargins(
+            theme.inner, theme.inner, theme.inner, theme.inner
+        )
+        self._override_layout.setSpacing(theme.outer)
+        self._override_form_layout.setSpacing(theme.outer)
+        self.override_fps_edit.setFixedHeight(theme.entry_height)
+        self.override_preset_combo.setFixedHeight(theme.combo_height)
         self._footer_layout.setContentsMargins(
             theme.outer, theme.spacing, theme.outer, theme.outer
         )
@@ -555,9 +649,22 @@ QWidget#Inspector QProgressBar::chunk {{
             else t("start_patch", lang)
         )
         self.cancel_btn.setText(t("cancel_btn", lang))
+        self.override_group.caption.setText(t("inspector_override_title", lang).upper())
+        self.override_empty.setText(t("inspector_override_no_selection", lang))
+        self.override_enable_label.setText(t("inspector_override_enable", lang))
+        self.override_switch.setAccessibleName(t("inspector_override_enable", lang))
+        self.override_fps_label.setText(t("inspector_override_fps", lang))
+        self.override_fps_edit.setAccessibleName(t("inspector_override_fps", lang))
+        self.override_fps_edit.setPlaceholderText(t("inspector_override_fps", lang))
+        self.override_preset_label.setText(t("inspector_override_preset", lang))
+        self.override_preset_combo.setAccessibleName(t("inspector_override_preset", lang))
+        self.override_apply_btn.setText(t("override_apply_btn", lang))
+        self.override_clear_btn.setText(t("override_clear_btn", lang))
+        self.override_hint.setText(t("inspector_override_hint", lang))
         self.segments.set_items(self._segment_items(), self._preset_display(self._preset))
         self._populate_profiles()
         self._progress_caption()
+        self._refresh_override_card()
 
     # ------------------------------------------------------------------ state
     def set_busy(self, busy: bool) -> None:
@@ -608,6 +715,7 @@ QWidget#Inspector QProgressBar::chunk {{
             self.start_btn.setText(t("start_patch", lang))
             self.cancel_btn.setEnabled(False)
         self.progress_bar.set_busy(self._busy)
+        self._sync_override_state()
         self._update_glow()
         self._progress_caption()
 
@@ -789,10 +897,87 @@ QWidget#Inspector QProgressBar::chunk {{
             if self._focused_item is None
             else (self._focused_item.item_id, id(self._focused_item.info))
         )
-        if key == current:
+        if key != current:
+            self._focused_item = item
+            self.refresh_readiness()
+        self._refresh_override_card()
+
+    def refresh_override(self) -> None:
+        self._refresh_override_card()
+
+    def _override_preset_label(self, strategy: str | None) -> str:
+        key = migrate_strategy_name(str(strategy or self.settings.strategy))[0]
+        preset = UI_PRESETS.get(key)
+        return preset.label if preset is not None else self.strategy_combo.currentText()
+
+    def _refresh_override_card(self) -> None:
+        item = self._focused_item
+        has_item = item is not None
+        self.override_empty.setVisible(not has_item)
+        self.override_form.setVisible(has_item)
+        if item is None:
             return
-        self._focused_item = item
-        self.refresh_readiness()
+        active = item.timescale is not None or item.strategy is not None
+        self.override_switch.blockSignals(True)
+        self.override_switch.setChecked(active)
+        self.override_switch.blockSignals(False)
+        timescale = item.timescale if item.timescale is not None else self.timescale()
+        self.override_fps_edit.setText("" if timescale is None else str(timescale))
+        self.override_preset_combo.setCurrentText(
+            self._override_preset_label(item.strategy)
+        )
+        self.override_state.setText(
+            t(
+                "inspector_override_active" if active else "inspector_override_inactive",
+                self._lang(),
+            )
+        )
+        self._sync_override_state()
+
+    def _override_toggled(self, checked: bool) -> None:
+        self._sync_override_state()
+
+    def _sync_override_state(self) -> None:
+        enabled = (
+            self._focused_item is not None and self.override_switch.isChecked() and not self._busy
+        )
+        self.override_fps_edit.setEnabled(enabled)
+        self.override_preset_combo.setEnabled(enabled)
+        self.override_apply_btn.setEnabled(enabled)
+        has_override = self._focused_item is not None and (
+            self._focused_item.timescale is not None
+            or self._focused_item.strategy is not None
+        )
+        self.override_clear_btn.setEnabled(has_override and not self._busy)
+
+    def _apply_override(self) -> None:
+        item = self._focused_item
+        if item is None or self._busy or not self.override_switch.isChecked():
+            return
+        try:
+            timescale = int(self.override_fps_edit.text().strip())
+        except ValueError:
+            timescale = 0
+        if not 1 <= timescale <= MAX_TIMESCALE:
+            self.override_fps_edit.setStyleSheet(
+                f"QLineEdit {{ border: 1px solid {self._theme.color('danger')}; }}"
+            )
+            self.override_fps_edit.setFocus()
+            return
+        self.override_fps_edit.setStyleSheet("")
+        strategy = self._label_to_strategy.get(self.override_preset_combo.currentText())
+        if strategy is None:
+            strategy = self.strategy()
+        self.override_changed.emit(item.path, timescale, strategy)
+        self._refresh_override_card()
+
+    def _clear_override(self) -> None:
+        item = self._focused_item
+        if item is None or self._busy:
+            return
+        self.override_fps_edit.setStyleSheet("")
+        self.override_changed.emit(item.path, None, None)
+        self._refresh_override_card()
 
     def refresh_readiness(self) -> None:
         lang = self._lang()
@@ -835,6 +1020,7 @@ QWidget#Inspector QProgressBar::chunk {{
         if persist:
             self.settings.last_preset = preset
             self.settings.save_async()
+        self.target_changed.emit()
 
     def _commit_custom(self) -> None:
         if self._preset != CUSTOM_PRESET:
@@ -847,6 +1033,7 @@ QWidget#Inspector QProgressBar::chunk {{
         self.settings.save_async()
         self._set_timescale_invalid(False)
         self._update_timescale_display()
+        self.target_changed.emit()
 
     def _parse_custom_timescale(self) -> int | None:
         try:

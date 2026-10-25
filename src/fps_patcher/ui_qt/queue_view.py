@@ -39,8 +39,10 @@ from PySide6.QtGui import (
     QDropEvent,
     QFont,
     QFontMetricsF,
+    QImage,
     QMouseEvent,
     QPainter,
+    QPainterPath,
     QPaintEvent,
     QPen,
     QPixmap,
@@ -50,6 +52,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
     QFrame,
+    QGraphicsDropShadowEffect,
     QHBoxLayout,
     QInputDialog,
     QLabel,
@@ -59,19 +62,21 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QStyledItemDelegate,
     QStyleOptionViewItem,
+    QToolTip,
     QVBoxLayout,
     QWidget,
 )
 
 from ..app.queue_model import QueueItem
-from ..core.models import SUPPORTED_EXTENSIONS
+from ..core.models import FPS_PRESETS, SUPPORTED_EXTENSIONS
 from ..core.platform_profiles import ReadinessReport, evaluate_readiness
-from ..core.strategies import UI_PRESETS
+from ..core.strategies import UI_PRESETS, migrate_strategy_name
 from ..ui.strings import t
 from .icons import get_icon
 from .motion import animate
 from .theme import UI_FONT_FAMILIES, Theme
-from .widgets import Switch, hairline, text_button
+from .thumbnails import THUMBNAIL_SIZE, ThumbnailLoader
+from .widgets import ElidedLabel, Switch, hairline, text_button
 
 if TYPE_CHECKING:
     from ..app.controller import AppController
@@ -80,6 +85,28 @@ if TYPE_CHECKING:
 
 ROW_HEIGHT = 56
 _INVALID_INDEX = QModelIndex()
+_MAX_THUMBS = 240
+_ACTION_SIZE = 28.0
+
+
+def _fps_text(value: float) -> str:
+    if value <= 0:
+        return "—"
+    rounded = round(value)
+    if abs(value - rounded) < 0.05:
+        return str(rounded)
+    return f"{value:.2f}".rstrip("0").rstrip(".")
+
+
+def _format_size(size: int | None) -> str:
+    if not size or size <= 0:
+        return "—"
+    value = float(size)
+    for unit in ("B", "KB", "MB", "GB"):
+        if value < 1024 or unit == "GB":
+            return f"{value:.0f} {unit}" if unit == "B" else f"{value:.1f} {unit}"
+        value /= 1024
+    return f"{value:.1f} GB"
 
 
 def _format_duration(seconds: float) -> str:
@@ -119,6 +146,7 @@ class DropCard(QWidget):
     """Dashed rounded drop target. Package 7 animates ``breath_phase``."""
 
     browse_requested = Signal()
+    folder_requested = Signal()
 
     def __init__(
         self,
@@ -133,6 +161,7 @@ class DropCard(QWidget):
         self._breath_phase = 0.0
         self._scale = 1.0
         self._bob = 0.0
+        self._profile: tuple[str, str, str] = ("—", "—", "—")
         self.reduce_motion = False
         self._breath_anim: QPropertyAnimation | None = None
         self._bob_anim: QPropertyAnimation | None = None
@@ -143,28 +172,83 @@ class DropCard(QWidget):
         layout.setSpacing(theme.outer)
         layout.addStretch(1)
 
-        self.icon_holder = QWidget(self)
+        self.center_card = QFrame(self)
+        self.center_card.setObjectName("DropCenterCard")
+        self.center_card.setFixedWidth(400)
+        self._card_layout = QVBoxLayout(self.center_card)
+        self._card_layout.setContentsMargins(
+            theme.outer, theme.outer, theme.outer, theme.outer
+        )
+        self._card_layout.setSpacing(theme.outer)
+        layout.addWidget(self.center_card, 0, Qt.AlignmentFlag.AlignHCenter)
+
+        self.icon_holder = QWidget(self.center_card)
         self.icon_holder.setFixedHeight(44)
         self.icon_label = QLabel(self.icon_holder)
         self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.icon_label.setFixedSize(40, 40)
-        layout.addWidget(self.icon_holder, 0, Qt.AlignmentFlag.AlignHCenter)
+        self._card_layout.addWidget(self.icon_holder, 0, Qt.AlignmentFlag.AlignHCenter)
 
         self.title_label = QLabel()
         self.title_label.setProperty("role", "title")
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.title_label)
+        self._card_layout.addWidget(self.title_label)
 
         self.subtitle_label = QLabel()
         self.subtitle_label.setProperty("role", "caption")
         self.subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.subtitle_label)
+        self._card_layout.addWidget(self.subtitle_label)
 
+        buttons = QWidget(self.center_card)
+        button_row = QHBoxLayout(buttons)
+        button_row.setContentsMargins(0, 0, 0, 0)
+        button_row.setSpacing(theme.outer)
         self.browse_button = text_button(
-            t("browse_files", language), theme, self.browse_requested.emit, variant="primary"
+            t("add_files_btn", language), theme, self.browse_requested.emit, variant="primary"
         )
-        self.browse_button.setFixedWidth(150)
-        layout.addWidget(self.browse_button, 0, Qt.AlignmentFlag.AlignHCenter)
+        self.browse_button.setMinimumWidth(128)
+        self.folder_button = text_button(
+            t("add_folder_btn", language),
+            theme,
+            self.folder_requested.emit,
+            variant="secondary",
+        )
+        self.folder_button.setMinimumWidth(128)
+        button_row.addStretch(1)
+        button_row.addWidget(self.browse_button)
+        button_row.addWidget(self.folder_button)
+        button_row.addStretch(1)
+        self._card_layout.addWidget(buttons)
+
+        self.format_labels: dict[str, QLabel] = {}
+        formats = QWidget(self.center_card)
+        format_row = QHBoxLayout(formats)
+        format_row.setContentsMargins(0, 0, 0, 0)
+        format_row.setSpacing(theme.outer)
+        format_row.addStretch(1)
+        for key in ("mp4", "mov", "m4v"):
+            label = QLabel()
+            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            label.setFixedHeight(20)
+            self.format_labels[key] = label
+            format_row.addWidget(label)
+        format_row.addStretch(1)
+        self._card_layout.addWidget(formats)
+
+        self.profile_strip = QFrame(self.center_card)
+        self.profile_strip.setObjectName("DropProfileStrip")
+        profile_layout = QVBoxLayout(self.profile_strip)
+        profile_layout.setContentsMargins(theme.inner, theme.outer, theme.inner, theme.outer)
+        profile_layout.setSpacing(2)
+        self._profile_layout = profile_layout
+        self.profile_title = QLabel()
+        self.profile_title.setProperty("role", "cardCaption")
+        profile_layout.addWidget(self.profile_title)
+        self.profile_summary = ElidedLabel()
+        self.profile_summary.setProperty("role", "caption")
+        self.profile_summary.setFixedHeight(16)
+        profile_layout.addWidget(self.profile_summary)
+        self._card_layout.addWidget(self.profile_strip)
 
         layout.addStretch(1)
         self.setMinimumHeight(180)
@@ -287,15 +371,79 @@ class DropCard(QWidget):
 
     def set_theme(self, theme: Theme) -> None:
         self._theme = theme
+        self._card_layout.setContentsMargins(
+            theme.outer, theme.outer, theme.outer, theme.outer
+        )
+        self._card_layout.setSpacing(theme.outer)
+        self._profile_layout.setContentsMargins(
+            theme.inner, theme.outer, theme.inner, theme.outer
+        )
+        self.folder_button.setIcon(get_icon("folder", theme.is_dark))
+        self.folder_button.setIconSize(QSize(14, 14))
         self._refresh_text()
         self._refresh_icon()
+        self._refresh_style()
         self.update()
+
+    def set_profile(self, fps: str, mode: str, output: str) -> None:
+        self._profile = (fps, mode, output)
+        self._refresh_text()
+
+    def set_language(self, language: str) -> None:
+        self._language = language
+        self._refresh_text()
 
     def _refresh_text(self) -> None:
         key = "drag_active" if self._drag_active else "drop_title"
         self.title_label.setText(t(key, self._language))
         self.subtitle_label.setText(t("drop_sub", self._language))
-        self.browse_button.setText(t("browse_files", self._language))
+        self.browse_button.setText(t("add_files_btn", self._language))
+        self.folder_button.setText(t("add_folder_btn", self._language))
+        for key, label in self.format_labels.items():
+            label.setText(t(f"format_{key}", self._language))
+        self.profile_title.setText(t("active_patch_profile", self._language))
+        fps, mode, output = self._profile
+        self.profile_summary.setText(
+            t("drop_profile_summary", self._language, fps=fps, mode=mode, output=output)
+        )
+
+    def _refresh_style(self) -> None:
+        theme = self._theme
+        caption = theme.fonts.caption
+        self.center_card.setStyleSheet(
+            "QFrame#DropCenterCard {"
+            f"background: {theme.color('surface_raised')};"
+            f"border: 1px solid {theme.color('border')};"
+            f"border-radius: {theme.radii.card}px;"
+            "}"
+        )
+        if self.center_card.graphicsEffect() is None:
+            shadow = QGraphicsDropShadowEffect(self.center_card)
+            shadow.setBlurRadius(26)
+            shadow.setOffset(0, 4)
+            shadow.setColor(QColor(0, 0, 0, 64))
+            self.center_card.setGraphicsEffect(shadow)
+        badge_qss = (
+            "QLabel {"
+            f"background: {theme.color('surface')};"
+            f"border: 1px solid {theme.color('border')};"
+            "border-radius: 9px;"
+            f"color: {theme.color('text2')};"
+            f"font-size: {caption}px;"
+            "font-weight: 600;"
+            "padding: 0 9px;"
+            "}"
+        )
+        for label in self.format_labels.values():
+            label.setStyleSheet(badge_qss)
+        self.profile_strip.setStyleSheet(
+            "QFrame#DropProfileStrip {"
+            f"background: {theme.color('surface')};"
+            f"border: 1px solid {theme.color('border')};"
+            f"border-radius: {theme.radii.control}px;"
+            "}"
+            f"QFrame#DropProfileStrip QLabel {{ color: {theme.color('text2')}; }}"
+        )
 
     def _refresh_icon(self) -> None:
         icon = get_icon("zap" if self._drag_active else "folder", self._theme.is_dark)
@@ -408,6 +556,8 @@ class QueueDelegate(QStyledItemDelegate):
         self.fm_badge = QFontMetricsF(self.font_badge)
         self._appear: dict[str, float] = {}
         self._appear_anims: dict[str, QVariantAnimation] = {}
+        self._pill_widths: dict[str, float] = {}
+        self._action_pixmaps: dict[str, QPixmap] = {}
         self.reduce_motion = False
         self.set_theme(self._theme)
 
@@ -460,6 +610,8 @@ class QueueDelegate(QStyledItemDelegate):
     def set_theme(self, theme: Theme) -> None:
         self._theme = theme
         self._colors = {}
+        self._pill_widths = {}
+        self._action_pixmaps = {}
         for font, size, weight in (
             (self.font_filename, theme.fonts.body, QFont.Weight.DemiBold),
             (self.font_caption, theme.fonts.caption, QFont.Weight.Normal),
@@ -481,10 +633,48 @@ class QueueDelegate(QStyledItemDelegate):
         size = 16.0
         return QRectF(row.left() + 12, row.center().y() - size / 2, size, size)
 
-    def remove_rect(self, rect: QRectF) -> QRectF:
+    def thumbnail_rect(self, rect: QRectF) -> QRectF:
         row = self.row_rect(rect)
-        size = 22.0
-        return QRectF(row.right() - 10 - size, row.center().y() - size / 2, size, size)
+        check = self.checkbox_rect(rect)
+        width, height = THUMBNAIL_SIZE
+        return QRectF(
+            check.right() + 10,
+            row.center().y() - height / 2,
+            width,
+            height,
+        )
+
+    def action_rects(self, rect: QRectF) -> dict[str, QRectF]:
+        row = self.row_rect(rect)
+        y = row.center().y() - _ACTION_SIZE / 2
+        right = row.right() - 10
+        rects: dict[str, QRectF] = {}
+        for key in ("remove", "forensic", "override"):
+            rects[key] = QRectF(right - _ACTION_SIZE, y, _ACTION_SIZE, _ACTION_SIZE)
+            right -= _ACTION_SIZE + 4
+        return rects
+
+    def remove_rect(self, rect: QRectF) -> QRectF:
+        return self.action_rects(rect)["remove"]
+
+    def row_pills(self, item: QueueItem) -> list[tuple[str, str]]:
+        """Structured metadata for one row, keyed for tests and tooling."""
+        info = item.info
+        resolution = (
+            f"{info.width}×{info.height}" if info and info.width and info.height else "—"
+        )
+        source = _fps_text(info.fps) if info is not None else "—"
+        codec = (info.codec or "—") if info is not None else "—"
+        timescale = item.timescale or self._owner.target_timescale()
+        target = _fps_text(timescale / 1000) if timescale else "—"
+        mode = self._owner.strategy_short_label(item.strategy)
+        size = _format_size(info.file_size_bytes if info is not None else None)
+        return [
+            ("resolution", resolution),
+            ("fps", f"{source} → {target} fps"),
+            ("mode", f"{codec} · {mode}"),
+            ("size", size),
+        ]
 
     def sizeHint(
         self,
@@ -575,9 +765,44 @@ class QueueDelegate(QStyledItemDelegate):
             for start, end in zip(path, path[1:], strict=False):
                 painter.drawLine(int(start[0]), int(start[1]), int(end[0]), int(end[1]))
 
-        # Right-side zones: remove, status pill, readiness pill, meta.
-        remove = self.remove_rect(QRectF(option.rect))
-        right = remove.left() - 8
+        # Thumbnail (56x32, 6px radius) after the checkbox.
+        thumb = self.thumbnail_rect(QRectF(option.rect))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(self.color("surface_raised"))
+        painter.drawRoundedRect(thumb, 6, 6)
+        pixmap = owner.thumbnail(item.item_id)
+        if pixmap is not None and not pixmap.isNull():
+            painter.save()
+            clip = QPainterPath()
+            clip.addRoundedRect(thumb, 6, 6)
+            painter.setClipPath(clip)
+            scaled = pixmap.scaled(
+                int(thumb.width()),
+                int(thumb.height()),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            painter.drawPixmap(
+                int(thumb.center().x() - scaled.width() / 2),
+                int(thumb.center().y() - scaled.height() / 2),
+                scaled,
+            )
+            painter.restore()
+        else:
+            media = self._icon_pixmap("play")
+            if not media.isNull():
+                painter.drawPixmap(
+                    int(thumb.center().x() - media.width() / 2),
+                    int(thumb.center().y() - media.height() / 2),
+                    media,
+                )
+        painter.setPen(QPen(self.color("border"), 1))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRoundedRect(thumb.adjusted(0.5, 0.5, -0.5, -0.5), 6, 6)
+
+        # Right-side zones: row actions, status, readiness, metadata pills.
+        actions = self.action_rects(QRectF(option.rect))
+        right = actions["override"].left() - 8
         center_y = row.center().y()
 
         status_text = owner.tr(f"status_{item.status}")
@@ -588,14 +813,24 @@ class QueueDelegate(QStyledItemDelegate):
         readiness_text, readiness_token = self._readiness(item)
         readiness_width = self.fm_badge.horizontalAdvance(readiness_text) + 16
         readiness_rect = QRectF(right - readiness_width, center_y - 10, readiness_width, 20)
-        right = readiness_rect.left() - 10
 
-        text_left = check.right() + 12
-        meta = _format_meta(item)
-        meta_width = min(140.0, self.fm_caption.horizontalAdvance(meta))
-        if meta_width < 40:
-            meta_width = 0.0
-        text_right = right - (meta_width + 12 if meta_width else 0.0)
+        text_left = thumb.right() + 12
+        pills = [
+            (text, self._pill_width(text))
+            for _key, text in self.row_pills(item)
+        ]
+        show_readiness = True
+        free = max(0.0, readiness_rect.left() - 10 - text_left)
+        if self._pills_width(pills) > free - 84:
+            # Metadata pills are the row's primary signal; drop the badge first.
+            show_readiness = False
+            free = max(0.0, status_rect.left() - 6 - text_left)
+        while pills and self._pills_width(pills) > free - 84:
+            pills.pop()
+        right = status_rect.left() - 6 if not show_readiness else readiness_rect.left() - 10
+        pill_width = self._pills_width(pills)
+        pill_left = right - pill_width if pills else right
+        text_right = pill_left - 12 if pills else right
         text_width = max(0.0, text_right - text_left)
         filename_rect = QRectF(text_left, row.top() + 8, text_width, 18)
         caption_rect = QRectF(text_left, row.top() + 28, text_width, 16)
@@ -613,26 +848,86 @@ class QueueDelegate(QStyledItemDelegate):
         painter.setPen(self.color("danger") if is_error else self.color("text2"))
         painter.drawText(caption_rect, int(Qt.AlignmentFlag.AlignLeft), caption)
 
-        if meta_width:
-            painter.setPen(self.color("muted"))
-            painter.drawText(
-                QRectF(right - meta_width, center_y - 8, meta_width, 16),
-                int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter),
-                meta,
-            )
+        x = pill_left
+        for text, width in pills:
+            pill = QRectF(x, center_y - 9, width, 18)
+            painter.setPen(QPen(self.color("border"), 1))
+            painter.setBrush(self.color("surface_raised"))
+            painter.drawRoundedRect(pill, 9, 9)
+            painter.setFont(self.font_badge)
+            painter.setPen(self.color("text2"))
+            painter.drawText(pill, int(Qt.AlignmentFlag.AlignCenter), text)
+            x += width + 6
 
-        self._draw_pill(painter, readiness_rect, readiness_text, readiness_token)
+        if show_readiness:
+            self._draw_pill(painter, readiness_rect, readiness_text, readiness_token)
         self._draw_pill(painter, status_rect, status_text, owner.status_token(item.status))
 
-        if owner.hover_remove == index.row() and not owner.busy:
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(self.color("surface_hover"))
-            painter.drawRoundedRect(remove, radius, radius)
-            painter.setFont(self.font_caption)
-            painter.setPen(self.color("muted"))
-            painter.drawText(remove, int(Qt.AlignmentFlag.AlignCenter), "✕")
+        if hovered or focused:
+            for key in ("override", "forensic", "remove"):
+                if key == "remove" and owner.busy:
+                    continue
+                area = actions[key]
+                if hovered and owner.hover_action == key:
+                    painter.setPen(Qt.PenStyle.NoPen)
+                    painter.setBrush(self.color("surface_hover"))
+                    painter.drawRoundedRect(area, radius, radius)
+                self._draw_action(painter, key, area)
 
         painter.restore()
+
+    def _pills_width(self, pills: list[tuple[str, float]]) -> float:
+        return sum(width + 6 for _text, width in pills) - 6 if pills else 0.0
+
+    def _pill_width(self, text: str) -> float:
+        cached = self._pill_widths.get(text)
+        if cached is not None:
+            return cached
+        width = self.fm_badge.horizontalAdvance(text) + 10
+        if len(self._pill_widths) > 256:
+            self._pill_widths.clear()
+        self._pill_widths[text] = width
+        return width
+
+    def _icon_pixmap(self, name: str) -> QPixmap:
+        cached = self._action_pixmaps.get(name)
+        if cached is not None:
+            return cached
+        pixmap = get_icon(name, self._theme.is_dark).pixmap(QSize(14, 14))
+        if pixmap.isNull():
+            pixmap = QPixmap()
+        self._action_pixmaps[name] = pixmap
+        return pixmap
+
+    def _draw_action(self, painter: QPainter, key: str, area: QRectF) -> None:
+        if key == "remove":
+            pen = QPen(
+                self.color("danger" if self._owner.hover_action == key else "muted"), 1.6
+            )
+            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            painter.setPen(pen)
+            inset = 9.0
+            painter.drawLine(
+                int(area.left() + inset),
+                int(area.top() + inset),
+                int(area.right() - inset),
+                int(area.bottom() - inset),
+            )
+            painter.drawLine(
+                int(area.right() - inset),
+                int(area.top() + inset),
+                int(area.left() + inset),
+                int(area.bottom() - inset),
+            )
+            return
+        pixmap = self._icon_pixmap("zap" if key == "override" else "forensic")
+        if pixmap.isNull():
+            return
+        painter.drawPixmap(
+            int(area.center().x() - pixmap.width() / 2),
+            int(area.center().y() - pixmap.height() / 2),
+            pixmap,
+        )
 
     def _draw_pill(self, painter: QPainter, rect: QRectF, text: str, token: str) -> None:
         painter.setPen(Qt.PenStyle.NoPen)
@@ -678,6 +973,7 @@ class QueueView(QWidget):
     focus_changed = Signal(object)
     selection_changed = Signal()
     status_message = Signal(str)
+    forensic_requested = Signal(Path)
 
     def __init__(
         self,
@@ -695,9 +991,14 @@ class QueueView(QWidget):
         self._focused_path: Path | None = None
         self.hover_row = -1
         self.hover_remove = -1
+        self.hover_action = ""
         self._known_ids: set[str] | None = None
         self._motion_window: QWidget | None = None
         self._readiness_cache: dict[str, tuple[int, str, ReadinessReport]] = {}
+        self._thumbs: dict[str, QPixmap] = {}
+        self._thumb_failed: set[str] = set()
+        self._thumb_loader = ThumbnailLoader(self._ffmpeg_path, self)
+        self._thumb_loader.ready.connect(self._on_thumb_ready)
 
         self._storage = QSettings("FPSPatcherStudio", "QtUI")
         self._preview_on = bool(settings.preview_player)
@@ -728,6 +1029,8 @@ class QueueView(QWidget):
         self._known_ids = set(ids)
         self.model.refresh()
         self._prune_readiness(items)
+        self._prune_thumbs(items)
+        self._request_thumbnails(items)
         if self._focused_path is not None and not any(i.path == self._focused_path for i in items):
             self._focused_path = None
         has_items = bool(items)
@@ -749,6 +1052,7 @@ class QueueView(QWidget):
 
     def set_theme(self, theme: Theme) -> None:
         self._theme = theme
+        self.drop_card.set_language(getattr(self.settings, "language", "en"))
         self.drop_card.set_theme(theme)
         self.add_files_button.setText(self.tr("add_files_btn"))
         self.add_folder_button.setText(self.tr("add_folder_btn"))
@@ -756,6 +1060,12 @@ class QueueView(QWidget):
         self.clear_selection_button.setText(self.tr("clear_selection"))
         self.clear_all_button.setText(self.tr("clear_all"))
         self.apply_button.setText(self.tr("apply_selected"))
+        self.list_view.setAccessibleDescription(
+            ", ".join(
+                self.tr(f"queue_{key}_action")
+                for key in ("override", "forensic", "remove")
+            )
+        )
         self.refresh()
         self.preview_switch.set_theme(theme)
         self.delegate.set_theme(theme)
@@ -777,6 +1087,7 @@ class QueueView(QWidget):
         self.drop_card.set_reduce_motion(reduce_motion)
         self.delegate.set_reduce_motion(reduce_motion)
         self._update_drop_motion()
+        self.refresh_profile()
         self.update()
 
     def _update_drop_motion(self) -> None:
@@ -844,6 +1155,86 @@ class QueueView(QWidget):
         self._readiness_cache[item.item_id] = (id(item.info), profile, report)
         return report
 
+    def target_timescale(self) -> int:
+        preset = str(getattr(self.settings, "last_preset", "60 FPS"))
+        if preset in FPS_PRESETS:
+            return FPS_PRESETS[preset]
+        try:
+            return int(getattr(self.settings, "custom_timescale", 60000))
+        except (TypeError, ValueError):
+            return 60000
+
+    def global_strategy(self) -> str:
+        return migrate_strategy_name(str(getattr(self.settings, "strategy", "bxd-mobile")))[0]
+
+    def strategy_label(self) -> str:
+        preset = UI_PRESETS.get(self.global_strategy())
+        return preset.label if preset is not None else self.global_strategy()
+
+    def strategy_short_label(self, strategy: str | None) -> str:
+        key = migrate_strategy_name(str(strategy or self.global_strategy()))[0]
+        preset = UI_PRESETS.get(key)
+        if preset is None:
+            return key
+        return preset.label.removeprefix("X1T ").removeprefix("For ")
+
+    def refresh_profile(self) -> None:
+        timescale = self.target_timescale()
+        fps = _fps_text(timescale / 1000) if timescale else "—"
+        if fps != "—":
+            fps += " FPS"
+        output_key = (
+            "drop_profile_output_custom"
+            if getattr(self.settings, "output_dir", "")
+            else "drop_profile_output_same"
+        )
+        self.drop_card.set_profile(fps, self.strategy_label(), self.tr(output_key))
+        self.list_view.viewport().update()
+
+    def thumbnail(self, item_id: str) -> QPixmap | None:
+        return self._thumbs.get(item_id)
+
+    def _ffmpeg_path(self) -> Path | None:
+        tools = self.controller.ffmpeg
+        return tools.ffmpeg if tools is not None else None
+
+    def _request_thumbnails(self, items: list[QueueItem]) -> None:
+        if self._ffmpeg_path() is None:
+            return
+        for item in items:
+            if item.item_id in self._thumbs or item.item_id in self._thumb_failed:
+                continue
+            self._thumb_loader.request(item.item_id, item.path)
+
+    def _on_thumb_ready(self, item_id: str, data: bytes) -> None:
+        self._thumb_loader.release(item_id)
+        if not data:
+            self._thumb_failed.add(item_id)
+            return
+        try:
+            image = QImage.fromData(data)
+        except ValueError:
+            self._thumb_failed.add(item_id)
+            return
+        if image.isNull():
+            self._thumb_failed.add(item_id)
+            return
+        pixmap = QPixmap.fromImage(image)
+        if pixmap.isNull():
+            self._thumb_failed.add(item_id)
+            return
+        self._thumbs[item_id] = pixmap
+        while len(self._thumbs) > _MAX_THUMBS:
+            self._thumbs.pop(next(iter(self._thumbs)))
+        self.list_view.viewport().update()
+
+    def _prune_thumbs(self, items: list[QueueItem]) -> None:
+        known = {item.item_id for item in items}
+        self._thumbs = {
+            key: value for key, value in self._thumbs.items() if key in known
+        }
+        self._thumb_failed &= known
+
     # ---------- construction ----------
     def _build_ui(self) -> None:
         theme = self._theme
@@ -880,6 +1271,7 @@ class QueueView(QWidget):
 
         self.drop_card = DropCard(theme, getattr(self.settings, "language", "en"), self)
         self.drop_card.browse_requested.connect(self._browse_files)
+        self.drop_card.folder_requested.connect(self._browse_folder)
         root.addWidget(self.drop_card, 1)
 
         self.summary_label = QLabel(self)
@@ -905,6 +1297,12 @@ class QueueView(QWidget):
         self.list_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.list_view.setFrameShape(QFrame.Shape.NoFrame)
         self.list_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.list_view.setAccessibleDescription(
+            ", ".join(
+                self.tr(f"queue_{key}_action")
+                for key in ("override", "forensic", "remove")
+            )
+        )
         self.list_view.setVisible(False)
         self.list_view.viewport().installEventFilter(self)
         self.list_view.customContextMenuRequested.connect(self._show_context_menu)
@@ -1220,6 +1618,8 @@ class QueueView(QWidget):
         elif kind == QEvent.Type.Leave:
             self.hover_row = -1
             self.hover_remove = -1
+            self.hover_action = ""
+            QToolTip.hideText()
             self.list_view.viewport().setCursor(Qt.CursorShape.ArrowCursor)
             self.list_view.viewport().update()
         elif kind == QEvent.Type.MouseButtonPress:
@@ -1246,14 +1646,29 @@ class QueueView(QWidget):
         if item is None:
             return False
         rect = QRectF(self.list_view.visualRect(index))
-        if self.delegate.remove_rect(rect).contains(pos):
-            self._remove_item(item.path)
-            return True
+        actions = self.delegate.action_rects(rect)
+        for key in ("override", "forensic", "remove"):
+            if actions[key].contains(pos):
+                if key == "remove":
+                    self._remove_item(item.path)
+                elif key == "forensic":
+                    self.forensic_requested.emit(item.path)
+                else:
+                    self._show_context_menu(pos)
+                return True
         if self.delegate.checkbox_rect(rect).contains(pos):
             self._toggle_item(item, index.row())
             return True
         self._focus_row(index.row(), open_player=self._preview_on)
         return True
+
+    def _action_at(self, rect: QRectF, pos: QPoint) -> str:
+        for key, area in self.delegate.action_rects(rect).items():
+            if area.contains(pos):
+                if key == "remove" and self._busy:
+                    return ""
+                return key
+        return ""
 
     def _update_hover(self, pos: QPoint) -> None:
         index = self.list_view.indexAt(pos)
@@ -1261,20 +1676,33 @@ class QueueView(QWidget):
             changed = self.hover_row != -1
             self.hover_row = -1
             self.hover_remove = -1
+            self.hover_action = ""
+            QToolTip.hideText()
             self.list_view.viewport().setCursor(Qt.CursorShape.ArrowCursor)
             if changed:
                 self.list_view.viewport().update()
             return
         rect = QRectF(self.list_view.visualRect(index))
-        over_remove = self.delegate.remove_rect(rect).contains(pos)
+        action = self._action_at(rect, pos)
+        over_remove = action == "remove"
         over_check = self.delegate.checkbox_rect(rect).contains(pos)
-        changed = (self.hover_row, self.hover_remove) != (
+        changed = (self.hover_row, self.hover_remove, self.hover_action) != (
             index.row(),
             index.row() if over_remove else -1,
+            action,
         )
+        if action != self.hover_action:
+            if action:
+                QToolTip.showText(
+                    self.list_view.viewport().mapToGlobal(pos),
+                    self.tr(f"queue_{action}_action"),
+                )
+            else:
+                QToolTip.hideText()
         self.hover_row = index.row()
         self.hover_remove = index.row() if over_remove else -1
-        interactive = over_remove or over_check
+        self.hover_action = action
+        interactive = bool(action) or over_check
         self.list_view.viewport().setCursor(
             Qt.CursorShape.PointingHandCursor if interactive else Qt.CursorShape.ArrowCursor
         )

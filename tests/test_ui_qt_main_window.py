@@ -18,6 +18,15 @@ from fps_patcher.ui_qt import main_window as mw  # noqa: E402
 from fps_patcher.ui_qt.settings_dialog import SettingsDialog  # noqa: E402
 
 
+def _queue_video(window: Any, tmp_path: Path) -> Path:
+    video = tmp_path / "clip.mp4"
+    video.write_bytes(b"not a real video")
+    window.controller.items.add([video])
+    window.queue_view.refresh()
+    window.queue_view._focus_row(0, open_player=False)
+    return video
+
+
 def test_default_window_metrics(qtbot: Any, monkeypatch: Any, tmp_path: Path) -> None:
     from qt_support import make_main_window
 
@@ -115,4 +124,123 @@ def test_all_seven_presets_construct(
 
     window = make_main_window(qtbot, monkeypatch, tmp_path, theme_preset=preset)
     assert window.theme.tokens.name == preset
+    window.close()
+
+
+def test_rich_empty_state_has_actions_badges_and_profile_strip(
+    qtbot: Any, monkeypatch: Any, tmp_path: Path
+) -> None:
+    from qt_support import make_main_window
+
+    window = make_main_window(qtbot, monkeypatch, tmp_path)
+    drop = window.queue_view.drop_card
+
+    assert not drop.isHidden()
+    assert drop.browse_button.text() == t("add_files_btn", "en")
+    assert drop.folder_button.text() == t("add_folder_btn", "en")
+    assert [label.text() for label in drop.format_labels.values()] == [
+        t("format_mp4", "en"),
+        t("format_mov", "en"),
+        t("format_m4v", "en"),
+    ]
+    assert drop.profile_title.text() == t("active_patch_profile", "en")
+    summary = drop.profile_summary.fullText()
+    assert "60 FPS" in summary
+    assert "X1T For Mobile" in summary
+    assert t("drop_profile_output_same", "en") in summary
+    window.close()
+
+
+def test_override_card_is_compact_until_a_row_is_selected(
+    qtbot: Any, monkeypatch: Any, tmp_path: Path
+) -> None:
+    from qt_support import make_main_window
+
+    window = make_main_window(qtbot, monkeypatch, tmp_path)
+    inspector = window.inspector
+    assert not inspector.override_empty.isHidden()
+    assert inspector.override_form.isHidden()
+    assert inspector.override_empty.text() == t("inspector_override_no_selection", "en")
+
+    _queue_video(window, tmp_path)
+    assert inspector.override_empty.isHidden()
+    assert not inspector.override_form.isHidden()
+    assert not inspector.override_switch.isChecked()
+    assert inspector.override_state.text() == t("inspector_override_inactive", "en")
+    window.close()
+
+
+def test_override_card_applies_to_controller_item(
+    qtbot: Any, monkeypatch: Any, tmp_path: Path
+) -> None:
+    from qt_support import make_main_window
+
+    window = make_main_window(qtbot, monkeypatch, tmp_path)
+    video = _queue_video(window, tmp_path)
+    inspector = window.inspector
+
+    inspector.override_switch.setChecked(True)
+    inspector.override_fps_edit.setText("90000")
+    inspector.override_preset_combo.setCurrentText("X1T Clean")
+    inspector.override_apply_btn.click()
+
+    item = window.controller.items.get(video)
+    assert item is not None
+    assert item.timescale == 90000
+    assert item.strategy == "bxd-clean"
+    assert inspector.override_state.text() == t("inspector_override_active", "en")
+
+    inspector.override_clear_btn.click()
+    item = window.controller.items.get(video)
+    assert item is not None
+    assert item.timescale is None and item.strategy is None
+    assert inspector.override_state.text() == t("inspector_override_inactive", "en")
+    window.close()
+
+
+def test_forensic_signal_opens_dialog_with_preselected_path(
+    qtbot: Any, monkeypatch: Any, tmp_path: Path
+) -> None:
+    from qt_support import make_main_window
+
+    created: list[Any] = []
+
+    class FakeDialog:
+        def __init__(self, settings: Any, theme_manager: Any, parent: Any = None) -> None:
+            self.original_edit = MagicMock()
+            self.executed = False
+            created.append(self)
+
+        def exec(self) -> None:
+            self.executed = True
+
+    monkeypatch.setattr(mw, "ForensicDialog", FakeDialog)
+    window = make_main_window(qtbot, monkeypatch, tmp_path)
+    video = tmp_path / "forensic.mp4"
+    video.write_bytes(b"not a real video")
+
+    window.queue_view.forensic_requested.emit(video)
+
+    assert len(created) == 1
+    assert created[0].executed
+    created[0].original_edit.setText.assert_called_once_with(str(video))
+    window.close()
+
+
+def test_settings_apply_refreshes_profile_strip(
+    qtbot: Any, monkeypatch: Any, tmp_path: Path
+) -> None:
+    from qt_support import make_main_window
+
+    window = make_main_window(qtbot, monkeypatch, tmp_path)
+    window.settings.last_preset = "120 FPS"
+    window.settings.strategy = "bxd-clean"
+    window.settings.output_dir = str(tmp_path)
+
+    window._on_settings_applied(window.settings)
+
+    summary = window.queue_view.drop_card.profile_summary.fullText()
+    assert "120 FPS" in summary
+    assert "X1T Clean" in summary
+    assert t("drop_profile_output_custom", "en") in summary
     window.close()

@@ -10,15 +10,26 @@ import pytest
 
 pytest.importorskip("PySide6")
 
-from PySide6.QtCore import QMimeData, QPoint, Qt, QUrl  # noqa: E402
-from PySide6.QtGui import QDragEnterEvent, QDragLeaveEvent  # noqa: E402
+from PySide6.QtCore import (  # noqa: E402
+    QBuffer,
+    QIODevice,
+    QMimeData,
+    QPoint,
+    QRectF,
+    QSize,
+    Qt,
+    QUrl,
+)
+from PySide6.QtGui import QDragEnterEvent, QDragLeaveEvent, QImage  # noqa: E402
 
 from fps_patcher.app.controller import AppController  # noqa: E402
 from fps_patcher.app.queue_model import QueueItem  # noqa: E402
 from fps_patcher.config import Settings  # noqa: E402
 from fps_patcher.core.models import VideoInfo  # noqa: E402
+from fps_patcher.ui.strings import t  # noqa: E402
 from fps_patcher.ui_qt.queue_view import QueueView, _format_meta  # noqa: E402
 from fps_patcher.ui_qt.theme import ThemeManager  # noqa: E402
+from fps_patcher.ui_qt.thumbnails import THUMBNAIL_SIZE, ThumbnailLoader  # noqa: E402
 
 
 def _touch(path: Path) -> Path:
@@ -84,6 +95,113 @@ def queue_view(qtbot: Any) -> QueueView:
     view.show()
     qtbot.waitExposed(view)
     return view
+
+
+def _png_bytes() -> bytes:
+    image = QImage(8, 8, QImage.Format.Format_ARGB32)
+    image.fill(Qt.GlobalColor.red)
+    buffer = QBuffer()
+    buffer.open(QIODevice.OpenModeFlag.WriteOnly)
+    assert image.save(buffer, "PNG")
+    return bytes(buffer.data())
+
+
+def test_thumbnail_loader_skips_work_without_ffmpeg(
+    qtbot: Any, tmp_path: Path
+) -> None:
+    def no_ffmpeg() -> Path | None:
+        return None
+
+    loader = ThumbnailLoader(no_ffmpeg)
+    with qtbot.assertNotEmitted(loader.ready):
+        assert loader.request("item", _touch(tmp_path / "clip.mp4")) is False
+    assert THUMBNAIL_SIZE == (56, 32)
+
+
+def test_thumbnail_cache_accepts_png_and_rejects_garbage(
+    qtbot: Any, queue_view: QueueView, tmp_path: Path
+) -> None:
+    video = _touch(tmp_path / "thumb.mp4")
+    queue_view.controller.items.add([video])
+    queue_view.refresh()
+    item = queue_view.controller.items.items[0]
+
+    assert queue_view.thumbnail(item.item_id) is None
+    queue_view._on_thumb_ready(item.item_id, b"not an image")
+    assert queue_view.thumbnail(item.item_id) is None
+
+    queue_view._on_thumb_ready(item.item_id, _png_bytes())
+    pixmap = queue_view.thumbnail(item.item_id)
+    assert pixmap is not None
+    assert pixmap.size() == QSize(8, 8)
+
+
+def test_row_pills_cover_resolution_fps_mode_and_size(
+    queue_view: QueueView, tmp_path: Path
+) -> None:
+    item = QueueItem(path=tmp_path / "pills.mp4")
+    item.info = VideoInfo(
+        path=item.path,
+        codec="h264",
+        width=1920,
+        height=1080,
+        avg_fps=Fraction(30),
+        r_fps=Fraction(30),
+        duration_s=10,
+        timescale=30000,
+        nb_frames=300,
+        has_audio=True,
+        stream_count=2,
+        file_size_bytes=12 * 1024 * 1024,
+    )
+    item.timescale = 90000
+    pills = dict(queue_view.delegate.row_pills(item))
+
+    assert pills["resolution"] == "1920×1080"
+    assert pills["fps"] == "30 → 90 fps"
+    assert pills["mode"] == "h264 · Mobile"
+    assert pills["size"] == "12.0 MB"
+
+
+def test_row_actions_are_large_and_emit_forensic(
+    qtbot: Any, queue_view: QueueView, tmp_path: Path
+) -> None:
+    video = _touch(tmp_path / "forensic.mp4")
+    queue_view.controller.items.add([video])
+    queue_view.refresh()
+    index = queue_view.model.index(0, 0)
+    rect = QRectF(queue_view.list_view.visualRect(index))
+    actions = queue_view.delegate.action_rects(rect)
+
+    assert set(actions) == {"override", "forensic", "remove"}
+    for area in actions.values():
+        assert area.width() >= 26
+        assert area.height() >= 26
+
+    received: list[Path] = []
+    queue_view.forensic_requested.connect(received.append)
+    assert queue_view._handle_click(actions["forensic"].center().toPoint()) is True
+    assert received == [video]
+
+
+def test_profile_strip_follows_preset_strategy_and_output(
+    queue_view: QueueView, tmp_path: Path
+) -> None:
+    queue_view.refresh_profile()
+    summary = queue_view.drop_card.profile_summary.fullText()
+    assert "60 FPS" in summary
+    assert "X1T For Mobile" in summary
+    assert t("drop_profile_output_same", "en") in summary
+
+    queue_view.settings.last_preset = "120 FPS"
+    queue_view.settings.strategy = "bxd-clean"
+    queue_view.settings.output_dir = str(tmp_path)
+    queue_view.refresh_profile()
+    summary = queue_view.drop_card.profile_summary.fullText()
+    assert "120 FPS" in summary
+    assert "X1T Clean" in summary
+    assert t("drop_profile_output_custom", "en") in summary
+    assert queue_view.drop_card.profile_title.text() == t("active_patch_profile", "en")
 
 
 @pytest.mark.filterwarnings("ignore::DeprecationWarning")
