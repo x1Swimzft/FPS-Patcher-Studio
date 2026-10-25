@@ -159,7 +159,33 @@ powershell -ExecutionPolicy Bypass -File build\sign_binaries.ps1 -GenerateSelfSi
 
 ---
 
-## 7. Generating Release Manifests & Hashes
+## 7. Headless CLI
+
+Every mode still goes through `__main__`; the CLI path never imports Qt.
+
+```powershell
+# Patch one or more files (exit 0 ok, 1 file failure, 2 usage, 130 cancelled)
+uv run python -m fps_patcher --cli patch "clip.mp4" "clip2.mov" --preset 60 --output out --tag-bt709 --json
+
+# Probe metadata / score platform readiness
+uv run python -m fps_patcher --cli probe "clip.mp4" --json
+uv run python -m fps_patcher --cli score "clip.mp4" --profile tiktok --json
+```
+
+`--json` keeps stdout machine-readable (one object); progress and log lines go to stderr.
+`--preset` accepts `60` or `120`; `--timescale` overrides it. `--overwrite` never
+overwrites unless asked; the default auto-renames. Explorer's `--quick-patch <file>`
+verb is unchanged.
+
+**Frozen windowed builds** use `--windows-console-mode=disable`, so the process has no
+stdout of its own. Starting `FPSPatcherStudio.exe --cli ...` from cmd/PowerShell works:
+the CLI calls `AttachConsole(ATTACH_PARENT_PROCESS)` and rebinds stdout/stderr to
+`CONOUT$`. Launching it by double-click still has no console to attach to, so output is
+discarded — use a terminal, or invoke the source entry point for automation.
+
+---
+
+## 8. Generating Release Manifests & Hashes
 
 Calculate SHA-256 hashes for all generated release artifacts and record them in the standard `sha256sum` format:
 

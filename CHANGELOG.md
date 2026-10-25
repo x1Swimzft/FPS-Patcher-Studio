@@ -4,6 +4,14 @@ All notable changes to FPS Patcher Studio are documented in this file.
 
 ## [Unreleased]
 
+### Added: Headless CLI (roadmap 4.2)
+- `fps-patcher-studio --cli patch INPUT... [--preset 60|120] [--timescale N] [--strategy NAME] [--output DIR] [--normalize-audio] [--cap-bitrate] [--tag-bt709] [--scrub-metadata] [--overwrite|--auto-rename] [--json]`.
+- `--cli probe INPUT` and `--cli score INPUT --profile generic|tiktok|instagram|youtube`.
+- Exit codes: `0` success, `1` any file failed, `2` usage error, `130` cancelled. Logs and progress go to stderr; `--json` writes one machine-readable object to stdout.
+- No Qt import on the CLI path (covered by an import-blocking test). Ctrl+C sets a cancel event, the child FFmpeg process is killed, temp files are removed, and the exit code is 130.
+- Frozen windowed builds reattach to the parent console (`AttachConsole`) so `FPSPatcherStudio.exe --cli ...` prints from cmd/PowerShell; a double-click launch has no console and discards output. Documented in `BUILDING.md`.
+- `--quick-patch <file>` (Explorer verb) is unchanged.
+
 ### Changed: PySide6 UI cutover
 - Qt/PySide6 is the sole UI runtime; the legacy Tk/CustomTkinter UI and its tests were removed.
 - `--ui tk` and `FPS_PATCHER_UI=tk` are deprecated: they log a warning and launch Qt.

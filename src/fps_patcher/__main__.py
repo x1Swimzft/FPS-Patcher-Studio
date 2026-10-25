@@ -43,6 +43,11 @@ def _select_ui(argv: list[str]) -> tuple[bool, list[str]]:
 
 def main(argv: list[str] | None = None) -> None:
     args = list(sys.argv[1:] if argv is None else argv)
+    if "--cli" in args:
+        # Headless mode: no Qt import happens on this path.
+        from fps_patcher.cli import main as cli_main
+
+        raise SystemExit(cli_main(args[args.index("--cli") + 1 :]))
     target = _quick_patch_target(args)
     if target is not None:
         from fps_patcher.logging_setup import setup_logging
