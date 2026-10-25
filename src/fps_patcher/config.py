@@ -34,6 +34,7 @@ THEME_PRESETS = [
 BACKDROP_MODES = ["Acrylic", "Mica", "Aero", "Solid"]
 FONT_SIZES = ["S", "M", "L"]
 RADIUS_STYLES = ["Sharp", "Normal", "Round"]
+LAYOUT_DENSITIES = ["Compact", "Comfortable"]
 NOTIFY_MODES = ["none", "sound", "toast"]
 LANGUAGES = ["en", "th"]
 
@@ -110,6 +111,7 @@ class Settings:
     ui_scale: int = 100
     font_size: str = "M"
     radius_style: str = "Normal"
+    layout_density: str = "Compact"
     reduce_motion: bool = False
 
     # V2 Output
@@ -196,6 +198,8 @@ class Settings:
             self.font_size = "M"
         if self.radius_style not in RADIUS_STYLES:
             self.radius_style = "Normal"
+        if self.layout_density not in LAYOUT_DENSITIES:
+            self.layout_density = "Compact"
         if self.notify_done not in NOTIFY_MODES:
             self.notify_done = "none"
         if self.language not in LANGUAGES:
