@@ -324,12 +324,16 @@ class MotionController(QObject):
         self._restore_buttons()
 
     def stop_all(self) -> None:
-        """Stop every animation owned by a widget and restore button styles."""
+        """Stop every animation owned by this controller and restore button styles."""
         self._restore_buttons()
         app = QApplication.instance()
+        groups: list[QObject] = [self]
         if app is not None:
-            for animation in app.findChildren(QAbstractAnimation):
+            groups.append(app)
+        for group in groups:
+            for animation in group.findChildren(QAbstractAnimation):
                 animation.stop()
+        if app is not None:
             for widget in app.allWidgets():
                 if isinstance(widget.graphicsEffect(), QGraphicsOpacityEffect):
                     widget.setGraphicsEffect(None)
