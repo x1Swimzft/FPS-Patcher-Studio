@@ -1,16 +1,19 @@
-"""Entry-point UI selection: no window, event loop or GUI toolkit is started."""
+"""Entry-point UI selection: Qt only, legacy Tk values are deprecated."""
 
 from __future__ import annotations
 
+import logging
 import subprocess
 import sys
+import warnings
 from typing import Any
 
 import pytest
 
 import fps_patcher.__main__ as entry
 from fps_patcher.config import Settings
-from fps_patcher.ui import main_window as legacy
+
+LEGACY = "fps_patcher.ui.main_window"
 
 
 @pytest.fixture
@@ -18,23 +21,33 @@ def launches(monkeypatch: pytest.MonkeyPatch) -> tuple[list[tuple[str, Any]], ob
     calls: list[tuple[str, Any]] = []
     settings = object()
 
-    class FakeWindow:
-        def __init__(self, received: Any) -> None:
-            calls.append(("tk", received))
-
-        def mainloop(self) -> None:
-            calls.append(("tk.mainloop", None))
-
     def fake_qt_run(received: Any) -> int:
         calls.append(("qt", received))
         return 0
 
     monkeypatch.setattr(Settings, "load", classmethod(lambda cls: settings))
-    monkeypatch.setattr(legacy, "MainWindow", FakeWindow)
-    monkeypatch.setattr("fps_patcher.logging_setup.setup_logging", lambda: None)
+    monkeypatch.setattr(
+        "fps_patcher.logging_setup.setup_logging",
+        lambda: logging.getLogger("fps_patcher.entrypoint_test"),
+    )
     monkeypatch.setattr("fps_patcher.ui_qt.app.run", fake_qt_run)
     monkeypatch.delenv("FPS_PATCHER_UI", raising=False)
+    monkeypatch.delitem(sys.modules, LEGACY, raising=False)
     return calls, settings
+
+
+def _warning_text(
+    caplog: pytest.LogCaptureFixture,
+    capsys: pytest.CaptureFixture[str],
+    caught: list[warnings.WarningMessage],
+) -> str:
+    out, err = capsys.readouterr()
+    parts = [caplog.text, out, err, *(str(item.message) for item in caught)]
+    return " ".join(parts).lower()
+
+
+def _assert_deprecation_notice(text: str) -> None:
+    assert any(word in text for word in ("deprecat", "legacy", "warn", "no longer")), text
 
 
 def test_default_is_qt(launches: tuple[list[tuple[str, Any]], object]) -> None:
@@ -43,41 +56,69 @@ def test_default_is_qt(launches: tuple[list[tuple[str, Any]], object]) -> None:
         entry.main([])
     assert exc.value.code == 0
     assert calls == [("qt", settings)]
+    assert LEGACY not in sys.modules
 
 
-def test_ui_flag_selects_tk(launches: tuple[list[tuple[str, Any]], object]) -> None:
+def test_ui_flag_selects_qt(launches: tuple[list[tuple[str, Any]], object]) -> None:
     calls, settings = launches
-    entry.main(["--ui", "tk"])
-    assert calls == [("tk", settings), ("tk.mainloop", None)]
-
-
-def test_env_selects_tk(
-    launches: tuple[list[tuple[str, Any]], object], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    calls, settings = launches
-    monkeypatch.setenv("FPS_PATCHER_UI", "tk")
-    entry.main([])
-    assert calls == [("tk", settings), ("tk.mainloop", None)]
-
-
-def test_ui_flag_overrides_env(
-    launches: tuple[list[tuple[str, Any]], object], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    calls, settings = launches
-    monkeypatch.setenv("FPS_PATCHER_UI", "tk")
-    with pytest.raises(SystemExit):
+    with pytest.raises(SystemExit) as exc:
         entry.main(["--ui", "qt"])
+    assert exc.value.code == 0
     assert calls == [("qt", settings)]
 
 
+def test_ui_flag_tk_warns_and_launches_qt(
+    launches: tuple[list[tuple[str, Any]], object],
+    caplog: pytest.LogCaptureFixture,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    calls, settings = launches
+    caplog.set_level(logging.DEBUG)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        with pytest.raises(SystemExit) as exc:
+            entry.main(["--ui", "tk"])
+    assert exc.value.code == 0
+    assert calls == [("qt", settings)]
+    assert LEGACY not in sys.modules
+    _assert_deprecation_notice(_warning_text(caplog, capsys, caught))
+
+
+def test_env_tk_warns_and_launches_qt(
+    launches: tuple[list[tuple[str, Any]], object],
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    calls, settings = launches
+    monkeypatch.setenv("FPS_PATCHER_UI", "tk")
+    caplog.set_level(logging.DEBUG)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        with pytest.raises(SystemExit) as exc:
+            entry.main([])
+    assert exc.value.code == 0
+    assert calls == [("qt", settings)]
+    assert LEGACY not in sys.modules
+    _assert_deprecation_notice(_warning_text(caplog, capsys, caught))
+
+
 def test_ui_flag_stripped_from_sys_argv(
-    launches: tuple[list[tuple[str, Any]], object], monkeypatch: pytest.MonkeyPatch
+    launches: tuple[list[tuple[str, Any]], object],
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     calls, settings = launches
     monkeypatch.setattr(sys, "argv", ["FPSPatcherStudio.exe", "--ui", "tk", "--flag"])
-    entry.main()
+    caplog.set_level(logging.DEBUG)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        with pytest.raises(SystemExit):
+            entry.main()
     assert sys.argv == ["FPSPatcherStudio.exe", "--flag"]
-    assert calls == [("tk", settings), ("tk.mainloop", None)]
+    assert calls == [("qt", settings)]
+    _assert_deprecation_notice(_warning_text(caplog, capsys, caught))
 
 
 def test_quick_patch_stays_headless() -> None:
@@ -90,6 +131,8 @@ def test_quick_patch_stays_headless() -> None:
         "    assert exc.code == 2\n"
         "assert 'PySide6' not in sys.modules\n"
         "assert 'tkinter' not in sys.modules\n"
+        "assert 'customtkinter' not in sys.modules\n"
+        "assert 'fps_patcher.ui.main_window' not in sys.modules\n"
     )
     completed = subprocess.run(
         [sys.executable, "-c", code],

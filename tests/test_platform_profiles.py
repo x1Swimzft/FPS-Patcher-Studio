@@ -5,10 +5,8 @@ from __future__ import annotations
 from fractions import Fraction
 from pathlib import Path
 
-import pytest
-
 from fps_patcher.config import Settings
-from fps_patcher.core.models import LogEvent, VideoInfo
+from fps_patcher.core.models import VideoInfo
 from fps_patcher.core.platform_profiles import (
     CRITICAL_UNKNOWN_SCORE_CAP,
     OPTIONAL_UNKNOWN_SCORE_CAP,
@@ -323,73 +321,3 @@ def test_new_localization_keys_exist_in_both_languages() -> None:
     assert keys <= set(STRINGS["en"])
     assert keys <= set(STRINGS["th"])
     assert set(STRINGS["en"]) == set(STRINGS["th"])
-
-
-def test_control_panel_profile_selector_updates_setting(
-    tk_root: object, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from fps_patcher.ui.control_panel import ControlPanel
-
-    monkeypatch.setattr(Settings, "save_async", lambda self: None)
-    settings = Settings(platform_profile="generic")
-    changes: list[str] = []
-    panel = ControlPanel(
-        tk_root,
-        settings=settings,
-        on_patch=lambda _ts, _strategy: None,
-        on_cancel=lambda: None,
-        on_profile_change=lambda: changes.append(settings.platform_profile),
-    )
-    panel.pack()
-    try:
-        assert panel.profile.get() == t("profile_generic", "en")
-        panel._profile_selected(t("profile_tiktok", "en"))
-        assert settings.platform_profile == "tiktok"
-        assert changes == ["tiktok"]
-
-        panel.set_profile("instagram")
-        assert settings.platform_profile == "instagram"
-        assert panel.profile.get() == t("profile_instagram", "en")
-    finally:
-        panel.destroy()
-
-
-def test_queue_card_readiness_badge_refreshes_on_profile_change(
-    tk_root: object, tmp_path: Path
-) -> None:
-    from unittest.mock import patch
-
-    from fps_patcher.app.controller import AppController
-    from fps_patcher.ui.drop_zone import DropZone
-    from fps_patcher.ui.input_list import InputList
-
-    settings = Settings(platform_profile="tiktok")
-    controller = AppController(settings)
-    target = tmp_path / "ready.mp4"
-    target.write_bytes(b"x")
-    assert controller.items.add([target]).added
-    controller.items.set_info(target, _info(tmp_path, bit_rate=30_000_000))
-
-    with patch.object(DropZone, "drop_target_register", return_value=None):
-        widget = InputList(tk_root, controller=controller, on_start_patch_selected=lambda: None)
-        widget.pack()
-        try:
-            widget.render()
-            item = controller.items.get(target)
-            assert item is not None
-            row = widget._row_widgets[item.item_id]
-            assert row.readiness_badge.cget("text") == "TikTok Review 88%"
-            widget._log_readiness(target)
-            messages: list[str] = []
-            while not controller.events.empty():
-                event = controller.events.get_nowait()
-                if isinstance(event, LogEvent):
-                    messages.append(event.message)
-            assert any("READINESS" in message for message in messages)
-            assert any("Bitrate" in message for message in messages)
-
-            settings.platform_profile = "generic"
-            widget.render()
-            assert row.readiness_badge.cget("text") == "Basic Ready 100%"
-        finally:
-            widget.destroy()

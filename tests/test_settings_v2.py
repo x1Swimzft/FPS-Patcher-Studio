@@ -10,7 +10,7 @@ from fps_patcher.config import (
     render_filename_template,
 )
 from fps_patcher.ui.strings import t
-from fps_patcher.ui.theme import PRESETS, ThemeManager, get_corner_radii
+from fps_patcher.ui_qt.theme import PRESETS
 
 
 def test_filename_template_rendering() -> None:
@@ -118,37 +118,6 @@ def test_concurrent_settings_saves_never_corrupt_the_file(tmp_path: Path) -> Non
     payload = json.loads(target.read_text(encoding="utf-8"))
     assert payload["theme_preset"] in presets
     assert not list(tmp_path.glob("*.tmp_*"))
-
-
-def test_theme_presets_and_theme_manager() -> None:
-    assert len(PRESETS) == 7
-    for name in [
-        "Obsidian",
-        "Midnight Violet",
-        "Emerald Terminal",
-        "Crimson Gamer",
-        "Graphite",
-        "Amber Warm",
-        "Light",
-    ]:
-        assert name in PRESETS
-        tokens = PRESETS[name]
-        assert tokens.bg[1].startswith("#")
-        assert tokens.surface[1].startswith("#")
-        assert tokens.accent[1].startswith("#")
-
-    s = Settings(theme_preset="Crimson Gamer")
-    mgr = ThemeManager(s)
-    assert mgr.tokens.name == "Crimson Gamer"
-
-    # Custom accent override
-    s.custom_accent = "#FF00FF"
-    assert mgr.tokens.accent == ("#FF00FF", "#FF00FF")
-
-    # Corner radii helper
-    assert get_corner_radii("Sharp") == (4, 4)
-    assert get_corner_radii("Normal") == (16, 10)
-    assert get_corner_radii("Round") == (22, 14)
 
 
 def test_localization_strings() -> None:

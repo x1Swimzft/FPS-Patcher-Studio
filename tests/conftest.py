@@ -8,7 +8,6 @@ import subprocess
 import sys
 from collections.abc import Generator
 from pathlib import Path
-from typing import Any
 
 # Qt tests must never try to open a real display; set this before PySide6 is
 # imported by pytest-qt or any test module.
@@ -38,35 +37,12 @@ def _flush_qt_deferred_deletes() -> Generator[None, None, None]:
     yield
 
 
-def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Run Qt widget tests before Tk initialises; both toolkits cannot share a process."""
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Run motion checks first; offscreen timers abort once many windows were torn down."""
     qt_items = [item for item in items if item.path.name.startswith("test_ui_qt_")]
-    if not qt_items:
-        return
-    # Animation checks run before bulk MainWindow construction; Qt's offscreen
-    # paint/timer path is unstable once several top-level windows have been torn down.
     priority = {"test_ui_qt_motion.py": 0, "test_ui_qt_main_window.py": 2}
     qt_items.sort(key=lambda item: priority.get(item.path.name, 1))
     items[:] = qt_items + [item for item in items if item not in qt_items]
-
-
-# uv-managed CPython may not locate its bundled Tcl/Tk scripts (init.tcl); point at them.
-_TCL_VARS = (("TCL_LIBRARY", "tcl8.6", "init.tcl"), ("TK_LIBRARY", "tk8.6", "tk.tcl"))
-for _var, _name, _probe in _TCL_VARS:
-    _dir = (Path(sys.base_prefix) / "tcl" / _name).resolve()
-    if not os.environ.get(_var) and (_dir / _probe).is_file():
-        os.environ[_var] = str(_dir)
-
-
-@pytest.fixture(scope="session")
-def tk_root() -> Generator[Any, None, None]:
-    import customtkinter as ctk
-
-    root = ctk.CTk()
-    root.geometry("800x600")
-    yield root
-    with contextlib.suppress(Exception):
-        root.destroy()
 
 
 @pytest.fixture(scope="session")

@@ -1,4 +1,4 @@
-"""Phase 2 (v0.7.0): MainWindow watch-inbox drain without a Tk display.
+"""Phase 2 (v0.7.0): Qt MainWindow watch-inbox drain without a display.
 
 The drain method is called unbound on a stub so no window or event loop is built;
 this keeps the test fast and headless while still exercising the real code path.
@@ -13,7 +13,7 @@ from typing import Any
 
 from fps_patcher.app.quick_patch import QUICK_PATCH_TIMESCALE
 from fps_patcher.config import Settings
-from fps_patcher.ui.main_window import MainWindow
+from fps_patcher.ui_qt.main_window import MainWindow
 
 
 class FakeController:
@@ -32,12 +32,12 @@ class FakeController:
             self.busy = True
 
 
-class FakeInputList:
+class FakeQueueView:
     def __init__(self) -> None:
-        self.renders = 0
+        self.refreshes = 0
 
-    def render(self) -> None:
-        self.renders += 1
+    def refresh(self) -> None:
+        self.refreshes += 1
 
 
 class FakeConsole:
@@ -57,7 +57,7 @@ def _stub(controller: FakeController, paths: list[Path]) -> Any:
         controller=controller,
         _watch_inbox=inbox,
         _watch_batch_active=False,
-        input_list=FakeInputList(),
+        queue_view=FakeQueueView(),
         console=FakeConsole(),
     )
 
@@ -70,7 +70,7 @@ def test_drain_queues_only_watched_paths(tmp_path: Path) -> None:
 
     controller = fake.controller
     assert controller.added == [(watched, False)]
-    assert fake.input_list.renders == 1
+    assert fake.queue_view.refreshes == 1
     (args, kwargs) = controller.started[0]
     assert args == (QUICK_PATCH_TIMESCALE, fake.settings.strategy)
     assert kwargs == {"only_selected": False, "only_paths": watched}
