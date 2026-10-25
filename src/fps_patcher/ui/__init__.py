@@ -1,1 +1,1 @@
-"""UI layer: CustomTkinter widgets. Only runs on the Tk main thread."""
+"""Localization strings and shared visual assets for the Qt UI."""
