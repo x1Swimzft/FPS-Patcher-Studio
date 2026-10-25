@@ -52,6 +52,7 @@ from .console import ConsolePanel
 from .forensic_dialog import ForensicDialog
 from .icons import get_icon
 from .inspector import Inspector
+from .motion import MotionController
 from .qss import apply_theme
 from .queue_view import QueueView
 from .settings_dialog import SettingsDialog
@@ -84,6 +85,7 @@ class MainWindow(QMainWindow):
         self.controller = AppController(settings)
         self.theme_manager = ThemeManager(settings, self)
         self.theme: Theme = self.theme_manager.theme
+        self.motion = MotionController(settings.reduce_motion, self.theme, self)
 
         self._last_output: Path | None = None
         self._watcher: FolderWatcher | None = None
@@ -176,6 +178,7 @@ class MainWindow(QMainWindow):
         outer.addWidget(body, 1)
 
         self.console = ConsolePanel(self.settings, self.theme_manager, root)
+        self.console.set_animated(True)
         outer.addWidget(self.console, 0)
 
     def _build_toolbar(self) -> QWidget:
@@ -200,6 +203,7 @@ class MainWindow(QMainWindow):
 
         self.ffmpeg_button = QPushButton()
         self.ffmpeg_button.setProperty("variant", "secondary")
+        self.ffmpeg_button.setProperty("motionSkip", True)
         self.ffmpeg_button.setFixedHeight(theme.button_height)
         self.ffmpeg_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.ffmpeg_button.clicked.connect(self._show_ffmpeg_menu)
@@ -324,6 +328,8 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------ theme
     def _on_theme_changed(self, theme: Theme) -> None:
         self.theme = theme
+        self.motion.set_theme(theme)
+        self.motion.set_reduce_motion(bool(self.settings.reduce_motion))
         app = QApplication.instance()
         if isinstance(app, QApplication):
             apply_theme(app, theme)
@@ -960,6 +966,7 @@ class MainWindow(QMainWindow):
 
     # -------------------------------------------------------------------- close
     def closeEvent(self, event: QCloseEvent) -> None:
+        self.motion.stop_all()
         self.bridge.stop()
         self._watch_timer.stop()
         if self._watcher is not None:

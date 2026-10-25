@@ -16,15 +16,18 @@ from typing import TYPE_CHECKING, Any
 from PySide6.QtCore import (
     Property,
     QAbstractListModel,
+    QEasingCurve,
     QEvent,
     QModelIndex,
     QObject,
     QPoint,
+    QPropertyAnimation,
     QRectF,
     QSettings,
     QSize,
     Qt,
     QUrl,
+    QVariantAnimation,
     Signal,
 )
 from PySide6.QtGui import (
@@ -63,6 +66,7 @@ from ..core.models import SUPPORTED_EXTENSIONS
 from ..core.platform_profiles import ReadinessReport, evaluate_readiness
 from ..ui.strings import t
 from .icons import get_icon
+from .motion import animate
 from .theme import UI_FONT_FAMILIES, Theme
 from .widgets import Switch, hairline, text_button
 
@@ -82,6 +86,15 @@ def _format_duration(seconds: float) -> str:
     mins, secs = divmod(total, 60)
     hrs, mins = divmod(mins, 60)
     return f"{hrs:d}:{mins:02d}:{secs:02d}" if hrs else f"{mins:02d}:{secs:02d}"
+
+
+def _blend_color(start: QColor, end: QColor, phase: float) -> QColor:
+    phase = max(0.0, min(1.0, phase))
+    return QColor(
+        round(start.red() + (end.red() - start.red()) * phase),
+        round(start.green() + (end.green() - start.green()) * phase),
+        round(start.blue() + (end.blue() - start.blue()) * phase),
+    )
 
 
 def _format_meta(item: QueueItem) -> str:
@@ -114,16 +127,25 @@ class DropCard(QWidget):
         self._theme = theme
         self._language = language
         self._drag_active = False
-        self.breath_phase = 0.0  # package 7 hook; no timer here
+        self._breath_phase = 0.0
+        self._scale = 1.0
+        self._bob = 0.0
+        self.reduce_motion = False
+        self._breath_anim = None
+        self._bob_anim = None
+        self._scale_anim = None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(theme.inner, theme.inner, theme.inner, theme.inner)
         layout.setSpacing(theme.outer)
         layout.addStretch(1)
 
-        self.icon_label = QLabel()
+        self.icon_holder = QWidget(self)
+        self.icon_holder.setFixedHeight(44)
+        self.icon_label = QLabel(self.icon_holder)
         self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.icon_label)
+        self.icon_label.setFixedSize(40, 40)
+        layout.addWidget(self.icon_holder, 0, Qt.AlignmentFlag.AlignHCenter)
 
         self.title_label = QLabel()
         self.title_label.setProperty("role", "title")
@@ -155,10 +177,107 @@ class DropCard(QWidget):
     def dragActive(self, active: bool) -> None:  # noqa: N802 - Qt property name
         self.set_drag_active(active)
 
+    @Property(float)
+    def breath_phase(self) -> float:  # noqa: N802 - Qt property name
+        return self._breath_phase
+
+    @breath_phase.setter
+    def breath_phase(self, value: float) -> None:  # noqa: N802 - Qt property name
+        self._breath_phase = float(value)
+        self.update()
+
+    @Property(float)
+    def scale(self) -> float:  # noqa: N802 - Qt property name
+        return self._scale
+
+    @scale.setter
+    def scale(self, value: float) -> None:  # noqa: N802 - Qt property name
+        self._scale = float(value)
+        self.update()
+
+    @Property(float)
+    def bob(self) -> float:  # noqa: N802 - Qt property name
+        return self._bob
+
+    @bob.setter
+    def bob(self, value: float) -> None:  # noqa: N802 - Qt property name
+        self._bob = float(value)
+        self._place_icon()
+
+    def set_reduce_motion(self, enabled: bool) -> None:
+        self.reduce_motion = bool(enabled)
+        if self.reduce_motion:
+            self.set_breathing(False)
+            self._scale = 1.0
+            self.update()
+
+    def set_breathing(self, active: bool) -> None:
+        should_run = bool(active) and not self.reduce_motion
+        if not should_run:
+            self._stop_animations()
+            self._breath_phase = 0.0
+            self._bob = 0.0
+            self._place_icon()
+            self.update()
+            return
+        if (
+            self._breath_anim is not None
+            and self._breath_anim.state() == QPropertyAnimation.State.Running
+        ):
+            return
+        breathing = QPropertyAnimation(self, b"breath_phase", self)
+        breathing.setDuration(3200)
+        breathing.setLoopCount(-1)
+        breathing.setEasingCurve(QEasingCurve(QEasingCurve.Type.InOutSine))
+        breathing.setKeyValueAt(0.0, 0.0)
+        breathing.setKeyValueAt(0.5, 1.0)
+        breathing.setKeyValueAt(1.0, 0.0)
+        self._breath_anim = breathing
+        breathing.start()
+
+        bobbing = QPropertyAnimation(self, b"bob", self)
+        bobbing.setDuration(2600)
+        bobbing.setLoopCount(-1)
+        bobbing.setEasingCurve(QEasingCurve(QEasingCurve.Type.InOutSine))
+        bobbing.setKeyValueAt(0.0, -3.0)
+        bobbing.setKeyValueAt(0.5, 3.0)
+        bobbing.setKeyValueAt(1.0, -3.0)
+        self._bob_anim = bobbing
+        bobbing.start()
+
+    def _stop_animations(self) -> None:
+        for animation in (self._breath_anim, self._bob_anim):
+            if animation is not None:
+                animation.stop()
+                animation.deleteLater()
+        self._breath_anim = None
+        self._bob_anim = None
+
+    def _place_icon(self) -> None:
+        if not hasattr(self, "icon_label"):
+            return
+        x = (self.icon_holder.width() - self.icon_label.width()) // 2
+        y = (self.icon_holder.height() - self.icon_label.height()) // 2 + int(self._bob)
+        self.icon_label.move(max(0, x), max(0, y))
+
+    def resizeEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        super().resizeEvent(event)
+        self._place_icon()
+
+    def hideEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        self.set_breathing(False)
+        super().hideEvent(event)
+
     def set_drag_active(self, active: bool) -> None:
         if active == self._drag_active:
             return
         self._drag_active = active
+        if self._scale_anim is not None:
+            self._scale_anim.stop()
+            self._scale_anim.deleteLater()
+        self._scale_anim = animate(
+            self, b"scale", self._scale, 1.01 if active else 1.0, 140
+        )
         self._refresh_text()
         self._refresh_icon()
         self.update()
@@ -193,6 +312,9 @@ class DropCard(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         rect = QRectF(self.rect()).adjusted(1.5, 1.5, -1.5, -1.5)
         radius = theme.radii.card
+        painter.translate(rect.center())
+        painter.scale(self._scale, self._scale)
+        painter.translate(-rect.center())
 
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(
@@ -200,7 +322,15 @@ class DropCard(QWidget):
         )
         painter.drawRoundedRect(rect, radius, radius)
 
-        pen = QPen(QColor(theme.color("accent" if self._drag_active else "border")))
+        if self._drag_active:
+            border = QColor(theme.color("accent"))
+        else:
+            border = _blend_color(
+                QColor(theme.color("border")),
+                QColor(theme.color("accent_dim_border")),
+                self._breath_phase,
+            )
+        pen = QPen(border)
         pen.setWidthF(2.0 if self._drag_active else 1.4)
         pen.setStyle(Qt.PenStyle.DashLine)
         pen.setDashPattern([4.0, 3.0])
@@ -267,7 +397,56 @@ class QueueDelegate(QStyledItemDelegate):
         self.fm_caption = QFontMetricsF(self.font_caption)
         self.fm_filename = QFontMetricsF(self.font_filename)
         self.fm_badge = QFontMetricsF(self.font_badge)
+        self._appear: dict[str, float] = {}
+        self._appear_anims: dict[str, QVariantAnimation] = {}
+        self.reduce_motion = False
         self.set_theme(self._theme)
+
+    def set_reduce_motion(self, enabled: bool) -> None:
+        self.reduce_motion = bool(enabled)
+        if self.reduce_motion:
+            for animation in self._appear_anims.values():
+                animation.stop()
+                animation.deleteLater()
+            self._appear_anims.clear()
+            self._appear.clear()
+
+    def mark_new(self, item_ids: list[str], current_ids: set[str]) -> None:
+        for item_id in list(self._appear):
+            if item_id not in current_ids:
+                self._appear.pop(item_id, None)
+                animation = self._appear_anims.pop(item_id, None)
+                if animation is not None:
+                    animation.stop()
+                    animation.deleteLater()
+        if self.reduce_motion:
+            return
+        for item_id in item_ids[:12]:
+            if item_id in self._appear_anims:
+                continue
+            self._appear[item_id] = 0.0
+            animation = QVariantAnimation(self)
+            animation.setStartValue(0.0)
+            animation.setEndValue(1.0)
+            animation.setDuration(160)
+            animation.setEasingCurve(QEasingCurve(QEasingCurve.Type.OutCubic))
+            animation.valueChanged.connect(
+                lambda value, key=item_id: self._appear_tick(key, float(value))
+            )
+            animation.finished.connect(lambda key=item_id: self._appear_done(key))
+            self._appear_anims[item_id] = animation
+            animation.start()
+
+    def _appear_tick(self, item_id: str, value: float) -> None:
+        self._appear[item_id] = value
+        self._owner.list_view.viewport().update()
+
+    def _appear_done(self, item_id: str) -> None:
+        self._appear.pop(item_id, None)
+        animation = self._appear_anims.pop(item_id, None)
+        if animation is not None:
+            animation.deleteLater()
+        self._owner.list_view.viewport().update()
 
     def set_theme(self, theme: Theme) -> None:
         self._theme = theme
@@ -333,6 +512,10 @@ class QueueDelegate(QStyledItemDelegate):
 
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        appear = self._appear.get(item.item_id, 1.0)
+        if appear < 1.0:
+            painter.setOpacity(max(0.0, appear))
+            painter.translate(0.0, (1.0 - appear) * 8.0)
 
         if focused:
             painter.setPen(QPen(self.color("accent_dim_border"), 1))
@@ -494,6 +677,8 @@ class QueueView(QWidget):
         self._focused_path: Path | None = None
         self.hover_row = -1
         self.hover_remove = -1
+        self._known_ids: set[str] | None = None
+        self._motion_window: QWidget | None = None
         self._readiness_cache: dict[str, tuple[int, str, ReadinessReport]] = {}
 
         self._storage = QSettings("FPSPatcherStudio", "QtUI")
@@ -507,12 +692,25 @@ class QueueView(QWidget):
         self.setAcceptDrops(True)
         self._build_ui()
         self._theme_manager.changed.connect(self.set_theme)
+        app = QApplication.instance()
+        if app is not None:
+            app.applicationStateChanged.connect(self._on_app_state)
         self.set_theme(self._theme)
         self.refresh()
+
+    def _on_app_state(self, _state: Qt.ApplicationState) -> None:
+        self._update_drop_motion()
 
     # ---------- public API ----------
     def refresh(self) -> None:
         items = self.controller.items.items
+        ids = [item.item_id for item in items]
+        new_ids = (
+            []
+            if self._known_ids is None
+            else [item_id for item_id in ids if item_id not in self._known_ids]
+        )
+        self._known_ids = set(ids)
         self.model.refresh()
         self._prune_readiness(items)
         if self._focused_path is not None and not any(i.path == self._focused_path for i in items):
@@ -523,13 +721,16 @@ class QueueView(QWidget):
         self.list_view.setVisible(has_items)
         self.summary_label.setText(self.tr("queue_collapsed", count=len(items)))
         self.retry_button.setVisible(any(i.status in ("failed", "skipped") for i in items))
+        self.delegate.mark_new(new_ids, set(ids))
         self._sync_footer()
         self._sync_controls()
+        self._update_drop_motion()
 
     def set_busy(self, busy: bool) -> None:
         self._busy = bool(busy)
         self._sync_controls()
         self.list_view.viewport().update()
+        self._update_drop_motion()
 
     def set_theme(self, theme: Theme) -> None:
         self._theme = theme
@@ -550,7 +751,34 @@ class QueueView(QWidget):
             "}"
         )
         self.add_folder_button.setIcon(get_icon("folder", theme.is_dark))
+        reduce_motion = bool(getattr(self.settings, "reduce_motion", False))
+        self.drop_card.set_reduce_motion(reduce_motion)
+        self.delegate.set_reduce_motion(reduce_motion)
+        self._update_drop_motion()
         self.update()
+
+    def _update_drop_motion(self) -> None:
+        app = QApplication.instance()
+        active = (
+            app is None
+            or app.applicationState() == Qt.ApplicationState.ApplicationActive
+        )
+        visible = self.drop_card.isVisible()
+        self.drop_card.set_breathing(active and visible)
+
+    def showEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        super().showEvent(event)
+        window = self.window()
+        if window is not self._motion_window:
+            if self._motion_window is not None:
+                self._motion_window.removeEventFilter(self)
+            self._motion_window = window
+            window.installEventFilter(self)
+        self._update_drop_motion()
+
+    def hideEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        self.drop_card.set_breathing(False)
+        super().hideEvent(event)
 
     def selected_paths(self) -> list[Path]:
         return [item.path for item in self.controller.items.selected()]
@@ -919,6 +1147,12 @@ class QueueView(QWidget):
 
     # ---------- view events ----------
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:  # noqa: N802 - Qt naming
+        if watched is self._motion_window and event.type() in (
+            QEvent.Type.WindowActivate,
+            QEvent.Type.WindowDeactivate,
+        ):
+            self._update_drop_motion()
+            return super().eventFilter(watched, event)
         if watched is not self.list_view.viewport():
             return super().eventFilter(watched, event)
         kind = event.type()

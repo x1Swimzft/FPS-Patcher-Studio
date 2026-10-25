@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtCore import QEasingCurve, Qt, QVariantAnimation, Signal
+from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
     QComboBox,
     QFrame,
+    QGraphicsDropShadowEffect,
+    QGraphicsOpacityEffect,
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QProgressBar,
     QPushButton,
     QScrollArea,
     QSizePolicy,
@@ -29,6 +30,7 @@ from ..core.platform_profiles import (
 )
 from ..core.strategies import UI_PRESETS, migrate_strategy_name
 from ..ui.strings import t
+from .motion import MotionProgressBar, animate_height, fade
 from .theme import UI_FONT_FAMILIES, Theme, ThemeManager
 from .widgets import Card, CardGroup, Popover, SegmentedControl, text_button
 
@@ -83,6 +85,11 @@ class Inspector(QWidget):
         self._progress_index = 0
         self._progress_total = 0
         self._preset = self._initial_preset()
+        self._custom_visible = False
+        self._custom_anim = None
+        self._custom_fade = None
+        self._glow: QGraphicsDropShadowEffect | None = None
+        self._glow_anim: QVariantAnimation | None = None
 
         self._label_to_strategy = {s.label: s.name for s in UI_PRESETS.values()}
 
@@ -150,6 +157,8 @@ class Inspector(QWidget):
         custom_layout.addWidget(self.custom_edit)
         target_layout.addWidget(self.custom_row)
         self.custom_row.setVisible(False)
+        self.custom_row.setMinimumHeight(0)
+        self.custom_row.setMaximumHeight(0)
 
         self.target_group.body.addWidget(target_content)
         self._body_layout.addWidget(self.target_group)
@@ -249,7 +258,7 @@ class Inspector(QWidget):
         self.percent_label.setProperty("role", "muted")
         self.percent_label.setAlignment(Qt.AlignmentFlag.AlignRight)
         progress_layout.addWidget(self.percent_label)
-        self.progress_bar = QProgressBar()
+        self.progress_bar = MotionProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         self.progress_bar.setTextVisible(False)
@@ -304,6 +313,12 @@ class Inspector(QWidget):
         self.progress_group.set_theme(theme)
         self.readiness_card.set_theme(theme)
         self.segments.set_theme(theme)
+        self.progress_bar.set_theme(theme)
+        reduce_motion = self._reduce_motion()
+        self.segments.set_reduce_motion(reduce_motion)
+        self.progress_bar.set_reduce_motion(reduce_motion)
+        self._sync_custom_height()
+        self._update_glow()
         self._retranslate()
         self._set_timescale_invalid(self._invalid)
 
@@ -544,7 +559,7 @@ QWidget#Inspector QProgressBar::chunk {{
         self._percent = int(round(fraction * 100))
         self._progress_index = event.file_index
         self._progress_total = event.total_files
-        self.progress_bar.setValue(self._percent)
+        self.progress_bar.animate_value(self._percent)
         self.percent_label.setText(f"{self._percent}%")
         self._progress_caption()
         if self._busy:
@@ -556,6 +571,7 @@ QWidget#Inspector QProgressBar::chunk {{
         self._percent = 0
         self._progress_index = 0
         self._progress_total = 0
+        self.progress_bar.stop()
         self.progress_bar.setValue(0)
         self.percent_label.setText("0%")
         self._progress_caption()
@@ -577,6 +593,8 @@ QWidget#Inspector QProgressBar::chunk {{
             self.start_btn.setEnabled(self._can_patch)
             self.start_btn.setText(t("start_patch", lang))
             self.cancel_btn.setEnabled(False)
+        self.progress_bar.set_busy(self._busy)
+        self._update_glow()
         self._progress_caption()
 
     def _progress_caption(self) -> None:
@@ -605,11 +623,150 @@ QWidget#Inspector QProgressBar::chunk {{
             label, migrate_strategy_name(str(self.settings.strategy))[0]
         )
 
+    def _reduce_motion(self) -> bool:
+        return bool(getattr(self.settings, "reduce_motion", False))
+
     def set_custom_visible(self, visible: bool) -> None:
-        """Hook for the motion package; visibility only, no persistence."""
-        self.custom_row.setVisible(visible)
+        """Show/hide the custom timescale row with a short height + fade."""
+        visible = bool(visible)
+        if visible == self._custom_visible:
+            if visible:
+                self._sync_custom_height()
+            return
+        self._custom_visible = visible
+        self._stop_custom_animation()
+        target = max(1, self.custom_row.sizeHint().height())
+        if self._reduce_motion():
+            self.custom_row.setMinimumHeight(target if visible else 0)
+            self.custom_row.setMaximumHeight(target if visible else 0)
+            self.custom_row.setVisible(visible)
+        elif visible:
+            self.custom_row.setMinimumHeight(0)
+            self.custom_row.setMaximumHeight(0)
+            self.custom_row.setVisible(True)
+            self._custom_fade = fade(
+                self.custom_row,
+                0.0,
+                1.0,
+                180,
+                False,
+                on_finished=self._clear_custom_fade,
+            )
+            self._custom_anim = animate_height(
+                self.custom_row, 0, target, 180, False,
+                on_finished=self._show_custom_done,
+            )
+        else:
+            start = self.custom_row.height() or target
+            self._custom_fade = fade(
+                self.custom_row,
+                1.0,
+                0.0,
+                180,
+                False,
+                on_finished=self._clear_custom_fade,
+            )
+            self._custom_anim = animate_height(
+                self.custom_row, start, 0, 180, False,
+                on_finished=self._hide_custom_done,
+            )
         if visible:
             self.custom_edit.setEnabled(not self._busy)
+
+    def _stop_custom_animation(self) -> None:
+        if self._custom_anim is not None:
+            self._custom_anim.stop()
+            self._custom_anim.deleteLater()
+            self._custom_anim = None
+        if self._custom_fade is not None:
+            self._custom_fade.stop()
+            self._custom_fade.deleteLater()
+            self._custom_fade = None
+        if isinstance(self.custom_row.graphicsEffect(), QGraphicsOpacityEffect):
+            self.custom_row.setGraphicsEffect(None)
+
+    def _sync_custom_height(self) -> None:
+        if not self._custom_visible or self._custom_anim is not None:
+            return
+        height = max(1, self.custom_row.sizeHint().height())
+        self.custom_row.setMinimumHeight(height)
+        self.custom_row.setMaximumHeight(height)
+
+    def _clear_custom_fade(self) -> None:
+        self._custom_fade = None
+
+    def _show_custom_done(self) -> None:
+        self._custom_anim = None
+        self._sync_custom_height()
+
+    def _hide_custom_done(self) -> None:
+        self._custom_anim = None
+        if not self._custom_visible:
+            self.custom_row.setVisible(False)
+            self.custom_row.setMinimumHeight(0)
+            self.custom_row.setMaximumHeight(0)
+
+    def _update_glow(self) -> None:
+        active = (
+            self._can_patch
+            and not self._busy
+            and not self._reduce_motion()
+            and hasattr(self, "start_btn")
+        )
+        if not active:
+            self._stop_glow()
+            return
+        if self._glow is None:
+            self._glow = QGraphicsDropShadowEffect(self.start_btn)
+            self._glow.setOffset(0, 0)
+            self.start_btn.setGraphicsEffect(self._glow)
+        if self._glow_anim is None:
+            animation = QVariantAnimation(self)
+            animation.setStartValue(0.0)
+            animation.setEndValue(1.0)
+            animation.setDuration(2400)
+            animation.setLoopCount(-1)
+            animation.setEasingCurve(QEasingCurve(QEasingCurve.Type.InOutSine))
+            animation.valueChanged.connect(self._pulse_glow)
+            self._glow_anim = animation
+            animation.start()
+        self._pulse_glow(self._glow_anim.currentValue() or 0.0)
+
+    def _pulse_glow(self, value: object) -> None:
+        if self._glow is None:
+            return
+        phase = float(value)
+        color = QColor(self._theme.color("accent_light"))
+        color.setAlphaF(0.18 + 0.42 * phase)
+        self._glow.setColor(color)
+        self._glow.setBlurRadius(10.0 + 18.0 * phase)
+
+    def _stop_glow(self) -> None:
+        if self._glow_anim is not None:
+            self._glow_anim.stop()
+            self._glow_anim.deleteLater()
+            self._glow_anim = None
+        if self._glow is not None:
+            self.start_btn.setGraphicsEffect(None)
+            self._glow = None
+
+    def hideEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        self._stop_glow()
+        self.progress_bar.stop()
+        self._stop_custom_animation()
+        if self._custom_visible:
+            self.custom_row.setVisible(True)
+            self._sync_custom_height()
+        else:
+            self.custom_row.setVisible(False)
+            self.custom_row.setMinimumHeight(0)
+            self.custom_row.setMaximumHeight(0)
+        super().hideEvent(event)
+
+    def showEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        super().showEvent(event)
+        self._update_glow()
+        self.progress_bar.set_busy(self._busy)
 
     def set_focused_item(self, item: QueueItem | None) -> None:
         key = None if item is None else (item.item_id, id(item.info))

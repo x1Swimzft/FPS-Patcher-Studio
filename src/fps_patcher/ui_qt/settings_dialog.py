@@ -50,6 +50,7 @@ from ..core.ffmpeg_locator import locate
 from ..core.models import FPS_PRESETS
 from ..core.strategies import UI_PRESETS, migrate_strategy_name
 from ..ui.strings import t
+from .motion import fade_in
 from .qss import build_qss
 from .theme import Theme, ThemeManager
 from .widgets import Card, SegmentedControl, Switch, set_prop, text_button
@@ -114,6 +115,7 @@ class SettingsDialog(QDialog):
         self._swatches: list[tuple[QPushButton, str]] = []
         self._ff_status: QLabel | None = None
         self._ff_status_token = "muted"
+        self._fade_anim = None
 
         self.setObjectName("SettingsDialog")
         self.setWindowTitle(self._title())
@@ -326,6 +328,7 @@ class SettingsDialog(QDialog):
         theme = self._theme_manager.theme
         label = self._field_label(layout, key)
         control = SegmentedControl(items, _WidgetTheme(theme))
+        control.set_reduce_motion(bool(self._draft.reduce_motion))
         if current in items:
             control.set_value(current)
         control.setAccessibleName(label.text())
@@ -440,6 +443,7 @@ class SettingsDialog(QDialog):
         for color in SWATCHES:
             button = QPushButton()
             button.setProperty("variant", "icon")
+            button.setProperty("motionSkip", True)
             button.setFixedSize(theme.icon_button_size, theme.icon_button_size)
             button.setToolTip(color)
             button.setAccessibleName(f"{self._tr('custom_accent')} {color}")
@@ -1011,6 +1015,36 @@ class SettingsDialog(QDialog):
         folder = QFileDialog.getExistingDirectory(self, self._tr("browse"), start)
         if folder:
             edit.setText(folder)
+
+    def _stop_fade(self) -> None:
+        if self._fade_anim is not None:
+            self._fade_anim.stop()
+            self._fade_anim.deleteLater()
+            self._fade_anim = None
+        if self.graphicsEffect() is not None:
+            self.setGraphicsEffect(None)
+
+    def showEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        super().showEvent(event)
+        self._stop_fade()
+        if not self._draft.reduce_motion:
+            self._fade_anim = fade_in(self, 140, False)
+            if self._fade_anim is not None:
+                self._fade_anim.finished.connect(
+                    lambda: setattr(self, "_fade_anim", None)
+                )
+
+    def hideEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        self._stop_fade()
+        super().hideEvent(event)
+
+    def closeEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        self._stop_fade()
+        super().closeEvent(event)
+
+    def done(self, result: int) -> None:
+        self._stop_fade()
+        super().done(result)
 
     def reject(self) -> None:
         self._theme_manager.apply(self._settings)

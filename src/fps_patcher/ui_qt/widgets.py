@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from PySide6.QtCore import QPoint, QRectF, QSize, Qt, Signal
+from PySide6.QtCore import Property, QPoint, QRectF, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPaintEvent, QPen
 from PySide6.QtWidgets import (
     QAbstractButton,
@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from .icons import get_icon
+from .motion import animate
 from .theme import Theme
 
 
@@ -243,6 +244,8 @@ class SegmentedControl(QWidget):
         self._theme = theme
         self._hover = -1
         self._thumb = 0.0
+        self._thumb_anim = None
+        self.reduce_motion = False
         self.setFixedHeight(theme.segmented_height)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -253,11 +256,30 @@ class SegmentedControl(QWidget):
     def value(self) -> str:
         return self._items[self._index] if self._items else ""
 
+    @Property(float)
+    def thumbPosition(self) -> float:  # noqa: N802 - Qt property name
+        return self._thumb
+
+    @thumbPosition.setter
+    def thumbPosition(self, position: float) -> None:  # noqa: N802 - Qt property name
+        self._thumb = float(position)
+        self.update()
+
+    def set_reduce_motion(self, enabled: bool) -> None:
+        self.reduce_motion = bool(enabled)
+
+    def _stop_thumb(self) -> None:
+        if self._thumb_anim is not None:
+            self._thumb_anim.stop()
+            self._thumb_anim.deleteLater()
+            self._thumb_anim = None
+
     def set_items(self, items: list[str], value: str | None = None) -> None:
         self._items = list(items)
         if value in self._items:
             self._index = self._items.index(value)
         self._index = max(0, min(self._index, len(self._items) - 1))
+        self._stop_thumb()
         self._thumb = float(self._index)
         self.setAccessibleName(" / ".join(items))
         self.update()
@@ -269,7 +291,14 @@ class SegmentedControl(QWidget):
         if index == self._index:
             return
         self._index = index
-        self._thumb = float(index)
+        self._stop_thumb()
+        if self.reduce_motion or index == self._thumb:
+            self._thumb = float(index)
+            self.update()
+        else:
+            self._thumb_anim = animate(
+                self, b"thumbPosition", self._thumb, float(index), 180
+            )
         self.valueChanged.emit(value)
         self.update()
 
@@ -307,7 +336,7 @@ class SegmentedControl(QWidget):
 
         width = rect.width() / len(self._items)
         thumb = QRectF(
-            rect.left() + width * self._index + 2,
+            rect.left() + width * self._thumb + 2,
             rect.top() + 2,
             width - 4,
             rect.height() - 4,

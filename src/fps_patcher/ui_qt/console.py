@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 from ..config import Settings, app_data_dir
 from ..ui.strings import t
 from .icons import get_icon
+from .motion import animate_height
 from .theme import MONO_FONT_FAMILIES, RADIUS_PILL, UI_FONT_FAMILIES, Theme, ThemeManager
 from .widgets import ElidedLabel, icon_button
 
@@ -85,6 +86,7 @@ class ConsolePanel(QWidget):
         self._theme = theme_manager.theme
         self._expanded = False
         self._animated = False
+        self._height_anim = None
         self._show_ffmpeg = bool(settings.show_ffmpeg_output)
         self._entries: list[tuple[str, str, str]] = []  # (timestamp, text, tag)
         self._lines: list[str] = []
@@ -416,24 +418,60 @@ class ConsolePanel(QWidget):
         expanded = bool(expanded)
         if expanded == self._expanded:
             return
-        self._apply_expanded(expanded)
+        self._expanded = expanded
+        self._chevron.setIcon(
+            get_icon("chevron_down" if expanded else "chevron_right", True)
+        )
+        if expanded:
+            self.detail.setVisible(True)
+        self.expanded_changed.emit(expanded)
+        target = self._drawer_height(expanded)
+        if self._animated and not self.reduce_motion:
+            self._stop_height()
+            self._height_anim = animate_height(
+                self,
+                self.height(),
+                target,
+                220,
+                False,
+                on_finished=lambda: self._finish_drawer(expanded),
+            )
+        else:
+            self._apply_expanded(expanded)
+
+    def _drawer_height(self, expanded: bool) -> int:
+        return (
+            self._theme.console_expanded_height
+            if expanded
+            else self._theme.console_collapsed_height
+        )
+
+    def _finish_drawer(self, expanded: bool) -> None:
+        self._height_anim = None
+        if expanded == self._expanded:
+            self._apply_expanded(expanded)
+
+    def _stop_height(self) -> None:
+        if self._height_anim is not None:
+            self._height_anim.stop()
+            self._height_anim.deleteLater()
+            self._height_anim = None
 
     def _apply_expanded(self, expanded: bool) -> None:
-        """Commit the final drawer state; package 7 animates around this call."""
+        """Commit the final drawer state; animation always lands here."""
         expanded = bool(expanded)
-        changed = expanded != self._expanded
+        self._stop_height()
         self._expanded = expanded
         self.detail.setVisible(expanded)
         self._chevron.setIcon(
             get_icon("chevron_down" if expanded else "chevron_right", True)
         )
-        self.setFixedHeight(
-            self._theme.console_expanded_height
-            if expanded
-            else self._theme.console_collapsed_height
-        )
-        if changed:
-            self.expanded_changed.emit(expanded)
+        self.setFixedHeight(self._drawer_height(expanded))
+
+    def hideEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        self._stop_height()
+        self._apply_expanded(self._expanded)
+        super().hideEvent(event)
 
     # ---------- menu and actions ----------
     def _menu_position(self, menu: QMenu) -> QPoint:
