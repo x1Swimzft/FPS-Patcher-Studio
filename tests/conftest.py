@@ -10,6 +10,10 @@ from collections.abc import Generator
 from pathlib import Path
 from typing import Any
 
+# Qt tests must never try to open a real display; set this before PySide6 is
+# imported by pytest-qt or any test module.
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
 if sys.platform == "win32":
     with contextlib.suppress(Exception):
         import ctypes
@@ -19,6 +23,32 @@ if sys.platform == "win32":
 import pytest
 
 from fps_patcher.core.ffmpeg_locator import FFmpegPaths, locate
+
+
+@pytest.fixture(autouse=True)
+def _flush_qt_deferred_deletes() -> Generator[None, None, None]:
+    """Process Qt's deleteLater queue between tests so windows do not pile up."""
+    if "PySide6" in sys.modules:
+        from PySide6.QtCore import QCoreApplication, QEvent
+
+        app = QCoreApplication.instance()
+        if app is not None:
+            QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+            app.processEvents()
+    yield
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Run Qt widget tests before Tk initialises; both toolkits cannot share a process."""
+    qt_items = [item for item in items if item.path.name.startswith("test_ui_qt_")]
+    if not qt_items:
+        return
+    # Animation checks run before bulk MainWindow construction; Qt's offscreen
+    # paint/timer path is unstable once several top-level windows have been torn down.
+    priority = {"test_ui_qt_motion.py": 0, "test_ui_qt_main_window.py": 2}
+    qt_items.sort(key=lambda item: priority.get(item.path.name, 1))
+    items[:] = qt_items + [item for item in items if item not in qt_items]
+
 
 # uv-managed CPython may not locate its bundled Tcl/Tk scripts (init.tcl); point at them.
 _TCL_VARS = (("TCL_LIBRARY", "tcl8.6", "init.tcl"), ("TK_LIBRARY", "tk8.6", "tk.tcl"))
