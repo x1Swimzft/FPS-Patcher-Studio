@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import urllib.error
 from fractions import Fraction
 from pathlib import Path
 from typing import Any
@@ -122,6 +123,23 @@ def test_url_guard_rejects_foreign_hosts() -> None:
     with pytest.raises(updater.UpdateError):
         updater._check_url("https://evil.example.com/a.exe")
     updater._check_url("https://github.com/x1Swimzft/FPS-Patcher-Studio/releases")
+
+
+def test_check_for_update_404_means_no_release(monkeypatch: pytest.MonkeyPatch) -> None:
+    def missing(url: str, timeout: float) -> Any:
+        raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(updater, "_open", missing)
+    assert updater.check_for_update("0.9.0") is None
+
+
+def test_check_for_update_403_still_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    def forbidden(url: str, timeout: float) -> Any:
+        raise urllib.error.HTTPError(url, 403, "Forbidden", {}, None)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(updater, "_open", forbidden)
+    with pytest.raises(updater.UpdateError):
+        updater.check_for_update("0.9.0")
 
 
 class _FakeResp:

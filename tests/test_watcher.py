@@ -174,3 +174,65 @@ def test_restart_after_nonblocking_stop_retires_old_thread(tmp_path: Path) -> No
     first.join(2)
     assert not first.is_alive()  # the old stop event was not cleared by start()
     watcher.stop()
+
+
+def test_prime_ignores_files_that_already_exist(tmp_path: Path) -> None:
+    old = _touch(tmp_path, "old.mp4")
+    seen: list[Path] = []
+    watcher = FolderWatcher(tmp_path, seen.append, settle_scans=1, min_age_s=0.0)
+    watcher._is_locked = lambda _path: False  # type: ignore[method-assign]
+
+    watcher.prime()
+    assert watcher.scan(now=0.0) == []
+    assert watcher.scan(now=1.0) == []
+
+    old.write_bytes(b"xx")  # changing after start makes it a new export again
+    assert watcher.scan(now=2.0) == []
+    assert watcher.scan(now=3.0) == [old]
+    assert seen == [old]
+
+
+def test_start_ignores_backlog_and_delivers_new_files(tmp_path: Path) -> None:
+    old = _touch(tmp_path, "old.mp4")
+    seen: list[Path] = []
+    watcher = FolderWatcher(
+        tmp_path, seen.append, poll_interval=0.01, settle_scans=1, min_age_s=0.0
+    )
+    watcher._is_locked = lambda _path: False  # type: ignore[method-assign]
+    watcher.start()
+    try:
+        deadline = time.time() + 2
+        while not watcher._processed and time.time() < deadline:
+            time.sleep(0.01)
+        assert watcher._processed, "prime ran on the poll thread"
+        new = _touch(tmp_path, "new.mp4")
+        deadline = time.time() + 2
+        while not seen and time.time() < deadline:
+            time.sleep(0.01)
+    finally:
+        watcher.stop()
+    assert seen == [new]
+    assert old not in seen
+
+
+def test_restart_delivers_files_that_arrived_while_stopped(tmp_path: Path) -> None:
+    seen: list[Path] = []
+    watcher = FolderWatcher(
+        tmp_path, seen.append, poll_interval=0.01, settle_scans=1, min_age_s=0.0
+    )
+    watcher._is_locked = lambda _path: False  # type: ignore[method-assign]
+    watcher.start()
+    deadline = time.time() + 2
+    while not watcher._primed and time.time() < deadline:
+        time.sleep(0.01)
+    watcher.stop()
+
+    clip = _touch(tmp_path, "while-paused.mp4")
+    watcher.start()
+    try:
+        deadline = time.time() + 2
+        while not seen and time.time() < deadline:
+            time.sleep(0.01)
+    finally:
+        watcher.stop()
+    assert seen == [clip]

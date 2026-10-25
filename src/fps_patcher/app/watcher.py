@@ -2,7 +2,9 @@
 
 A file is ready when its size and mtime stay unchanged for ``settle_scans`` scans,
 it is older than ``min_age_s``, it opens for read/write on Windows, and it is not
-one of our own outputs. The callback runs on the watcher thread; it must be
+one of our own outputs. Files already in the folder when watching starts are
+recorded and ignored, so pointing the watcher at an old export folder does not
+patch its backlog. The callback runs on the watcher thread; it must be
 thread-safe and quick (the UI pushes into a queue).
 """
 
@@ -67,6 +69,7 @@ class FolderWatcher:
         self._processed: dict[Path, tuple[int, int]] = {}
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        self._primed = False
         self._deliver_lock = threading.RLock()
         self._is_locked = _is_locked
 
@@ -156,6 +159,20 @@ class FolderWatcher:
                 self._processed.pop(path, None)
         return ready
 
+    def prime(self) -> None:
+        """Ignore files that already exist; only files that change later are delivered."""
+        try:
+            entries = list(os.scandir(self.folder))
+        except OSError:
+            return
+        for entry in entries:
+            try:
+                if entry.is_file(follow_symlinks=False):
+                    stat = entry.stat()
+                    self._processed[Path(entry.path)] = (stat.st_size, stat.st_mtime_ns)
+            except OSError:
+                continue
+
     def start(self) -> None:
         if self._thread is not None and self._thread.is_alive():
             return
@@ -168,6 +185,10 @@ class FolderWatcher:
         self._thread.start()
 
     def _run(self, stop: threading.Event) -> None:
+        # Prime on the poll thread: folder I/O never blocks the UI thread.
+        if not self._primed:
+            self._primed = True
+            self.prime()
         while not stop.wait(self.poll_interval):
             try:
                 self.scan()

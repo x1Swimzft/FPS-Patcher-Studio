@@ -1,6 +1,6 @@
 """Per-user Explorer context menu registration (HKCU only, no admin).
 
-The verb is registered under ``SystemFileAssociations`` so it applies to .mp4/.mov
+The verb is registered under ``SystemFileAssociations`` so it applies to .mp4/.mov/.m4v
 without taking over the default file association.
 """
 
@@ -18,7 +18,7 @@ else:  # pragma: no cover - exercised on non-Windows CI only
 
 LABEL = "Quick Patch with X1T"
 _KEY_ROOT = r"Software\Classes\SystemFileAssociations\{ext}\shell\FPSPatcherStudio"
-_EXTENSIONS = (".mp4", ".mov")
+_EXTENSIONS = (".mp4", ".mov", ".m4v")
 
 
 class ShellIntegrationError(Exception):
@@ -51,7 +51,7 @@ def _key_path(ext: str) -> str:
 
 
 def install(exe: Path | None = None) -> None:
-    """Idempotently register the verb for .mp4 and .mov under HKCU."""
+    """Idempotently register the verb for .mp4, .mov and .m4v under HKCU."""
     reg = _reg()
     target = exe or application_executable()
     command = quick_patch_command(target)

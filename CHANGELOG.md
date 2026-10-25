@@ -12,12 +12,26 @@ All notable changes to FPS Patcher Studio are documented in this file.
 - Removed `customtkinter`, `tkinterdnd2` and `pywinstyles` dependencies and mypy overrides.
 - PyInstaller spec excludes Tcl/Tk, CustomTkinter, TkinterDnD2 and pywinstyles; only `ui/assets` is collected. Post-cutover artifact sizes are measured by the release build.
 
+## [0.10.0] - 2026-10-25
+
+### Completed: Phase 2/3 acceptance on the Qt UI
+- **Readiness badge is now actionable**: the badge paints its own text plus a hover tooltip with every check, and clicking it writes the per-check reasons (status, measured value, recommendation) to the Activity Console. The inspector's detail popover is unchanged.
+- **Watch folder**: files that already exist when watching starts are ignored, so pointing the watcher at an old export folder no longer patches its backlog; a file that changes after start is still picked up.
+- **Explorer verb**: registered for `.m4v` as well as `.mp4`/`.mov`.
+- **Updater**: HTTP 404 from `/releases/latest` now means "no release published" (no update) instead of an `UpdateError`; other HTTP failures still raise.
+- **Version metadata** unified at 0.10.0 (pyproject, `__version__`, `version_info.txt`, manifest, installer, `uv.lock`).
+
+### Verification
+- `uv run pytest -q` → 361 passed; `uv run ruff check .` and `uv run mypy src/fps_patcher` clean.
+- Real-ffmpeg e2e tests (PCM `.mov` normalize, `colr` add/scrub with `mdat` hash) were part of the run.
+- Not verified: registry writes on a real machine, toast display, and Nuitka/MSVC builds.
+
 ## [0.9.0] - 2026-10-25
 
 ### Added: Phase 3 — Platform Profiles & Pre-Flight Readiness Score
 - **Platform profiles**: `Generic`, `X1T — TikTok (No Compress)`, `X1T — Instagram Reels`, and `X1T — YouTube Shorts`, stored as typed offline data in `core/platform_profiles.py`.
 - **Readiness reports**: deterministic 0–100 heuristic score with `Ready`/`Review`/`Issues`/`Unknown` status, stable check ids, severity, measured value, explanation, recommendation, and evidence label (`documented`/`recommended`/`heuristic`).
-- **Queue badges**: every queue card shows the selected profile's readiness and refreshes when a file is added, re-probed, or the profile changes. Clicking a badge writes the per-check reasons to the Activity Console.
+- **Queue badges**: every queue card shows the selected profile's readiness and refreshes when a file is added, re-probed, or the profile changes. Per-check detail lives in the inspector popover (badge click logging ships in 0.10.0).
 - **Global selector**: profile selection sits beside the patch preset in the inspector, persists in `settings.json`, and never changes the patch strategy or media by itself.
 - **Truth-in-labeling**: no unverified `ftyp`/`moov` rewriting; no claim of guaranteed zero recompression. The TikTok preset retains its requested label with a visible disclaimer.
 - **HDR-safe**: HDR/BT.2020 metadata is reported, never stripped or forced to Rec.709. Unknown color metadata is reported as unknown, not as SDR.
@@ -29,7 +43,7 @@ All notable changes to FPS Patcher Studio are documented in this file.
 ### Notes
 - Scoring is read-only, offline, and reuses existing probe data; it does not add `ffprobe` calls or modify media.
 - Unknown critical fields cap the score at 70 and force `Review`; missing optional color metadata caps the score at 95. Missing data never produces a false `Ready 100%`.
-- Verification: 341 passed; `ruff check src tests` and `mypy src tests` clean (87 source/test files). PyInstaller one-folder build in a temporary output directory passed the 6-second launch smoke test; no release artifacts were replaced.
+- Verification: 356 passed; `ruff check .` and `mypy src/fps_patcher` clean on the Qt line (48 source files). The 341-test figure in the Phase 3 handoff was the Tk tree before cutover. PyInstaller one-folder build in a temporary output directory passed the 6-second launch smoke test; no release artifacts were replaced.
 
 ## [0.8.0] - 2026-10-24
 

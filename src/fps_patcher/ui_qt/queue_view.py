@@ -558,6 +558,7 @@ class QueueDelegate(QStyledItemDelegate):
         self._appear_anims: dict[str, QVariantAnimation] = {}
         self._pill_widths: dict[str, float] = {}
         self._action_pixmaps: dict[str, QPixmap] = {}
+        self._readiness_hits: dict[str, QRectF | None] = {}
         self.reduce_motion = False
         self.set_theme(self._theme)
 
@@ -656,6 +657,27 @@ class QueueDelegate(QStyledItemDelegate):
 
     def remove_rect(self, rect: QRectF) -> QRectF:
         return self.action_rects(rect)["remove"]
+
+    def readiness_rect(self, item: QueueItem) -> QRectF | None:
+        """Last painted badge rect; paint is what the user can actually click."""
+        if self._owner.readiness(item) is None:  # still probing: nothing to explain
+            return None
+        return self._readiness_hits.get(item.item_id)
+
+    def readiness_tooltip(self, item: QueueItem) -> str:
+        report = self._owner.readiness(item)
+        if report is None:
+            return self._owner.tr("readiness_unknown")
+        lines = [
+            f"{self._owner.tr(f'readiness_{report.status}')} {report.score}%",
+            *(
+                f"{check.label}: {self._owner.tr(f'check_status_{check.status}')} "
+                f"— {check.detail}"
+                for check in report.checks
+            ),
+            self._owner.tr("readiness_tip"),
+        ]
+        return "\n".join(lines)
 
     def row_pills(self, item: QueueItem) -> list[tuple[str, str]]:
         """Structured metadata for one row, keyed for tests and tooling."""
@@ -861,6 +883,7 @@ class QueueDelegate(QStyledItemDelegate):
 
         if show_readiness:
             self._draw_pill(painter, readiness_rect, readiness_text, readiness_token)
+        self._readiness_hits[item.item_id] = readiness_rect if show_readiness else None
         self._draw_pill(painter, status_rect, status_text, owner.status_token(item.status))
 
         if hovered or focused:
@@ -974,6 +997,7 @@ class QueueView(QWidget):
     selection_changed = Signal()
     status_message = Signal(str)
     forensic_requested = Signal(Path)
+    readiness_clicked = Signal(object)
 
     def __init__(
         self,
@@ -992,6 +1016,7 @@ class QueueView(QWidget):
         self.hover_row = -1
         self.hover_remove = -1
         self.hover_action = ""
+        self.hover_readiness = False
         self._known_ids: set[str] | None = None
         self._motion_window: QWidget | None = None
         self._readiness_cache: dict[str, tuple[int, str, ReadinessReport]] = {}
@@ -1619,6 +1644,7 @@ class QueueView(QWidget):
             self.hover_row = -1
             self.hover_remove = -1
             self.hover_action = ""
+            self.hover_readiness = False
             QToolTip.hideText()
             self.list_view.viewport().setCursor(Qt.CursorShape.ArrowCursor)
             self.list_view.viewport().update()
@@ -1656,6 +1682,11 @@ class QueueView(QWidget):
                 else:
                     self._show_context_menu(pos)
                 return True
+        badge = self.delegate.readiness_rect(item)
+        if badge is not None and badge.contains(pos):
+            self.readiness_clicked.emit(item)
+            self._focus_row(index.row(), open_player=False)
+            return True
         if self.delegate.checkbox_rect(rect).contains(pos):
             self._toggle_item(item, index.row())
             return True
@@ -1677,21 +1708,39 @@ class QueueView(QWidget):
             self.hover_row = -1
             self.hover_remove = -1
             self.hover_action = ""
+            self.hover_readiness = False
             QToolTip.hideText()
             self.list_view.viewport().setCursor(Qt.CursorShape.ArrowCursor)
             if changed:
                 self.list_view.viewport().update()
             return
         rect = QRectF(self.list_view.visualRect(index))
-        action = self._action_at(rect, pos)
+        item = self.model.item_at(index.row())
+        badge = self.delegate.readiness_rect(item) if item is not None else None
+        over_readiness = badge is not None and badge.contains(pos)
+        action = "" if over_readiness else self._action_at(rect, pos)
         over_remove = action == "remove"
         over_check = self.delegate.checkbox_rect(rect).contains(pos)
-        changed = (self.hover_row, self.hover_remove, self.hover_action) != (
+        changed = (
+            self.hover_row,
+            self.hover_remove,
+            self.hover_action,
+            self.hover_readiness,
+        ) != (
             index.row(),
             index.row() if over_remove else -1,
             action,
+            over_readiness,
         )
-        if action != self.hover_action:
+        if over_readiness != self.hover_readiness:
+            if over_readiness and item is not None:
+                QToolTip.showText(
+                    self.list_view.viewport().mapToGlobal(pos),
+                    self.delegate.readiness_tooltip(item),
+                )
+            else:
+                QToolTip.hideText()
+        elif action != self.hover_action:
             if action:
                 QToolTip.showText(
                     self.list_view.viewport().mapToGlobal(pos),
@@ -1702,7 +1751,8 @@ class QueueView(QWidget):
         self.hover_row = index.row()
         self.hover_remove = index.row() if over_remove else -1
         self.hover_action = action
-        interactive = bool(action) or over_check
+        self.hover_readiness = over_readiness
+        interactive = bool(action) or over_check or over_readiness
         self.list_view.viewport().setCursor(
             Qt.CursorShape.PointingHandCursor if interactive else Qt.CursorShape.ArrowCursor
         )

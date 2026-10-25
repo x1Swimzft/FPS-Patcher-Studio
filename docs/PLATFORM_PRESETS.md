@@ -1,6 +1,6 @@
 # Platform Presets & Readiness Scoring
 
-**Version:** 0.9.0  
+**Version:** 0.10.0  
 **Evidence reviewed:** 2026-10-25  
 **Scope:** read-only pre-flight checks. No media is modified by selecting a profile.
 

@@ -31,7 +31,7 @@ from PySide6.QtWidgets import (
 from .. import APP_NAME, __version__
 from ..app import shell_integration
 from ..app.controller import AppController
-from ..app.queue_model import InputQueue
+from ..app.queue_model import InputQueue, QueueItem
 from ..app.quick_patch import QUICK_PATCH_TIMESCALE
 from ..app.watcher import FolderWatcher
 from ..config import Settings, app_data_dir
@@ -47,6 +47,7 @@ from ..core.models import (
     UpdateDownloadEvent,
 )
 from ..core.notify import toast
+from ..core.platform_profiles import get_profile
 from ..core.strategies import strategy_requires_ffmpeg
 from ..ui.strings import t
 from .bridge import ControllerBridge
@@ -277,6 +278,7 @@ class MainWindow(QMainWindow):
         self.queue_view.focus_changed.connect(self._on_queue_focus_changed)
         self.queue_view.selection_changed.connect(self._refresh_readiness)
         self.queue_view.forensic_requested.connect(self._open_forensic_for)
+        self.queue_view.readiness_clicked.connect(self._log_readiness)
 
         self.inspector.patch_requested.connect(
             lambda timescale, strategy: self._start_patch(
@@ -530,15 +532,24 @@ class MainWindow(QMainWindow):
 
     # ----------------------------------------------------------------- watcher
     def _sync_watcher(self) -> None:
-        if self._watcher is not None:
-            self._watcher.stop(wait=False)
-            self._watcher = None
-        if not self.settings.watch_folder_enabled:
-            return
         folder = Path(self.settings.watch_folder) if self.settings.watch_folder else None
+        if not self.settings.watch_folder_enabled:
+            if self._watcher is not None:
+                self._watcher.stop(wait=False)
+                self._watcher = None
+            return
         if folder is None or not folder.is_dir():
+            if self._watcher is not None:
+                self._watcher.stop(wait=False)
+                self._watcher = None
             self.console.append("Watch folder is not configured or missing.", "WARN")
             return
+        # Keep a running watcher: restarting re-primes and would drop exports that
+        # finished while the settings dialog was open.
+        if self._watcher is not None and self._watcher.folder == folder:
+            return
+        if self._watcher is not None:
+            self._watcher.stop(wait=False)
         self._watcher = FolderWatcher(folder, self._watch_inbox.put)
         self._watcher.start()
         self.console.append(f"Watching folder: {folder}", "INFO")
@@ -738,6 +749,44 @@ class MainWindow(QMainWindow):
         self.queue_view.refresh()
         self._sync_focused_item()
         self._refresh_readiness()
+
+    def _log_readiness(self, item: QueueItem) -> None:
+        report = self.queue_view.readiness(item)
+        if report is None:
+            return
+        lang = self.settings.language
+        profile = get_profile(self.settings.platform_profile)
+        self.console.append(
+            t(
+                "readiness_log_title",
+                lang,
+                profile=t(profile.label_key, lang),
+                score=report.score,
+                status=t(f"readiness_{report.status}", lang),
+            ),
+            "INFO",
+        )
+        for check in report.checks:
+            level = {"warning": "WARN", "error": "ERROR"}.get(check.status, "INFO")
+            self.console.append(
+                t(
+                    "readiness_log_check",
+                    lang,
+                    check=check.label,
+                    status=t(f"check_status_{check.status}", lang),
+                    detail=check.detail,
+                ),
+                level,
+            )
+            if check.recommendation:
+                self.console.append(
+                    t(
+                        "readiness_log_recommend",
+                        lang,
+                        recommendation=check.recommendation,
+                    ),
+                    "INFO",
+                )
 
     def _refresh_readiness(self) -> None:
         strategy = self.inspector.strategy() or self.settings.strategy

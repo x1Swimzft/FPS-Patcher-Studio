@@ -95,7 +95,7 @@ When minimizing, restoring, maximizing, or Alt-Tabbing back to `FPS Patcher Stud
   - ระบบเฝ้าดูโฟลเดอร์ Export (เช่น โฟลเดอร์ขาออกของ CapCut / Premiere / DaVinci)
   - เมื่อเรนเดอร์คลิปเสร็จ แอปจะแพตช์ X1T ให้ในพื้นหลังทันที พร้อมเด้ง Windows Toast Notification
 - **2.2 Windows Explorer Right-Click Context Menu**:
-  - เพิ่มคำสั่งคลิกขวาบนไฟล์ `.mp4` / `.mov` -> `"⚡ Quick Patch with X1T"` (ลงทะเบียนใน `HKCU\Software\Classes\SystemFileAssociations\.mp4\shell`)
+  - เพิ่มคำสั่งคลิกขวาบนไฟล์ `.mp4` / `.mov` / `.m4v` -> `"⚡ Quick Patch with X1T"` (ลงทะเบียนใน `HKCU\Software\Classes\SystemFileAssociations\.mp4\shell`)
 - **2.3 Lossless Color Space (`colr` BT.709) Patcher & Metadata Scrubber**:
   - แพตช์กล่อง `colr` (`nclx` Primaries=1, Transfer=1, Matrix=1) เป็นมาตรฐาน Rec.709 แบบไม่ต้องเรนเดอร์ใหม่ แก้ปัญหาสีเพี้ยนหรือมืดลงบน TikTok
   - ล้างกล่อง `udta` / `meta` เพื่อลบประวัติซอฟต์แวร์ตัดต่อออกจากไฟล์
@@ -107,6 +107,9 @@ When minimizing, restoring, maximizing, or Alt-Tabbing back to `FPS Patcher Stud
 
 > Delivered in v0.9.0 as read-only platform profiles and readiness scoring. No
 > unverified `ftyp`/`moov` rewrites or platform-specific binary transforms were added.
+>
+> Acceptance completed on the Qt UI in v0.10.0 (badge tooltip + click-to-console,
+> watcher ignores pre-existing files, `.m4v` verb, updater 404 handling).
 
 - **3.1 Platform-Specific X1T Presets**:
   - `X1T — TikTok (No Compress)`

@@ -135,6 +135,11 @@ def check_for_update(current_version: str, timeout: float = 15) -> UpdateInfo | 
     try:
         with _open(LATEST_URL, timeout) as resp:
             data = json.loads(resp.read().decode("utf-8", errors="replace"))
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:  # no release published yet, not a failure
+            exc.close()
+            return None
+        raise UpdateError(f"Update check failed: {exc}") from exc
     except (OSError, urllib.error.URLError, json.JSONDecodeError) as exc:
         raise UpdateError(f"Update check failed: {exc}") from exc
     if not isinstance(data, dict) or data.get("draft") or data.get("prerelease"):

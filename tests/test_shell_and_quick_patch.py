@@ -63,7 +63,7 @@ def test_registry_install_query_uninstall(fake_registry: FakeWinreg) -> None:
     shell_integration.install(Path(r"C:\Apps\FPS Patcher Studio.exe"))
     assert shell_integration.is_installed()
 
-    for ext in (".mp4", ".mov"):
+    for ext in (".mp4", ".mov", ".m4v"):
         command = fake_registry.keys[
             rf"Software\Classes\SystemFileAssociations\{ext}"
             r"\shell\FPSPatcherStudio\command"

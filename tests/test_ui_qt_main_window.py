@@ -271,3 +271,69 @@ def test_settings_apply_refreshes_profile_strip(
     assert "X1T Clean" in summary
     assert t("drop_profile_output_custom", "en") in summary
     window.close()
+
+
+def _quicktime_info(path: Path) -> Any:
+    from fractions import Fraction
+
+    from fps_patcher.core.models import VideoInfo
+
+    return VideoInfo(
+        path=path,
+        codec="h264",
+        width=1080,
+        height=1920,
+        avg_fps=Fraction(60),
+        r_fps=Fraction(60),
+        duration_s=10.0,
+        timescale=60000,
+        nb_frames=600,
+        has_audio=True,
+        stream_count=2,
+        audio_codec="aac",
+        bit_rate=8_000_000,
+        audio_sample_rate=48_000,
+        audio_channels=2,
+        format_name="mov,mp4,m4a,3gp,3g2,mj2",
+        color_primaries="bt709",
+        color_transfer="bt709",
+        color_space="bt709",
+        pix_fmt="yuv420p",
+        file_size_bytes=path.stat().st_size,
+    )
+
+
+def test_readiness_badge_has_tooltip_and_click_logs_checks(
+    qtbot: Any, monkeypatch: Any, tmp_path: Path
+) -> None:
+    from qt_support import make_main_window
+
+    window = make_main_window(qtbot, monkeypatch, tmp_path)
+    video = tmp_path / "clip.mp4"
+    video.write_bytes(b"not a real video")
+    window.controller.items.add([video])
+    item = window.controller.items.get(video)
+    assert item is not None
+    item.info = _quicktime_info(video)
+    window.queue_view.refresh()
+    window.queue_view._focus_row(0, open_player=False)
+    window.resize(1600, 900)
+    window.show()
+    qtbot.waitExposed(window)
+    qtbot.wait(1)
+    window.queue_view.list_view.viewport().repaint()
+
+    delegate = window.queue_view.delegate
+    badge = delegate.readiness_rect(item)
+    assert badge is not None
+
+    tooltip = delegate.readiness_tooltip(item)
+    assert len(tooltip.splitlines()) > 1
+    assert t("readiness_tip", "en") in tooltip
+
+    assert window.queue_view._handle_click(badge.center().toPoint())
+    lines = "\n".join(window.console.get_lines())
+    assert "[READINESS]" in lines
+    assert "100/100" in lines
+    assert "Container:" in lines
+    window.close()
