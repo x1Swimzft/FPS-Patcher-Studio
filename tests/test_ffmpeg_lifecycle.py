@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ctypes
+import io
 import os
 import subprocess
 import sys
@@ -202,3 +203,66 @@ def test_run_json_timeout_kills_process(
         assert _wait_pid_gone(pid)
     finally:
         _kill_pid(pid)
+
+def test_second_cancel_force_kills_unresponsive_child(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class HangingProc:
+        pid = 2_000_000_000
+        _handle = None
+        returncode = None
+
+        def __init__(self, *_args: object, **_kwargs: object) -> None:
+            self.stdout = io.StringIO("")
+            self.stderr = io.StringIO("")
+            self.terminated = False
+            self.killed = False
+
+        def wait(self, timeout: float | None = None) -> int:
+            time.sleep(0.02)
+            raise subprocess.TimeoutExpired("fake", timeout or 0.0)
+
+        def poll(self) -> int | None:
+            return None  # deliberately ignores the soft stop
+
+        def terminate(self) -> None:
+            self.terminated = True
+
+        def kill(self) -> None:
+            self.killed = True
+
+    proc = HangingProc()
+    monkeypatch.setattr(
+        "fps_patcher.core.ffmpeg_runner.subprocess.Popen",
+        lambda *_args, **_kwargs: proc,
+    )
+    commands: list[object] = []
+
+    def fake_run(cmd: object, **_kwargs: object) -> subprocess.CompletedProcess[Any]:
+        commands.append(cmd)
+        return subprocess.CompletedProcess([], 1)
+
+    monkeypatch.setattr("fps_patcher.core.ffmpeg_runner.subprocess.run", fake_run)
+    cancel = threading.Event()
+    force = threading.Event()
+    cancel.set()
+
+    def press_again() -> None:
+        time.sleep(0.2)
+        force.set()
+
+    threading.Thread(target=press_again, daemon=True).start()
+    started = time.monotonic()
+    with pytest.raises(PatchCancelledError):
+        run_streaming(
+            Path(sys.executable),
+            [],
+            lambda _line: None,
+            lambda _line: None,
+            cancel,
+            force,
+        )
+
+    assert time.monotonic() - started < 3
+    assert proc.killed
+    assert any("taskkill" in str(cmd) for cmd in commands)

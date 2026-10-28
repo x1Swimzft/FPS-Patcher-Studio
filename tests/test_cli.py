@@ -151,12 +151,17 @@ def test_cli_cancel_returns_130(
     import signal
 
     def cancelled(
-        _request: object, _ffmpeg: object, _emit: object, cancel: Any = None
+        _request: object,
+        _ffmpeg: object,
+        _emit: object,
+        cancel: Any = None,
+        force_event: Any = None,
     ) -> None:
         handler = signal.getsignal(signal.SIGINT)
         assert callable(handler)
         handler(signal.SIGINT, None)  # what Ctrl+C does inside a patch
         assert cancel is not None and cancel.is_set()
+        assert force_event is not None and not force_event.is_set()
         raise PatchCancelledError("Patch cancelled by user.")
 
     monkeypatch.setattr("fps_patcher.cli.patch", cancelled)
@@ -167,6 +172,35 @@ def test_cli_cancel_returns_130(
     assert code == 130
     assert payload["cancelled"] is True
     assert payload["files"][0]["error"] == "cancelled"
+
+
+def test_cli_second_sigint_sets_force(
+    ff: FFmpegPaths, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: Any
+) -> None:
+    import signal
+
+    def cancelled(
+        _request: object,
+        _ffmpeg: object,
+        _emit: object,
+        cancel: Any = None,
+        force_event: Any = None,
+    ) -> None:
+        handler = signal.getsignal(signal.SIGINT)
+        assert callable(handler)
+        handler(signal.SIGINT, None)
+        handler(signal.SIGINT, None)
+        assert cancel is not None and cancel.is_set()
+        assert force_event is not None and force_event.is_set()
+        raise PatchCancelledError("Patch cancelled by user.")
+
+    monkeypatch.setattr("fps_patcher.cli.patch", cancelled)
+    clip = tmp_path / "clip.mp4"
+    clip.write_bytes(b"x")
+    code = main(["patch", str(clip), "--json"], _settings(ff, tmp_path))
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 130
+    assert payload["cancelled"] is True
 
 
 def test_cli_cancel_removes_partial_temp(
@@ -181,8 +215,10 @@ def test_cli_cancel_removes_partial_temp(
         _on_stdout: object,
         _on_stderr: object,
         cancel_event: Any = None,
+        force_event: Any = None,
     ) -> int:
         assert cancel_event is not None
+        assert force_event is not None
         cancel_event.set()
         raise PatchCancelledError("Patch cancelled by user.")
     monkeypatch.setattr("fps_patcher.core.patcher.run_streaming", cancel_inside)

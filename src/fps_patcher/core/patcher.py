@@ -209,6 +209,8 @@ def patch(
     paths: FFmpegPaths | None,
     emit: Emit,
     cancel_event: threading.Event | None = None,
+    *,
+    force_event: threading.Event | None = None,
 ) -> PatchResult:
     start = time.perf_counter()
     src = req.src
@@ -308,7 +310,13 @@ def patch(
                 )
                 emit(LogEvent(f"[PREFLIGHT] Auto-fix: {what}", "INFO"))
                 work_src = run_preflight(
-                    src, plan, paths, emit, cancel_event, extra_args=extra_args
+                    src,
+                    plan,
+                    paths,
+                    emit,
+                    cancel_event,
+                    extra_args=extra_args,
+                    force_event=force_event,
                 )
                 work_before = probe(work_src, ffprobe_bin)
                 emit(LogEvent("[PREFLIGHT] Done; patching the fixed copy.", "OK"))
@@ -389,7 +397,9 @@ def patch(
                 extra_args,
             )
             emit(LogEvent("ffmpeg " + " ".join(f'"{a}"' if " " in a else a for a in args), "DEBUG"))
-            code = run_streaming(paths.ffmpeg, args, on_stdout, on_stderr, cancel_event)
+            code = run_streaming(
+                paths.ffmpeg, args, on_stdout, on_stderr, cancel_event, force_event
+            )
             if code != 0:
                 raise PatchError(f"ffmpeg exited with code {code}", list(stderr_tail))
 

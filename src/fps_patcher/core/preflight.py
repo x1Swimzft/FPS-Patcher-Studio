@@ -326,6 +326,7 @@ def run_preflight(
     cancel_event: threading.Event | None = None,
     *,
     extra_args: Sequence[str] = (),
+    force_event: threading.Event | None = None,
 ) -> Path:
     """Run the pre-flight ffmpeg pass; return the temp file (caller deletes it)."""
     # Unique per invocation so two jobs on the same source never share a temp.
@@ -359,6 +360,7 @@ def run_preflight(
                     lambda _line: None,
                     on_stderr,
                     cancel_event,
+                    force_event,
                 )
             except Exception:
                 dst.unlink(missing_ok=True)  # cancel/error: never leave a partial preflight copy

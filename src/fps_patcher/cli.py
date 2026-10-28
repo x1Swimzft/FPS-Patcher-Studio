@@ -198,9 +198,21 @@ def _cmd_patch(args: argparse.Namespace, settings: Settings) -> int:
     auto_rename = not overwrite
 
     cancel = threading.Event()
+    force = threading.Event()
+    presses = 0
 
     def _cancel(_signum: int, _frame: Any) -> None:
-        cancel.set()
+        nonlocal presses
+        presses += 1
+        if presses == 1:
+            cancel.set()
+            print(
+                "Cancelling... press Ctrl+C again to force-kill.",
+                file=sys.stderr,
+            )
+        else:
+            force.set()
+            print("Force-killing...", file=sys.stderr)
 
     previous = signal.signal(signal.SIGINT, _cancel)
     files: list[dict[str, Any]] = []
@@ -235,7 +247,13 @@ def _cmd_patch(args: argparse.Namespace, settings: Settings) -> int:
                     backup_original=settings.backup_original,
                     extra_ffmpeg_args=settings.extra_ffmpeg_args,
                 )
-                result = patch(request, ffmpeg, _emit_stderr, cancel)
+                result = patch(
+                    request,
+                    ffmpeg,
+                    _emit_stderr,
+                    cancel,
+                    force_event=force,
+                )
                 entry["ok"] = True
                 entry["output"] = str(result.output)
                 if not args.json:

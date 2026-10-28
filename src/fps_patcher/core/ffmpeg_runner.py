@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import contextlib
 import json
+import os
 import shlex
 import subprocess
 import threading
+import time
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import IO, Any
@@ -47,14 +49,22 @@ def _kill(proc: subprocess.Popen[str]) -> None:
         proc.kill()
 
 
-def _wait_bounded(proc: subprocess.Popen[str], timeout: float = 5.0) -> None:
-    """Wait for a killed child, falling back to a direct kill; never wait forever."""
-    try:
-        proc.wait(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        _kill(proc)
-        with contextlib.suppress(subprocess.TimeoutExpired):
-            proc.wait(timeout=timeout)
+_CANCEL_GRACE_S = 5.0
+
+
+def _force_kill_tree(job: ProcessJob, proc: subprocess.Popen[str]) -> None:
+    """Second Ctrl+C / grace timeout: job kill then a native tree kill fallback."""
+    job.terminate()
+    if proc.poll() is None and os.name == "nt" and proc.pid:
+        with contextlib.suppress(OSError, subprocess.SubprocessError):
+            subprocess.run(
+                ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                capture_output=True,
+                timeout=10,
+                creationflags=CREATE_NO_WINDOW,
+                check=False,
+            )
+    _kill(proc)
 
 
 def run_json(ffprobe: Path, args: Sequence[str], timeout: float = 30) -> dict[str, Any]:
@@ -115,8 +125,14 @@ def run_streaming(
     on_stdout: LineCallback,
     on_stderr: LineCallback,
     cancel_event: threading.Event | None = None,
+    force_event: threading.Event | None = None,
 ) -> int:
-    """Run ffmpeg, streaming stdout/stderr lines to callbacks. Returns exit code."""
+    """Run ffmpeg, streaming stdout/stderr lines to callbacks. Returns exit code.
+
+    The first cancel asks the job/child to stop and waits briefly. If the
+    process is still alive when ``force_event`` is set (second Ctrl+C) or the
+    grace period expires, its process tree is force-killed before raising.
+    """
     cmd = [_checked_exe(ffmpeg), *args]
     job = ProcessJob()
     try:
@@ -147,14 +163,20 @@ def run_streaming(
         ]
         for t in readers:
             t.start()
+        cancelled = False
+        cancel_deadline = 0.0
         while True:
             if cancel_event is not None and cancel_event.is_set():
-                if not job.terminate():  # no job/assignment: direct child only
-                    _kill(proc)
-                _wait_bounded(proc)
-                for t in readers:
-                    t.join(timeout=2)
-                raise PatchCancelledError("Patch cancelled by user.")
+                if not cancelled:
+                    cancelled = True
+                    if not job.terminate():  # no job/assignment: direct child only
+                        _kill(proc)
+                    cancel_deadline = time.monotonic() + _CANCEL_GRACE_S
+                forced = force_event is not None and force_event.is_set()
+                if forced or time.monotonic() >= cancel_deadline:
+                    if proc.poll() is None:
+                        _force_kill_tree(job, proc)
+                    break
             try:
                 code = proc.wait(timeout=0.1)
                 break
@@ -162,6 +184,8 @@ def run_streaming(
                 continue
         for t in readers:
             t.join(timeout=2)
+        if cancelled:
+            raise PatchCancelledError("Patch cancelled by user.")
         return code
     finally:
         job.close()
