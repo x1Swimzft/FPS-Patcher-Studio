@@ -5,9 +5,10 @@ All notable changes to FPS Patcher Studio are documented in this file.
 ## [1.0.1] - Unreleased
 
 ### Fixed: v1.0.0 defect sweep
-- **Settings now have runtime consumers**: `verify_after`, `backup_original`, `stop_on_error`, `extra_ffmpeg_args`, `log_to_file`, `confirm_overwrite` and `notify_done` are wired through the GUI, CLI and watch paths.
-  - `extra_ffmpeg_args` is tokenised with `shlex.split(posix=True)` and passed as an argument vector; NUL bytes and malformed quoting are rejected and no shell is used.
+- **Settings now have runtime consumers**: `verify_after`, `backup_original`, `preserve_mtime`, `stop_on_error`, `extra_ffmpeg_args`, `log_to_file`, `confirm_overwrite` and `notify_done` are wired through the GUI, CLI and watch paths.
+  - `extra_ffmpeg_args` is tokenised with `shlex.split(posix=True)` and passed as an argument vector; NUL bytes and malformed quoting are rejected and no shell is used. The reserved input/output flags `-i`, `-y`, `-n` (and `-i=...`) are rejected before FFmpeg runs.
   - `backup_original` creates an exclusive `.bak` (or `.<n>.bak`) copy next to an existing destination before replacement; it never overwrites an existing backup.
+  - `preserve_mtime` copies the source's pre-patch access/modification timestamps onto the final output after the atomic replace. If Windows refuses the timestamp update, the patch succeeds with a warning.
   - `verify_after=false` skips both post-patch verifiers; `stop_on_error` stops controller and CLI batches at the first failure.
   - `confirm_overwrite` prompts in the GUI. Unattended watch and quick-patch runs auto-rename when it is enabled; the CLI `--overwrite` flag is explicit consent.
   - `log_to_file` controls rotating file logging at the entry points; `notify_done` dispatches `sound`, `toast` or `none` after manual batches and watch batches.
@@ -23,15 +24,14 @@ All notable changes to FPS Patcher Studio are documented in this file.
   change.
 
 ### Known limitations
-- No setting was hidden: all seven newly wired settings already have UI controls and consumers.
-- `preserve_mtime` is still persisted but has no runtime consumer; it is not claimed as fixed.
+- No setting was hidden: all eight newly wired settings already have UI controls and consumers.
 - `notify_done` defaults to `none`, so watch-folder and manual batch completion are silent until the user selects `sound` or `toast`.
 - Version metadata is still 1.0.0 and no v1.0.1 installer/zip has been built, tagged or published; those steps await approval.
 
 ### Verification
 - `uv run ruff check src tests tools` clean.
 - `uv run mypy src tests tools` clean (95 files).
-- `uv run pytest -q` 395 passed.
+- `uv run pytest -q` 403 passed.
 
 ## [1.0.0] - 2026-10-25
 

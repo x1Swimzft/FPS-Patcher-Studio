@@ -63,6 +63,7 @@ for the `stop_on_error` case. Record the settings file path so results are repro
 | S4.3 | Enter malformed quoting (for example a lone `"`); attempt a patch. | Patch is rejected with a clear settings/argument error; no FFmpeg run starts and no output is written. | | |
 | S4.4 | Enter shell metacharacters (for example `; calc`); attempt a patch. | Tokens are treated as FFmpeg arguments, not shell commands; no external program starts. | | |
 | S4.5 | Clear the field and patch a clip. | Behavior matches the pre-v1.0.1 default. | | |
+| S4.6 | Try each reserved flag: `-i other.mp4`, `-i=other.mp4`, `-y`, `-n`. | Each is rejected before FFmpeg runs with an error naming the input/output conflict; no output is written. | | |
 
 ### 2.5 `log_to_file`
 
@@ -93,11 +94,13 @@ for the `stop_on_error` case. Record the settings file path so results are repro
 | S7.4 | Repeat S7.2 and S7.3 for a watch-folder batch. | The selected notification fires after the watch batch, not per file. | | |
 | S7.5 | Cancel a manual batch with each mode; then cancel a watch batch. | Manual cancel fires no completion notification. Watch cancel may fire the watch-cancel notification when a mode is selected; record the observed behavior. | | |
 
-### 2.8 `preserve_mtime` (known limitation)
+### 2.8 `preserve_mtime`
 
 | # | Step | Expected | Result | Notes |
 |---|---|---|---|---|
-| S8.1 | Note that `preserve_mtime` remains persisted but unwired in v1.0.1. | No claim of working behavior; do not report a failure as a v1.0.1 regression. | | |
+| S8.1 | Set a known old modification time on a source clip, enable `preserve_mtime`, and patch it. | The output's modification time equals the source's pre-patch modification time. | | |
+| S8.2 | Disable `preserve_mtime` and patch the same source to a new output. | The output gets a fresh modification time, not the source's old timestamp. | | |
+| S8.3 | Repeat S8.1 from the CLI (with the setting saved) and from `--quick-patch`. | Both paths preserve the source timestamp. | | |
 
 ## 3. Two-stage Ctrl+C
 

@@ -9,22 +9,23 @@ tagged.
 
 ### Highlights
 
-- **Persisted settings now work** — the seven settings that v1.0.0 stored but never
+- **Persisted settings now work** — the eight settings that v1.0.0 stored but never
   read now have runtime consumers:
   - `verify_after` skips post-patch verification when disabled;
   - `backup_original` makes an exclusive `.bak`/`.<n>.bak` copy before replacing an
     existing output (an existing backup is never overwritten);
+  - `preserve_mtime` copies the source's pre-patch timestamps onto the final output;
   - `stop_on_error` stops GUI/CLI batches at the first failure;
   - `extra_ffmpeg_args` is tokenised without a shell (`shlex.split(posix=True)`),
     rejects NUL bytes/malformed quoting, and is injected before the output path and
-    into preflight;
+    into preflight. The app's input/output flags `-i`, `-y`, `-n` and `-i=...` are
+    rejected before FFmpeg runs;
   - `log_to_file` controls rotating file logging at the entry points;
   - `confirm_overwrite` prompts in the GUI; unattended watch/quick-patch runs
     auto-rename, and the CLI `--overwrite` flag is explicit consent;
   - `notify_done` dispatches `sound`, `toast` or `none` after manual and watch batches.
-- **No settings were hidden** — all seven already have UI controls and now have
-  consumers, so their controls stay visible. `preserve_mtime` remains persisted but
-  unwired and is still a documented limitation, not a fixed setting.
+- **No settings were hidden** — all eight already have UI controls and now have
+  consumers, so their controls stay visible.
 - **Two-stage Ctrl+C** — the first press requests a soft cancel and exits 130; a
   second press force-kills the job and its child process tree on Windows after a
   5-second grace period, followed by temporary-file cleanup.
@@ -55,7 +56,7 @@ tagged.
 
 - `uv run ruff check src tests tools` — clean.
 - `uv run mypy src tests tools` — clean (95 files).
-- `uv run pytest -q` — 395 passed (baseline 375).
+- `uv run pytest -q` — 403 passed (baseline 375).
 - Not verified: manual GUI/watch/Explorer/DPI checks, a frozen v1.0.1 build, code
   signing, and a real Windows machine without a development environment.
 
@@ -128,8 +129,7 @@ pipeline stays on PyInstaller.
 - Fragmented MP4 is skipped with a warning; offset repair for fragments is absent.
 - `notify_done`, `preserve_mtime`, `verify_after`, `backup_original`, `stop_on_error`,
   `extra_ffmpeg_args`, `log_to_file` and `confirm_overwrite` were persisted settings
-  with no runtime consumer in v1.0.0. v1.0.1 wires all of them except
-  `preserve_mtime`; that one remains unwired.
+  with no runtime consumer in v1.0.0. v1.0.1 wires all eight.
 - The windowed EXE has no console of its own; a double-click launch discards CLI
   output. Start it from a terminal for CLI mode.
 
