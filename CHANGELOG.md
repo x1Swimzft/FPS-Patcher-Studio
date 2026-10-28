@@ -18,8 +18,9 @@ All notable changes to FPS Patcher Studio are documented in this file.
 ### Documentation
 - README method order corrected, stale `v0.7.0` build filenames replaced with the current `v1.0.0` names, `tools` added to the ruff command, and the one-folder size recorded from measurement: 323,001,846 bytes (308.0 MiB, 189 files).
 - `score` added to the Nuitka CLI checklist and the release-notes CLI coverage.
-- Manual GUI/watch/Explorer/DPI checklist added separately; it has not been executed
-  as part of this change.
+- Manual GUI/watch/Explorer/DPI checklist added at
+  `docs/handoff/manual-test-v1.0.1.md`; it has not been executed as part of this
+  change.
 
 ### Known limitations
 - No setting was hidden: all seven newly wired settings already have UI controls and consumers.

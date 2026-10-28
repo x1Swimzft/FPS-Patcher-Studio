@@ -48,8 +48,8 @@ tagged.
   the current `v1.0.0` names, `tools` added to the ruff command, and the measured
   one-folder size recorded as 323,001,846 bytes (308.0 MiB, 189 files).
 - CLI `score` added where the Nuitka checklist and release verification omitted it.
-- New manual test checklist will cover GUI, watch-folder, Explorer and CLI checks.
-  **Not executed in this change**; every pass/fail field is left for a human tester.
+- New manual test checklist: `docs/handoff/manual-test-v1.0.1.md`. **Not executed in
+  this change**; every pass/fail field is left for a human tester.
 
 ### Verification
 
