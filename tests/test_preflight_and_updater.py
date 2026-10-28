@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import urllib.error
 from fractions import Fraction
 from pathlib import Path
@@ -126,18 +127,36 @@ def test_url_guard_rejects_foreign_hosts() -> None:
 
 
 def test_check_for_update_404_means_no_release(monkeypatch: pytest.MonkeyPatch) -> None:
+    fp = io.BytesIO(b"not found")
+
     def missing(url: str, timeout: float) -> Any:
-        raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)  # type: ignore[arg-type]
+        raise urllib.error.HTTPError(url, 404, "Not Found", {}, fp)  # type: ignore[arg-type]
 
     monkeypatch.setattr(updater, "_open", missing)
     assert updater.check_for_update("0.9.0") is None
+    assert fp.closed
 
 
-def test_check_for_update_403_still_errors(monkeypatch: pytest.MonkeyPatch) -> None:
-    def forbidden(url: str, timeout: float) -> Any:
-        raise urllib.error.HTTPError(url, 403, "Forbidden", {}, None)  # type: ignore[arg-type]
+@pytest.mark.parametrize("code", [403, 500])
+def test_check_for_update_http_error_is_closed(
+    code: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fp = io.BytesIO(b"error body")
 
-    monkeypatch.setattr(updater, "_open", forbidden)
+    def failing(url: str, timeout: float) -> Any:
+        raise urllib.error.HTTPError(url, code, "Error", {}, fp)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(updater, "_open", failing)
+    with pytest.raises(updater.UpdateError):
+        updater.check_for_update("0.9.0")
+    assert fp.closed
+
+
+def test_check_for_update_timeout_is_an_update_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    def slow(url: str, timeout: float) -> Any:
+        raise urllib.error.URLError(TimeoutError("timed out"))
+
+    monkeypatch.setattr(updater, "_open", slow)
     with pytest.raises(updater.UpdateError):
         updater.check_for_update("0.9.0")
 
@@ -170,6 +189,33 @@ def test_download_verifies_sha(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     out = updater.download_update(_info_for(data, hashlib.sha256(data).hexdigest()), tmp_path)
     assert out.read_bytes() == data
     assert not list(tmp_path.glob("*.part"))
+
+
+def test_download_closes_http_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    fp = io.BytesIO(b"forbidden")
+
+    def failing(url: str, timeout: float) -> Any:
+        raise urllib.error.HTTPError(url, 403, "Forbidden", {}, fp)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(updater, "_open", failing)
+    with pytest.raises(updater.UpdateError):
+        updater.download_update(_info_for(b"x", None), tmp_path)
+    assert fp.closed
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_sha_lookup_closes_http_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    fp = io.BytesIO(b"forbidden")
+
+    def failing(url: str, timeout: float) -> Any:
+        raise urllib.error.HTTPError(url, 403, "Forbidden", {}, fp)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(updater, "_open", failing)
+    assets = [
+        {"name": "Setup.exe.sha256", "browser_download_url": "https://github.com/x/sha"}
+    ]
+    assert updater._find_sha256(assets, "Setup.exe", 1) is None
+    assert fp.closed
 
 
 def test_download_rejects_bad_sha(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

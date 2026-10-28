@@ -14,7 +14,8 @@ import subprocess
 import sys
 import urllib.error
 import urllib.request
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -81,6 +82,17 @@ def _open(url: str, timeout: float) -> Any:
     return urllib.request.urlopen(req, timeout=timeout)  # noqa: S310
 
 
+@contextmanager
+def _open_checked(url: str, timeout: float) -> Iterator[Any]:
+    """Close HTTPError responses, which urlopen raises instead of returning."""
+    try:
+        with _open(url, timeout) as resp:
+            yield resp
+    except urllib.error.HTTPError as exc:
+        exc.close()
+        raise
+
+
 def _pick_asset(assets: list[dict[str, Any]]) -> dict[str, Any] | None:
     """Prefer the Windows installer, then any .exe, then a .zip."""
 
@@ -104,7 +116,7 @@ def _find_sha256(assets: list[dict[str, Any]], asset_name: str, timeout: float) 
     for a in assets:
         if str(a.get("name", "")).lower() in wanted and a.get("browser_download_url"):
             try:
-                with _open(str(a["browser_download_url"]), timeout) as resp:
+                with _open_checked(str(a["browser_download_url"]), timeout) as resp:
                     text = resp.read(4096).decode("utf-8", errors="replace")
             except (OSError, UpdateError):
                 return None
@@ -133,11 +145,10 @@ def parse_release(data: dict[str, Any], timeout: float = 15) -> UpdateInfo:
 def check_for_update(current_version: str, timeout: float = 15) -> UpdateInfo | None:
     """Return release info when a newer version exists, else None. Raises UpdateError."""
     try:
-        with _open(LATEST_URL, timeout) as resp:
+        with _open_checked(LATEST_URL, timeout) as resp:
             data = json.loads(resp.read().decode("utf-8", errors="replace"))
     except urllib.error.HTTPError as exc:
         if exc.code == 404:  # no release published yet, not a failure
-            exc.close()
             return None
         raise UpdateError(f"Update check failed: {exc}") from exc
     except (OSError, urllib.error.URLError, json.JSONDecodeError) as exc:
@@ -163,7 +174,7 @@ def download_update(
     part = final.with_name(final.name + ".part")
     digest = hashlib.sha256()
     try:
-        with _open(info.asset_url, timeout) as resp, part.open("wb") as fh:
+        with _open_checked(info.asset_url, timeout) as resp, part.open("wb") as fh:
             total = int(resp.headers.get("Content-Length") or info.asset_size or 0)
             done = 0
             while chunk := resp.read(256 * 1024):
