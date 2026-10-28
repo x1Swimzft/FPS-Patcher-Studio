@@ -28,7 +28,7 @@ def launches(monkeypatch: pytest.MonkeyPatch) -> tuple[list[tuple[str, Any]], ob
     monkeypatch.setattr(Settings, "load", classmethod(lambda cls: settings))
     monkeypatch.setattr(
         "fps_patcher.logging_setup.setup_logging",
-        lambda: logging.getLogger("fps_patcher.entrypoint_test"),
+        lambda enabled=True: logging.getLogger("fps_patcher.entrypoint_test"),
     )
     monkeypatch.setattr("fps_patcher.ui_qt.app.run", fake_qt_run)
     monkeypatch.delenv("FPS_PATCHER_UI", raising=False)

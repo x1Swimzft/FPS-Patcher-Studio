@@ -217,6 +217,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "confirm_cancel_run": (
             "A patching operation is in progress. Are you sure you want to cancel?"
         ),
+        "confirm_overwrite_run": (
+            "This run will overwrite {count} existing output file(s). Continue?"
+        ),
         "export_success": "Settings exported to {path}",
         "import_success": "Settings imported successfully.",
         "import_error": "Failed to parse imported settings JSON.",
@@ -561,6 +564,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "restart_hint": "หมายเหตุ: การปรับขนาด UI หรือภาษาบางส่วนจะแสดงผลทันทีหรือเมื่อเริ่มโปรแกรมใหม่",
         "reset_confirm": "ต้องการคืนค่าเริ่มต้นทั้งหมดหรือไม่? การตั้งค่าเดิมจะหายไป",
         "confirm_cancel_run": "กำลังแปลงไฟล์อยู่ ต้องการยกเลิกใช่หรือไม่?",
+        "confirm_overwrite_run": "การแปลงนี้จะเขียนทับไฟล์ผลลัพธ์ที่มีอยู่ {count} ไฟล์ ต้องการดำเนินการต่อหรือไม่?",
         "export_success": "ส่งออกการตั้งค่าไปยัง {path}",
         "import_success": "นำเข้าการตั้งค่าเรียบร้อยแล้ว",
         "import_error": "ไม่สามารถอ่านไฟล์ JSON การตั้งค่าได้",

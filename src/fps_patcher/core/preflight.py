@@ -103,7 +103,11 @@ def _video_args(encoder: str | None) -> list[str]:
 
 
 def build_preflight_args(
-    src: Path, dst: Path, plan: PreflightPlan, encoder: str | None = None
+    src: Path,
+    dst: Path,
+    plan: PreflightPlan,
+    encoder: str | None = None,
+    extra_args: Sequence[str] = (),
 ) -> list[str]:
     """ffmpeg arguments for one pre-flight pass (audio-only or audio+video)."""
     video_encoder = (encoder or SOFTWARE_ENCODER) if plan.cap_bitrate else None
@@ -114,6 +118,7 @@ def build_preflight_args(
         "-map_metadata", "0",
         *_video_args(video_encoder),
         *_audio_args(plan.normalize_audio),
+        *extra_args,
         "-progress", "pipe:1",
         str(dst),
     ]  # fmt: skip
@@ -319,6 +324,8 @@ def run_preflight(
     paths: FFmpegPaths,
     emit: Emit,
     cancel_event: threading.Event | None = None,
+    *,
+    extra_args: Sequence[str] = (),
 ) -> Path:
     """Run the pre-flight ffmpeg pass; return the temp file (caller deletes it)."""
     # Unique per invocation so two jobs on the same source never share a temp.
@@ -348,7 +355,7 @@ def run_preflight(
             try:
                 code = run_streaming(
                     paths.ffmpeg,
-                    build_preflight_args(src, dst, plan, encoder),
+                    build_preflight_args(src, dst, plan, encoder, extra_args),
                     lambda _line: None,
                     on_stderr,
                     cancel_event,

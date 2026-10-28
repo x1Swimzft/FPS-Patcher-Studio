@@ -75,6 +75,9 @@ class PatchRequest:
     auto_cap_bitrate: bool = False
     fix_color_tag: bool = False
     scrub_metadata: bool = False
+    verify_after: bool = True
+    backup_original: bool = True
+    extra_ffmpeg_args: str = ""
 
 
 @dataclass(frozen=True)

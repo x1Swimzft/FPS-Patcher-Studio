@@ -231,6 +231,9 @@ def _cmd_patch(args: argparse.Namespace, settings: Settings) -> int:
                     auto_cap_bitrate=bool(args.cap_bitrate),
                     fix_color_tag=bool(args.tag_bt709),
                     scrub_metadata=bool(args.scrub_metadata),
+                    verify_after=settings.verify_after,
+                    backup_original=settings.backup_original,
+                    extra_ffmpeg_args=settings.extra_ffmpeg_args,
                 )
                 result = patch(request, ffmpeg, _emit_stderr, cancel)
                 entry["ok"] = True
@@ -246,6 +249,8 @@ def _cmd_patch(args: argparse.Namespace, settings: Settings) -> int:
                 entry["error"] = str(exc)
                 files.append(entry)
                 print(f"Failed: {source}: {exc}", file=sys.stderr)
+                if settings.stop_on_error:
+                    break
                 continue
             files.append(entry)
     finally:

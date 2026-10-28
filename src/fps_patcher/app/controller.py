@@ -370,6 +370,10 @@ class AppController:
 
         eff_overwrite = self.settings.overwrite if overwrite is None else overwrite
         eff_auto_rename = self.settings.auto_rename if auto_rename is None else auto_rename
+        if only_paths is not None and self.settings.confirm_overwrite:
+            # Watch-folder runs are unattended: never overwrite without a prompt.
+            eff_overwrite = False
+            eff_auto_rename = True
 
         ff = self.ffmpeg
         total_files = len(items)
@@ -421,6 +425,9 @@ class AppController:
                         auto_cap_bitrate=self.settings.auto_cap_bitrate,
                         fix_color_tag=self.settings.fix_color_tag,
                         scrub_metadata=self.settings.scrub_metadata,
+                        verify_after=self.settings.verify_after,
+                        backup_original=self.settings.backup_original,
+                        extra_ffmpeg_args=self.settings.extra_ffmpeg_args,
                     )
 
                     self.emit(LogEvent(f"[{idx}/{total_files}] Starting patch for {src.name}"))
@@ -444,6 +451,7 @@ class AppController:
                         else:
                             self.emit(evt)
 
+                    file_failed = False
                     try:
                         self.items.set_status(src, "patching")
                         self.emit(QueueChangedEvent("patching"))
@@ -457,6 +465,7 @@ class AppController:
                         self.emit(LogEvent(f"[{idx}/{total_files}] Cancelled {src.name}", "WARN"))
                         break
                     except OutputFileExistsError as exc:
+                        file_failed = True
                         last_error = str(exc)
                         failed.append((src, str(exc)))
                         self.items.set_status(src, "failed", error=str(exc))
@@ -467,6 +476,7 @@ class AppController:
                             )
                         )
                     except PatchError as exc:
+                        file_failed = True
                         last_error = str(exc)
                         last_stderr = exc.stderr_tail
                         failed.append((src, str(exc)))
@@ -475,6 +485,7 @@ class AppController:
                             LogEvent(f"[{idx}/{total_files}] Failed {src.name}: {exc}", "ERROR")
                         )
                     except FPSPatcherError as exc:
+                        file_failed = True
                         last_error = str(exc)
                         failed.append((src, str(exc)))
                         self.items.set_status(src, "failed", error=str(exc))
@@ -486,6 +497,7 @@ class AppController:
                         )
                     except Exception as exc:
                         log.exception("Unexpected patch failure in batch")
+                        file_failed = True
                         last_error = f"Unexpected error: {exc}"
                         failed.append((src, last_error))
                         self.items.set_status(src, "failed", error=last_error)
@@ -497,6 +509,15 @@ class AppController:
                         )
                     finally:
                         self.current_patching_path = None
+                    if file_failed and self.settings.stop_on_error:
+                        self.emit(
+                            LogEvent(
+                                f"[{idx}/{total_files}] Stopping batch after first error "
+                                "(stop_on_error).",
+                                "WARN",
+                            )
+                        )
+                        break
             finally:
                 self.current_patching_path = None
 

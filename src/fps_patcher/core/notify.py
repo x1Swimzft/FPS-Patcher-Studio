@@ -35,6 +35,23 @@ _TOAST_SCRIPT = "\n".join(
 )
 
 
+def notify(mode: str, message: str) -> bool:
+    """Dispatch the ``notify_done`` setting: ``none``, ``sound`` or ``toast``."""
+    if mode == "toast":
+        return toast(message)
+    if mode == "sound":
+        if sys.platform != "win32":
+            return False
+        try:
+            import winsound
+
+            winsound.MessageBeep()
+        except (OSError, RuntimeError):
+            return False
+        return True
+    return False
+
+
 def toast(
     message: str,
     *,

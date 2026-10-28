@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import shutil
 import tempfile
 import threading
 import time
@@ -23,7 +24,7 @@ from .errors import (
     VerifyError,
 )
 from .ffmpeg_locator import FFmpegPaths
-from .ffmpeg_runner import run_streaming
+from .ffmpeg_runner import parse_extra_ffmpeg_args, run_streaming
 from .models import (
     SUPPORTED_EXTENSIONS,
     LogEvent,
@@ -144,6 +145,35 @@ def _temp_output(final: Path) -> Path:
     return Path(name)
 
 
+def backup_existing_output(final: Path) -> Path:
+    """Copy an existing output beside itself without ever replacing a backup.
+
+    ``.bak`` is tried first, then ``.<n>.bak``. Creation is exclusive so a
+    pre-existing backup (possibly a user file) is never overwritten; if no
+    backup can be created the caller aborts before touching ``final``.
+    """
+    for index in range(10_000):
+        candidate = final.with_name(
+            f"{final.name}.bak" if index == 0 else f"{final.name}.{index}.bak"
+        )
+        try:
+            with final.open("rb") as src, candidate.open("xb") as dst:
+                shutil.copyfileobj(src, dst)
+            shutil.copystat(final, candidate)
+            return candidate
+        except FileExistsError:
+            continue
+        except OSError as exc:
+            candidate.unlink(missing_ok=True)
+            raise PatchError(f"Could not back up '{final.name}': {exc}") from exc
+    raise PatchError(f"Could not find a free backup name for '{final.name}'.")
+
+
+def _insert_extra_args(args: list[str], extra: list[str]) -> list[str]:
+    """Place user arguments before the output path (the last argv item)."""
+    return [*args[:-1], *extra, args[-1]] if extra else args
+
+
 def _cleanup_stale_temps(final: Path, max_age_s: float = 24 * 3600) -> int:
     """Delete abandoned temp files that match this destination's own name pattern.
 
@@ -234,6 +264,7 @@ def patch(
     emit(LogEvent(f"Strategy: {strategy.label}"))
 
     stderr_tail: deque[str] = deque(maxlen=15)
+    extra_args = parse_extra_ffmpeg_args(req.extra_ffmpeg_args)
 
     # Smart pre-flight (audio normalise / bitrate cap) works on a temp copy; the
     # original source is never modified. ``work_src`` feeds the patch strategies.
@@ -276,7 +307,9 @@ def patch(
                     if on
                 )
                 emit(LogEvent(f"[PREFLIGHT] Auto-fix: {what}", "INFO"))
-                work_src = run_preflight(src, plan, paths, emit, cancel_event)
+                work_src = run_preflight(
+                    src, plan, paths, emit, cancel_event, extra_args=extra_args
+                )
                 work_before = probe(work_src, ffprobe_bin)
                 emit(LogEvent("[PREFLIGHT] Done; patching the fixed copy.", "OK"))
 
@@ -351,7 +384,10 @@ def patch(
         else:
             if paths is None:
                 raise FFmpegNotFoundError("FFmpeg executable required for stream copy.")
-            args = strategy.build_args(replace(req, src=work_src), work_before, tmp)
+            args = _insert_extra_args(
+                strategy.build_args(replace(req, src=work_src), work_before, tmp),
+                extra_args,
+            )
             emit(LogEvent("ffmpeg " + " ".join(f'"{a}"' if " " in a else a for a in args), "DEBUG"))
             code = run_streaming(paths.ffmpeg, args, on_stdout, on_stderr, cancel_event)
             if code != 0:
@@ -374,22 +410,36 @@ def patch(
             )
 
         after = probe(tmp, ffprobe_bin)
-        dur_tol: float | None = None
-        norm_strat = strategy.name.replace("x1t-", "bxd-")
-        if norm_strat == "bxd-hybrid" and req.bxd_max_tail_ms > 0:
-            dur_tol = max(0.25, (req.bxd_max_tail_ms / 1000.0) + 0.1)
-        warnings = verify(work_before, after, req.timescale, duration_tolerance_s=dur_tol)
-        for w in warnings:
-            emit(LogEvent(w, "WARN"))
-
-        # Output detailed payload integrity log
-        integrity = verify_payload_integrity(work_src, tmp)
-        experimental = any(status == "EXPERIMENTAL" for status in integrity.values())
-        for item, status in integrity.items():
-            level: LogLevel = (
-                "OK" if status == "PASS" else ("WARN" if status == "EXPERIMENTAL" else "ERROR")
+        experimental = False
+        if req.verify_after:
+            dur_tol: float | None = None
+            norm_strat = strategy.name.replace("x1t-", "bxd-")
+            if norm_strat == "bxd-hybrid" and req.bxd_max_tail_ms > 0:
+                dur_tol = max(0.25, (req.bxd_max_tail_ms / 1000.0) + 0.1)
+            warnings = verify(
+                work_before, after, req.timescale, duration_tolerance_s=dur_tol
             )
-            emit(LogEvent(f"[VERIFY] {item:<18} {status}", level))
+            for w in warnings:
+                emit(LogEvent(w, "WARN"))
+
+            # Output detailed payload integrity log
+            integrity = verify_payload_integrity(work_src, tmp)
+            experimental = any(status == "EXPERIMENTAL" for status in integrity.values())
+            for item, status in integrity.items():
+                level: LogLevel = (
+                    "OK"
+                    if status == "PASS"
+                    else ("WARN" if status == "EXPERIMENTAL" else "ERROR")
+                )
+                emit(LogEvent(f"[VERIFY] {item:<18} {status}", level))
+        else:
+            emit(LogEvent("[VERIFY] Skipped: verify_after is disabled.", "WARN"))
+
+        # Back up the file we are about to replace before touching it. ``final``
+        # can never be the source here (checked above).
+        if req.backup_original and final.exists():
+            backup = backup_existing_output(final)
+            emit(LogEvent(f"Backup: {backup}", "INFO"))
 
         # os.replace is atomic on NTFS; unlink+rename left a window where a crash
         # could destroy the previous output.

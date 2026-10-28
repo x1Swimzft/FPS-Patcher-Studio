@@ -4,17 +4,35 @@ from __future__ import annotations
 
 import contextlib
 import json
+import shlex
 import subprocess
 import threading
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import IO, Any
 
-from .errors import PatchCancelledError, ProbeError
+from .errors import PatchCancelledError, PatchError, ProbeError
 from .ffmpeg_locator import CREATE_NO_WINDOW
 from .win_job import ProcessJob
 
 LineCallback = Callable[[str], None]
+
+
+def parse_extra_ffmpeg_args(text: str) -> list[str]:
+    """Split a user argument string into argv tokens without invoking a shell.
+
+    ``shlex`` only tokenises; the result always goes to ``subprocess`` as a list,
+    so quotes, ``&`` or ``|`` cannot become shell syntax. A malformed quote or a
+    NUL byte is rejected instead of silently dropping part of the input.
+    """
+    if not text or not text.strip():
+        return []
+    if "\x00" in text:
+        raise PatchError("Extra FFmpeg arguments contain a NUL byte.")
+    try:
+        return shlex.split(text, posix=True)
+    except ValueError as exc:
+        raise PatchError(f"Invalid extra FFmpeg arguments: {exc}") from exc
 
 
 def _checked_exe(path: Path) -> str:

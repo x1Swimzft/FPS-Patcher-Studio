@@ -30,13 +30,14 @@ def _ffmpeg(settings: Settings) -> FFmpegPaths | None:
 
 
 def _request(path: Path, settings: Settings) -> PatchRequest:
+    overwrite = settings.overwrite and not settings.confirm_overwrite
     return PatchRequest(
         src=path,
         out_dir=Path(settings.output_dir) if settings.output_dir else path.parent,
         timescale=QUICK_PATCH_TIMESCALE,
         strategy=settings.strategy,
-        overwrite=settings.overwrite,
-        auto_rename=settings.auto_rename,
+        overwrite=overwrite,
+        auto_rename=settings.auto_rename or settings.confirm_overwrite,
         v4_strict_lossless=settings.v4_strict_lossless,
         v4_preserve_video=settings.v4_preserve_video,
         v4_preserve_audio=settings.v4_preserve_audio,
@@ -49,6 +50,9 @@ def _request(path: Path, settings: Settings) -> PatchRequest:
         auto_cap_bitrate=settings.auto_cap_bitrate,
         fix_color_tag=settings.fix_color_tag,
         scrub_metadata=settings.scrub_metadata,
+        verify_after=settings.verify_after,
+        backup_original=settings.backup_original,
+        extra_ffmpeg_args=settings.extra_ffmpeg_args,
     )
 
 

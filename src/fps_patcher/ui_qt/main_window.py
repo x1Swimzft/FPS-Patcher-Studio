@@ -40,13 +40,15 @@ from ..core.models import (
     FFmpegDownloadEvent,
     LogEvent,
     PatchDoneEvent,
+    PatchRequest,
     ProbeDoneEvent,
     ProgressEvent,
     QueueChangedEvent,
     UpdateAvailableEvent,
     UpdateDownloadEvent,
 )
-from ..core.notify import toast
+from ..core.notify import notify
+from ..core.patcher import output_base_for
 from ..core.platform_profiles import get_profile
 from ..core.strategies import strategy_requires_ffmpeg
 from ..ui.strings import t
@@ -580,7 +582,13 @@ class MainWindow(QMainWindow):
             self._watch_batch_active = False
 
     def _notify_watch_done(self, message: str) -> None:
-        threading.Thread(target=toast, args=(message,), daemon=True).start()
+        self._notify_done(message)
+
+    def _notify_done(self, message: str) -> None:
+        mode = self.settings.notify_done
+        if mode == "none":
+            return
+        threading.Thread(target=notify, args=(mode, message), daemon=True).start()
 
     def _cleanup_stale_preflight(self) -> None:
         from ..core.preflight import cleanup_stale_preflight
@@ -637,6 +645,7 @@ class MainWindow(QMainWindow):
         lang = self.settings.language
         self._queue_dirty = True
         self._latest_progress = None
+        was_watch = self._watch_batch_active
 
         if self._watch_batch_active:
             self._watch_batch_active = False
@@ -704,6 +713,17 @@ class MainWindow(QMainWindow):
             self.inspector.set_idle()
 
         self._refresh_readiness()
+        if not was_watch and not event.cancelled:
+            total = event.total_files or len(event.batch_results) + len(event.failed)
+            self._notify_done(
+                t(
+                    "batch_summary_msg",
+                    lang,
+                    ok=max(total - len(event.failed), 0),
+                    failed=len(event.failed),
+                    total=total,
+                )
+            )
 
     def _flush_events(self) -> None:
         if self._pending_logs:
@@ -821,6 +841,36 @@ class MainWindow(QMainWindow):
             if strategy is not None
             else self.inspector.strategy() or self.settings.strategy
         )
+        if self.settings.overwrite and self.settings.confirm_overwrite:
+            existing = 0
+            for item in self.controller.items.snapshot_for_run(only_selected):
+                out_dir = (
+                    Path(self.settings.output_dir)
+                    if self.settings.output_dir
+                    else item.path.parent
+                )
+                base = output_base_for(
+                    PatchRequest(
+                        src=item.path,
+                        out_dir=out_dir,
+                        timescale=item.timescale or effective_timescale,
+                        strategy=item.strategy or effective_strategy,
+                    )
+                )
+                if base.exists():
+                    existing += 1
+            if existing:
+                answer = QMessageBox.question(
+                    self,
+                    t("app_title", self.settings.language),
+                    t(
+                        "confirm_overwrite_run",
+                        self.settings.language,
+                        count=existing,
+                    ),
+                )
+                if answer != QMessageBox.StandardButton.Yes:
+                    return
         self.controller.start_patch(
             effective_timescale, effective_strategy, only_selected=only_selected
         )
