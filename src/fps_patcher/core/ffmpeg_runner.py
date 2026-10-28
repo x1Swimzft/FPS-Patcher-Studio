@@ -19,22 +19,37 @@ from .win_job import ProcessJob
 
 LineCallback = Callable[[str], None]
 
+_RESERVED_EXTRA_ARGS = frozenset({"-i", "-y", "-n"})
+
 
 def parse_extra_ffmpeg_args(text: str) -> list[str]:
     """Split a user argument string into argv tokens without invoking a shell.
 
     ``shlex`` only tokenises; the result always goes to ``subprocess`` as a list,
     so quotes, ``&`` or ``|`` cannot become shell syntax. A malformed quote or a
-    NUL byte is rejected instead of silently dropping part of the input.
+    NUL byte is rejected instead of silently dropping part of the input. Options
+    that would replace the app's input or output (``-i``, ``-y``, ``-n``) are
+    rejected before FFmpeg runs.
     """
     if not text or not text.strip():
         return []
     if "\x00" in text:
         raise PatchError("Extra FFmpeg arguments contain a NUL byte.")
     try:
-        return shlex.split(text, posix=True)
+        tokens = shlex.split(text, posix=True)
     except ValueError as exc:
         raise PatchError(f"Invalid extra FFmpeg arguments: {exc}") from exc
+    reserved = sorted(
+        token
+        for token in set(tokens)
+        if token in _RESERVED_EXTRA_ARGS or token.startswith("-i=")
+    )
+    if reserved:
+        raise PatchError(
+            "Extra FFmpeg arguments may not override the app's input/output: "
+            + ", ".join(reserved)
+        )
+    return tokens
 
 
 def _checked_exe(path: Path) -> str:

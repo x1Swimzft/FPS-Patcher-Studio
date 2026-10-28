@@ -35,10 +35,18 @@ def test_extra_ffmpeg_args_are_tokenised_without_a_shell() -> None:
     ]
     # Shell metacharacters stay inert data because subprocess receives a list.
     assert parse_extra_ffmpeg_args("a; rm -rf /") == ["a;", "rm", "-rf", "/"]
+    # A value that merely contains a reserved name is allowed.
+    assert parse_extra_ffmpeg_args("-metadata title=-y") == ["-metadata", "title=-y"]
     with pytest.raises(PatchError):
         parse_extra_ffmpeg_args("'unterminated")
     with pytest.raises(PatchError):
         parse_extra_ffmpeg_args("ok\x00bad")
+
+
+@pytest.mark.parametrize("arg", ["-i other.mp4", "-i=other.mp4", "-y", "-n"])
+def test_extra_ffmpeg_args_reject_reserved_input_output_flags(arg: str) -> None:
+    with pytest.raises(PatchError, match="input/output"):
+        parse_extra_ffmpeg_args(f"-movflags +faststart {arg}")
 
 
 def test_extra_args_are_inserted_before_the_output_path() -> None:

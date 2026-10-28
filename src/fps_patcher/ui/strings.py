@@ -190,7 +190,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "check_on_start": "Check FFmpeg on startup",
         "show_output_console": "Show verbose FFmpeg stdout/stderr in console",
         "extra_args": "Extra FFmpeg Arguments (Advanced)",
-        "extra_args_warn": "Caution: Invalid flags may cause remux failure.",
+        "extra_args_warn": "Caution: -i, -y and -n are reserved by the app and rejected.",
         # Console Tab
         "console_font_size": "Console Font Size",
         "max_log_lines": "Max Log Buffer Lines",
@@ -549,7 +549,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "check_on_start": "ตรวจสอบ FFmpeg เมื่อเปิดโปรแกรม",
         "show_output_console": "แสดงข้อความละเอียดจาก FFmpeg ในคอนโซล",
         "extra_args": "พารามิเตอร์เสริม FFmpeg (ขั้นสูง)",
-        "extra_args_warn": "คำเตือน: คำสั่งที่ไม่ถูกต้องอาจทำให้การ remux ล้มเหลว",
+        "extra_args_warn": "คำเตือน: -i, -y และ -n สงวนไว้สำหรับแอปและจะถูกปฏิเสธ",
         # Console Tab
         "console_font_size": "ขนาดอักษรในคอนโซล",
         "max_log_lines": "จำนวนบรรทัดบันทึกสูงสุด",
