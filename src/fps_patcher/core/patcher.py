@@ -215,6 +215,7 @@ def patch(
     start = time.perf_counter()
     src = req.src
     validate_input(src)
+    source_stat = src.stat() if req.preserve_mtime else None
     if req.timescale <= 0:
         raise PatchError("Timescale must be a positive integer.")
     req.out_dir.mkdir(parents=True, exist_ok=True)
@@ -454,6 +455,15 @@ def patch(
         # os.replace is atomic on NTFS; unlink+rename left a window where a crash
         # could destroy the previous output.
         os.replace(tmp, final)
+        if source_stat is not None:
+            try:
+                os.utime(
+                    final,
+                    ns=(source_stat.st_atime_ns, source_stat.st_mtime_ns),
+                )
+                emit(LogEvent(f"[MTIME] Preserved timestamps on {final.name}", "INFO"))
+            except OSError as exc:
+                emit(LogEvent(f"[MTIME] Could not preserve timestamps: {exc}", "WARN"))
     except (PatchError, VerifyError) as exc:
         if tmp is not None:
             tmp.unlink(missing_ok=True)

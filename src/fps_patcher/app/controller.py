@@ -427,6 +427,7 @@ class AppController:
                         scrub_metadata=self.settings.scrub_metadata,
                         verify_after=self.settings.verify_after,
                         backup_original=self.settings.backup_original,
+                        preserve_mtime=self.settings.preserve_mtime,
                         extra_ffmpeg_args=self.settings.extra_ffmpeg_args,
                     )
 

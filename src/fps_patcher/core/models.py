@@ -77,6 +77,7 @@ class PatchRequest:
     scrub_metadata: bool = False
     verify_after: bool = True
     backup_original: bool = True
+    preserve_mtime: bool = True
     extra_ffmpeg_args: str = ""
 
 

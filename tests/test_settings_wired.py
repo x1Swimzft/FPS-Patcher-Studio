@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -90,6 +91,47 @@ def test_backup_original_copies_the_output_being_replaced(
     assert backup.read_bytes() == original
 
 
+def test_preserve_mtime_copies_source_timestamp(
+    clip30: Path, ff: Any, tmp_path: Path
+) -> None:
+    stamp = 1_600_000_000_000_000_000
+    os.utime(clip30, ns=(stamp, stamp))
+    request = PatchRequest(
+        src=clip30,
+        out_dir=tmp_path,
+        timescale=60000,
+        strategy="direct-atom",
+        backup_original=False,
+        preserve_mtime=True,
+        verify_after=False,
+    )
+
+    result = patch(request, ff, lambda _event: None)
+
+    assert result.output.stat().st_mtime_ns == stamp
+    assert clip30.stat().st_mtime_ns == stamp
+
+
+def test_preserve_mtime_false_keeps_fresh_output_timestamp(
+    clip30: Path, ff: Any, tmp_path: Path
+) -> None:
+    stamp = 1_600_000_000_000_000_000
+    os.utime(clip30, ns=(stamp, stamp))
+    request = PatchRequest(
+        src=clip30,
+        out_dir=tmp_path,
+        timescale=60000,
+        strategy="direct-atom",
+        backup_original=False,
+        preserve_mtime=False,
+        verify_after=False,
+    )
+
+    result = patch(request, ff, lambda _event: None)
+
+    assert result.output.stat().st_mtime_ns != stamp
+
+
 def test_verify_after_false_skips_both_verifiers(
     clip30: Path, ff: Any, tmp_path: Path, monkeypatch: Any
 ) -> None:
@@ -127,6 +169,7 @@ def test_controller_wires_settings_and_stops_on_error(
         stop_on_error=stop_on_error,
         verify_after=False,
         backup_original=False,
+        preserve_mtime=False,
         extra_ffmpeg_args="-movflags +faststart",
     )
     controller = AppController(settings)
@@ -149,6 +192,7 @@ def test_controller_wires_settings_and_stops_on_error(
     request = calls[0]
     assert request.verify_after is False
     assert request.backup_original is False
+    assert request.preserve_mtime is False
     assert request.extra_ffmpeg_args == "-movflags +faststart"
 
 
@@ -159,20 +203,21 @@ def test_cli_stop_on_error_halts_after_first_failure(
     second = tmp_path / "b.mp4"
     first.write_bytes(b"x")
     second.write_bytes(b"x")
-    calls: list[Path] = []
+    calls: list[PatchRequest] = []
 
     def fake_patch(request: PatchRequest, *_args: Any, **_kwargs: Any) -> Any:
-        calls.append(request.src)
+        calls.append(request)
         raise PatchError("boom")
 
     monkeypatch.setattr("fps_patcher.cli.patch", fake_patch)
     code = cli_main(
         ["patch", str(first), str(second)],
-        Settings(stop_on_error=True),
+        Settings(stop_on_error=True, preserve_mtime=False),
     )
 
     assert code == 1
-    assert calls == [first]
+    assert [request.src for request in calls] == [first]
+    assert calls[0].preserve_mtime is False
     assert "boom" in capsys.readouterr().err
 
 
@@ -239,6 +284,9 @@ def test_quick_patch_never_overwrites_when_confirmation_is_on() -> None:
         Path("clip.mp4"), Settings(overwrite=True, confirm_overwrite=False)
     )
     assert explicit.overwrite is True
+    assert quick_request(
+        Path("clip.mp4"), Settings(preserve_mtime=False)
+    ).preserve_mtime is False
 
 
 def test_gui_confirm_overwrite_declines_and_accepts(

@@ -245,6 +245,7 @@ def _cmd_patch(args: argparse.Namespace, settings: Settings) -> int:
                     scrub_metadata=bool(args.scrub_metadata),
                     verify_after=settings.verify_after,
                     backup_original=settings.backup_original,
+                    preserve_mtime=settings.preserve_mtime,
                     extra_ffmpeg_args=settings.extra_ffmpeg_args,
                 )
                 result = patch(
