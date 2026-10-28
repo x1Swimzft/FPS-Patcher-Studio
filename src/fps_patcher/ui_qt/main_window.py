@@ -51,7 +51,7 @@ from ..core.notify import notify
 from ..core.patcher import output_base_for
 from ..core.platform_profiles import get_profile
 from ..core.strategies import strategy_requires_ffmpeg
-from ..ui.strings import t
+from ..ui.strings import readiness_check_label, t
 from .bridge import ControllerBridge
 from .console import ConsolePanel
 from .forensic_dialog import ForensicDialog
@@ -792,7 +792,7 @@ class MainWindow(QMainWindow):
                 t(
                     "readiness_log_check",
                     lang,
-                    check=check.label,
+                    check=readiness_check_label(check.check_id, check.label, lang),
                     status=t(f"check_status_{check.status}", lang),
                     detail=check.detail,
                 ),

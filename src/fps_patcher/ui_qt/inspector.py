@@ -38,7 +38,7 @@ from ..core.platform_profiles import (
     get_profile,
 )
 from ..core.strategies import UI_PRESETS, migrate_strategy_name
-from ..ui.strings import t
+from ..ui.strings import readiness_check_label, t
 from .icons import get_icon
 from .motion import MotionProgressBar, animate_height, fade
 from .theme import UI_FONT_FAMILIES, Theme, ThemeManager
@@ -1190,7 +1190,9 @@ QScrollArea, QWidget#PopoverBody {{ background: transparent; border: none; }}
             for check in report.checks:
                 status = t(f"check_status_{check.status}", lang)
                 color = theme.color(_CHECK_STATUS_TOKEN.get(check.status, "muted"))
-                line = QLabel(f"{check.label} — {status}")
+                line = QLabel(
+                    f"{readiness_check_label(check.check_id, check.label, lang)} — {status}"
+                )
                 line.setStyleSheet(f"color: {color}; font-weight: 600;")
                 line.setWordWrap(True)
                 content_layout.addWidget(line)

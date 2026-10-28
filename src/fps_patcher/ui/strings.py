@@ -58,6 +58,16 @@ STRINGS: dict[str, dict[str, str]] = {
         "check_status_warning": "Warning",
         "check_status_error": "Error",
         "check_status_unknown": "Unknown",
+        "readiness_check_container": "Container",
+        "readiness_check_video_codec": "Video codec",
+        "readiness_check_frame_geometry": "Resolution / aspect ratio",
+        "readiness_check_frame_rate": "Frame rate",
+        "readiness_check_duration": "Duration",
+        "readiness_check_file_size": "File size",
+        "readiness_check_audio": "Audio",
+        "readiness_check_bitrate": "Bitrate",
+        "readiness_check_hdr_color": "Color / HDR",
+        "readiness_check_probe": "Probe",
         "readiness_disclaimer": (
             "Readiness is a local metadata heuristic, not an official platform score. "
             "It cannot guarantee that a platform will skip re-compression. "
@@ -407,6 +417,16 @@ STRINGS: dict[str, dict[str, str]] = {
         "check_status_warning": "คำเตือน",
         "check_status_error": "ข้อผิดพลาด",
         "check_status_unknown": "ไม่ทราบ",
+        "readiness_check_container": "คอนเทนเนอร์",
+        "readiness_check_video_codec": "รหัสวิดีโอ",
+        "readiness_check_frame_geometry": "ความละเอียด / อัตราส่วนภาพ",
+        "readiness_check_frame_rate": "อัตราเฟรม",
+        "readiness_check_duration": "ความยาวคลิป",
+        "readiness_check_file_size": "ขนาดไฟล์",
+        "readiness_check_audio": "เสียง",
+        "readiness_check_bitrate": "บิตเรต",
+        "readiness_check_hdr_color": "สี / HDR",
+        "readiness_check_probe": "การตรวจสอบไฟล์",
         "readiness_disclaimer": (
             "คะแนนความพร้อมคำนวณจากข้อมูลไฟล์ในเครื่องเท่านั้น ไม่ใช่คะแนนอย่างเป็นทางการ "
             "และไม่รับประกันว่าแพลตฟอร์มจะไม่บีบอัดวิดีโออีกครั้ง "
@@ -706,3 +726,9 @@ def t(key: str, lang: str = "en", **kwargs: object) -> str:
         except Exception:
             return text
     return text
+
+
+def readiness_check_label(check_id: str, fallback: str, lang: str = "en") -> str:
+    """Localized readiness label; new checks keep their English label until translated."""
+    key = f"readiness_check_{check_id}"
+    return t(key, lang) if key in STRINGS["en"] else fallback

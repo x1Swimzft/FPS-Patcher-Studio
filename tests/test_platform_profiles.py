@@ -15,7 +15,7 @@ from fps_patcher.core.platform_profiles import (
     get_profile,
 )
 from fps_patcher.core.prober import parse_probe
-from fps_patcher.ui.strings import STRINGS, t
+from fps_patcher.ui.strings import STRINGS, readiness_check_label, t
 
 
 def _info(tmp_path: Path, **overrides: object) -> VideoInfo:
@@ -321,3 +321,26 @@ def test_new_localization_keys_exist_in_both_languages() -> None:
     assert keys <= set(STRINGS["en"])
     assert keys <= set(STRINGS["th"])
     assert set(STRINGS["en"]) == set(STRINGS["th"])
+
+
+def test_readiness_check_labels_exist_in_both_languages(tmp_path: Path) -> None:
+    check_ids = {c.check_id for c in evaluate_readiness(_info(tmp_path), "tiktok").checks}
+    check_ids |= {c.check_id for c in evaluate_readiness(None, "tiktok").checks}
+    assert check_ids == {
+        "container",
+        "video_codec",
+        "frame_geometry",
+        "frame_rate",
+        "duration",
+        "file_size",
+        "audio",
+        "bitrate",
+        "hdr_color",
+        "probe",
+    }
+    for lang in ("en", "th"):
+        for check_id in check_ids:
+            assert readiness_check_label(check_id, "fallback", lang) != (
+                f"readiness_check_{check_id}"
+            )
+    assert readiness_check_label("future_check", "Future check", "th") == "Future check"

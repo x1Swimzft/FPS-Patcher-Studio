@@ -71,7 +71,7 @@ from ..app.queue_model import QueueItem
 from ..core.models import FPS_PRESETS, SUPPORTED_EXTENSIONS
 from ..core.platform_profiles import ReadinessReport, evaluate_readiness
 from ..core.strategies import UI_PRESETS, migrate_strategy_name
-from ..ui.strings import t
+from ..ui.strings import readiness_check_label, t
 from .icons import get_icon
 from .motion import animate
 from .theme import UI_FONT_FAMILIES, Theme
@@ -670,13 +670,14 @@ class QueueDelegate(QStyledItemDelegate):
             return self._owner.tr("readiness_unknown")
         lines = [
             f"{self._owner.tr(f'readiness_{report.status}')} {report.score}%",
-            *(
-                f"{check.label}: {self._owner.tr(f'check_status_{check.status}')} "
-                f"— {check.detail}"
-                for check in report.checks
-            ),
-            self._owner.tr("readiness_tip"),
         ]
+        for check in report.checks:
+            label = readiness_check_label(
+                check.check_id, check.label, self._owner.settings.language
+            )
+            status = self._owner.tr(f"check_status_{check.status}")
+            lines.append(f"{label}: {status} — {check.detail}")
+        lines.append(self._owner.tr("readiness_tip"))
         return "\n".join(lines)
 
     def row_pills(self, item: QueueItem) -> list[tuple[str, str]]:
