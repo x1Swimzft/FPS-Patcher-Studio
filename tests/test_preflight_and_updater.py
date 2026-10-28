@@ -162,10 +162,14 @@ def test_check_for_update_timeout_is_an_update_error(monkeypatch: pytest.MonkeyP
 
 
 class _FakeResp:
-    def __init__(self, payload: bytes) -> None:
+    def __init__(self, payload: bytes, error: BaseException | None = None) -> None:
         self._p, self.headers = payload, {"Content-Length": str(len(payload))}
+        self._error = error
+        self.closed = False
 
     def read(self, n: int = -1) -> bytes:
+        if self._error is not None:
+            raise self._error
         out, self._p = self._p[:n], self._p[n:]
         return out
 
@@ -173,7 +177,7 @@ class _FakeResp:
         return self
 
     def __exit__(self, *a: object) -> None:
-        return None
+        self.closed = True
 
 
 def _info_for(payload: bytes, sha: str | None) -> updater.UpdateInfo:
@@ -181,6 +185,27 @@ def _info_for(payload: bytes, sha: str | None) -> updater.UpdateInfo:
         "0.6.0", "v0.6.0", "", "https://github.com/x", "Setup.exe",
         "https://github.com/x/Setup.exe", len(payload), sha,
     )  # fmt: skip
+
+
+def test_check_for_update_read_timeout_closes_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    resp = _FakeResp(b"", error=TimeoutError("timed out while reading"))
+    monkeypatch.setattr(updater, "_open", lambda url, timeout: resp)
+    with pytest.raises(updater.UpdateError):
+        updater.check_for_update("0.9.0")
+    assert resp.closed
+
+
+def test_download_read_timeout_closes_response_and_removes_part(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    resp = _FakeResp(b"", error=TimeoutError("timed out while reading"))
+    monkeypatch.setattr(updater, "_open", lambda url, timeout: resp)
+    with pytest.raises(updater.UpdateError):
+        updater.download_update(_info_for(b"x", None), tmp_path)
+    assert resp.closed
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_download_verifies_sha(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
