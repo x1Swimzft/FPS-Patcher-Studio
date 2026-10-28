@@ -44,8 +44,8 @@ Unlike traditional video converters or FFmpeg stream copying, FPS Patcher Studio
 
 The links only resolve after v1.0.0 is published. Until then, build from source
 (`build/release.ps1`) or use the artifacts produced by that script in `release/`.
-Approximate sizes: installer ~84 MB, portable zip ~117 MB, one-folder build ~323 MB
-(189 files). Exact sizes and hashes are in `FPSPatcherStudio-v1.0.0.sha256` and
+Approximate sizes: installer ~84 MB, portable zip ~117 MB, one-folder build
+~308 MiB (323,001,846 bytes; 189 files). Exact sizes and hashes are in `FPSPatcherStudio-v1.0.0.sha256` and
 `FPSPatcherStudio-v1.0.0.manifest.json`, which are generated from the artifacts
 themselves and therefore are the authoritative numbers.
 
@@ -181,15 +181,6 @@ Open the **Forensic** window to inspect deep container metadata before and after
 4. Select the target preset (default: **X1T For Mobile**) or specify a custom timescale.
 5. Click **Start Patch**. Patched files are saved next to the source or in the configured output folder.
 
-### Method 3: Headless CLI
-```powershell
-FPSPatcherStudio.exe --cli patch "clip.mp4" --preset 60 --output out --json
-FPSPatcherStudio.exe --cli probe "clip.mp4" --json
-FPSPatcherStudio.exe --cli score "clip.mp4" --profile tiktok --json
-```
-Run it from cmd/PowerShell: a windowed build attaches to the parent console. Exit codes are
-0 (ok), 1 (file failure), 2 (usage) and 130 (cancelled). See `BUILDING.md` §7.
-
 ### Method 2: Running from Source
 Requires [Python 3.11+](https://www.python.org/) and [uv](https://docs.astral.sh/uv/):
 
@@ -205,6 +196,15 @@ uv sync
 uv run fps-patcher-studio
 ```
 
+### Method 3: Headless CLI
+```powershell
+FPSPatcherStudio.exe --cli patch "clip.mp4" --preset 60 --output out --json
+FPSPatcherStudio.exe --cli probe "clip.mp4" --json
+FPSPatcherStudio.exe --cli score "clip.mp4" --profile tiktok --json
+```
+Run it from cmd/PowerShell: a windowed build attaches to the parent console. Exit codes are
+0 (ok), 1 (file failure), 2 (usage) and 130 (cancelled). See `BUILDING.md` §7.
+
 ---
 
 ## 🛠️ Development & Testing
@@ -218,7 +218,7 @@ uv run pytest -q
 uv run mypy src tests tools
 
 # Run code style and linter
-uv run ruff check src tests
+uv run ruff check src tests tools
 ```
 
 ### Building Standalone Distributable
@@ -227,8 +227,8 @@ To compile the PySide6 PyInstaller one-folder portable package and Inno Setup in
 powershell -ExecutionPolicy Bypass -File build\release.ps1
 ```
 Build artifacts will be placed in `release/`:
-- `FPSPatcherStudio-v0.7.0-Setup.exe`
-- `FPSPatcherStudio-v0.7.0-win64.zip`
+- `FPSPatcherStudio-v1.0.0-Setup.exe`
+- `FPSPatcherStudio-v1.0.0-win64.zip`
 
 ---
 

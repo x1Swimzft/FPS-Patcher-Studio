@@ -1,5 +1,64 @@
 # Release Notes
 
+## v1.0.1 - Unreleased (defect fixes)
+
+Prepared on `fix/v1.0.1`. This is a defect-fix release: no new features, no
+telemetry, and no version bump or release build yet. The v1.0.0 artifacts in
+`release/` remain the current binaries until this version is approved, built and
+tagged.
+
+### Highlights
+
+- **Persisted settings now work** — the seven settings that v1.0.0 stored but never
+  read now have runtime consumers:
+  - `verify_after` skips post-patch verification when disabled;
+  - `backup_original` makes an exclusive `.bak`/`.<n>.bak` copy before replacing an
+    existing output (an existing backup is never overwritten);
+  - `stop_on_error` stops GUI/CLI batches at the first failure;
+  - `extra_ffmpeg_args` is tokenised without a shell (`shlex.split(posix=True)`),
+    rejects NUL bytes/malformed quoting, and is injected before the output path and
+    into preflight;
+  - `log_to_file` controls rotating file logging at the entry points;
+  - `confirm_overwrite` prompts in the GUI; unattended watch/quick-patch runs
+    auto-rename, and the CLI `--overwrite` flag is explicit consent;
+  - `notify_done` dispatches `sound`, `toast` or `none` after manual and watch batches.
+- **No settings were hidden** — all seven already have UI controls and now have
+  consumers, so their controls stay visible. `preserve_mtime` remains persisted but
+  unwired and is still a documented limitation, not a fixed setting.
+- **Two-stage Ctrl+C** — the first press requests a soft cancel and exits 130; a
+  second press force-kills the job and its child process tree on Windows after a
+  5-second grace period, followed by temporary-file cleanup.
+- **Updater response cleanup** — non-404 `HTTPError` responses from the release
+  check, checksum lookup and download are now closed. HTTP 404 still means "no
+  release published".
+- **Readiness labels in Thai** — all ten readiness check labels use English/Thai
+  i18n keys with an English fallback for future checks.
+
+### Behavior changes
+
+- `notify_done` defaults to `none`, so a completed watch-folder or manual batch is
+  silent unless `sound` or `toast` is selected. v1.0.0 always attempted a toast for
+  watch completions.
+- With `confirm_overwrite` enabled, unattended paths (watch folder, `--quick-patch`)
+  auto-rename instead of overwriting, because no dialog can be shown.
+
+### Documentation
+
+- README: method order fixed (1 → 2 → 3), stale `v0.7.0` build names replaced with
+  the current `v1.0.0` names, `tools` added to the ruff command, and the measured
+  one-folder size recorded as 323,001,846 bytes (308.0 MiB, 189 files).
+- CLI `score` added where the Nuitka checklist and release verification omitted it.
+- New manual test checklist will cover GUI, watch-folder, Explorer and CLI checks.
+  **Not executed in this change**; every pass/fail field is left for a human tester.
+
+### Verification
+
+- `uv run ruff check src tests tools` — clean.
+- `uv run mypy src tests tools` — clean (95 files).
+- `uv run pytest -q` — 395 passed (baseline 375).
+- Not verified: manual GUI/watch/Explorer/DPI checks, a frozen v1.0.1 build, code
+  signing, and a real Windows machine without a development environment.
+
 ## v1.0.0 - Consolidation (2026-10-25)
 
 FPS Patcher Studio ships as a Qt-only application with the Phase 2 automation
@@ -48,7 +107,8 @@ build is ~323 MB (189 files), and the build also writes the CycloneDX SBOM
   clean (94 files), `pytest -q` **372 passed**.
 - Frozen build: `--quick-patch <clip>` returned 0 and wrote the patched file;
   `--cli probe <clip> --json` returned 0 with valid JSON on stdout (direct console
-  and redirected to a file).
+  and redirected to a file). The same CLI exposes `--cli score <clip> --profile
+  tiktok --json`; it is not part of this frozen-build verification.
 - Real-ffmpeg e2e tests (PCM `.mov` normalize, `colr` add/scrub with `mdat` hash)
   ran as part of the suite.
 
@@ -67,9 +127,9 @@ pipeline stays on PyInstaller.
   platform will skip recompression. HDR/BT.2020 is reported, never retagged.
 - Fragmented MP4 is skipped with a warning; offset repair for fragments is absent.
 - `notify_done`, `preserve_mtime`, `verify_after`, `backup_original`, `stop_on_error`,
-  `extra_ffmpeg_args`, `log_to_file` and `confirm_overwrite` are persisted settings
-  with no runtime consumer on the Qt line. They are documented here rather than
-  silently claimed to work.
+  `extra_ffmpeg_args`, `log_to_file` and `confirm_overwrite` were persisted settings
+  with no runtime consumer in v1.0.0. v1.0.1 wires all of them except
+  `preserve_mtime`; that one remains unwired.
 - The windowed EXE has no console of its own; a double-click launch discards CLI
   output. Start it from a terminal for CLI mode.
 

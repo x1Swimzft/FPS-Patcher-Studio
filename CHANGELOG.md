@@ -2,6 +2,36 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
+## [1.0.1] - Unreleased
+
+### Fixed: v1.0.0 defect sweep
+- **Settings now have runtime consumers**: `verify_after`, `backup_original`, `stop_on_error`, `extra_ffmpeg_args`, `log_to_file`, `confirm_overwrite` and `notify_done` are wired through the GUI, CLI and watch paths.
+  - `extra_ffmpeg_args` is tokenised with `shlex.split(posix=True)` and passed as an argument vector; NUL bytes and malformed quoting are rejected and no shell is used.
+  - `backup_original` creates an exclusive `.bak` (or `.<n>.bak`) copy next to an existing destination before replacement; it never overwrites an existing backup.
+  - `verify_after=false` skips both post-patch verifiers; `stop_on_error` stops controller and CLI batches at the first failure.
+  - `confirm_overwrite` prompts in the GUI. Unattended watch and quick-patch runs auto-rename when it is enabled; the CLI `--overwrite` flag is explicit consent.
+  - `log_to_file` controls rotating file logging at the entry points; `notify_done` dispatches `sound`, `toast` or `none` after manual batches and watch batches.
+- **Ctrl+C is now two-stage**: the first press requests a soft cancel (exit code 130); a second press force-kills the job and its child process tree on Windows after a 5-second grace period, and temp files are cleaned up.
+- **Updater closes error responses**: non-404 `HTTPError` responses from the release check, checksum lookup and download are closed instead of leaked. HTTP 404 still means "no release published".
+- **Readiness check labels are localized**: all ten check labels now use English and Thai i18n keys, with the English label as a fallback for future checks.
+
+### Documentation
+- README method order corrected, stale `v0.7.0` build filenames replaced with the current `v1.0.0` names, `tools` added to the ruff command, and the one-folder size recorded from measurement: 323,001,846 bytes (308.0 MiB, 189 files).
+- `score` added to the Nuitka CLI checklist and the release-notes CLI coverage.
+- Manual GUI/watch/Explorer/DPI checklist added separately; it has not been executed
+  as part of this change.
+
+### Known limitations
+- No setting was hidden: all seven newly wired settings already have UI controls and consumers.
+- `preserve_mtime` is still persisted but has no runtime consumer; it is not claimed as fixed.
+- `notify_done` defaults to `none`, so watch-folder and manual batch completion are silent until the user selects `sound` or `toast`.
+- Version metadata is still 1.0.0 and no v1.0.1 installer/zip has been built, tagged or published; those steps await approval.
+
+### Verification
+- `uv run ruff check src tests tools` clean.
+- `uv run mypy src tests tools` clean (95 files).
+- `uv run pytest -q` 395 passed.
+
 ## [1.0.0] - 2026-10-25
 
 ### Consolidated: Qt-only v1.0.0

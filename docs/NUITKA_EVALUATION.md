@@ -73,7 +73,7 @@ powershell -ExecutionPolicy Bypass -File build\build_nuitka.ps1 -Run   # real bu
    - add a clip, probe, readiness badge and inspector popover work;
    - patch one real clip end-to-end (FFmpeg located, output verified);
    - `--quick-patch <clip>` from Explorer and from a terminal;
-   - `--cli probe <clip> --json` and `--cli patch <clip> --json` print to the parent console;
+   - `--cli probe <clip> --json`, `--cli score <clip> --profile tiktok --json` and `--cli patch <clip> --json` print to the parent console;
    - watch folder switch + Explorer verb install/uninstall on a real account;
    - toast appears (or is documented as suppressed by Windows).
 5. Measure: on-disk size of the `.dist` folder, cold-start to usable window (3 runs, median),
