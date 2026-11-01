@@ -2,7 +2,7 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
-## [Unreleased]
+## [1.2.0] - 2026-11-01
 
 ### Added
 - Queue rows and the Inspector now show the source video bitrate and, when auto-cap applies, the estimated post-patch bitrate (`source → target`).
@@ -10,7 +10,11 @@ All notable changes to FPS Patcher Studio are documented in this file.
 - The startup update check now opens the update dialog automatically when a newer release exists. It still asks for confirmation before downloading or installing.
 
 ### Changed
+- Auto-cap now triggers when the source bitrate exceeds the selected target instead of a fixed 25 Mbps threshold. With auto-cap enabled and the default 16 Mbps target, sources between 16 and 25 Mbps are re-encoded instead of copied.
 - Patch console logs now report the source and output bitrate alongside the timescale.
+
+### Known limitations
+- Version metadata is now 1.2.0, but no v1.2.0 installer/zip has been built, tagged or published.
 
 ### Verification
 - `uv run ruff check src tests tools` clean.

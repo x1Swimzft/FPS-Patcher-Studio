@@ -1,5 +1,35 @@
 # Release Notes
 
+## v1.2.0 - 2026-11-01 (bitrate planning + startup update prompt)
+
+Prepared on `fix/v1.0.1`. Version 1.2.0 adds bitrate visibility and a target control,
+plus an automatic update prompt at startup. The v1.0.0 artifacts in `release/`
+remain the current binaries until this version is built and tagged.
+
+### Highlights
+
+- **Bitrate is visible before patching** — queue rows and the Inspector show the
+  source video bitrate and, when auto-cap applies, the estimated post-patch bitrate
+  (`source → target`). The patch console now reports both values too.
+- **Adjustable bitrate target** — the new `bitrate_target_mbps` setting (1-24 Mbps,
+  default 16) controls the auto-cap target in the GUI, CLI and quick-patch. Sources
+  at or below the target are still copied losslessly; only higher-bitrate sources
+  are re-encoded to H.264 at the target.
+- **Behavior change:** auto-cap now triggers when the source exceeds the selected
+  target instead of the old fixed 25 Mbps threshold. With the default 16 Mbps target,
+  sources between 16 and 25 Mbps are re-encoded when auto-cap is enabled.
+- **Startup update prompt** — when a newer GitHub release exists, the app opens the
+  existing update dialog automatically after launch. It still asks for confirmation
+  before downloading or installing, and declining leaves the update button available.
+
+### Verification
+
+- `uv run ruff check src tests tools` — clean.
+- `uv run mypy src tests tools` — clean (95 files).
+- `uv run pytest -q` — 412 passed.
+- Not verified: manual GUI/watch/Explorer/DPI checks, a frozen v1.2.0 build, code
+  signing, and a real Windows machine without a development environment.
+
 ## v1.1.0 - 2026-11-01 (defect fixes + AV1 preflight)
 
 Prepared on `fix/v1.0.1`. Version 1.1.0 combines the v1.0.0 defect fixes with an
