@@ -10,9 +10,10 @@ import pytest
 
 pytest.importorskip("PySide6")
 
-from PySide6.QtWidgets import QWidget  # noqa: E402
+from PySide6.QtWidgets import QMessageBox, QWidget  # noqa: E402
 
 from fps_patcher.config import THEME_PRESETS  # noqa: E402
+from fps_patcher.core.models import UpdateAvailableEvent  # noqa: E402
 from fps_patcher.ui.strings import t  # noqa: E402
 from fps_patcher.ui_qt import main_window as mw  # noqa: E402
 from fps_patcher.ui_qt.settings_dialog import SettingsDialog  # noqa: E402
@@ -386,4 +387,89 @@ def test_sync_watcher_reuses_a_running_watcher_for_the_same_folder(
     window.settings.watch_folder_enabled = False
     window._sync_watcher()
     assert FakeWatcher.instances[-1].stops == 1
+    window.close()
+
+
+def test_update_available_prompts_on_startup(
+    qtbot: Any, monkeypatch: Any, tmp_path: Path
+) -> None:
+    from types import SimpleNamespace
+
+    from qt_support import make_main_window
+
+    window = make_main_window(qtbot, monkeypatch, tmp_path)
+    info = SimpleNamespace(version="9.9.9", notes="Bug fixes")
+    prompts: list[str] = []
+
+    def ask(*args: Any, **_kwargs: Any) -> QMessageBox.StandardButton:
+        prompts.append(str(args[2]))
+        return QMessageBox.StandardButton.No
+
+    monkeypatch.setattr(QMessageBox, "question", ask)
+    window._on_update_available(UpdateAvailableEvent(info))
+    qtbot.wait(20)
+
+    assert len(prompts) == 1
+    assert "9.9.9" in prompts[0]
+    assert not window.update_button.isHidden()
+    window.close()
+
+
+def test_update_prompt_yes_starts_download(
+    qtbot: Any, monkeypatch: Any, tmp_path: Path
+) -> None:
+    from types import SimpleNamespace
+
+    from qt_support import make_main_window
+
+    window = make_main_window(qtbot, monkeypatch, tmp_path)
+    info = SimpleNamespace(version="9.9.9", notes="Bug fixes")
+    started: list[Any] = []
+    monkeypatch.setattr(window.controller, "start_update_download", started.append)
+    monkeypatch.setattr(
+        QMessageBox, "question", lambda *args, **kwargs: QMessageBox.StandardButton.Yes
+    )
+
+    window._on_update_available(UpdateAvailableEvent(info))
+    qtbot.wait(20)
+
+    assert started == [info]
+    window.close()
+
+
+def test_inspector_bitrate_shows_source_and_capped_target(
+    qtbot: Any, monkeypatch: Any, tmp_path: Path
+) -> None:
+    from fractions import Fraction
+
+    from qt_support import make_main_window
+
+    from fps_patcher.app.queue_model import QueueItem
+    from fps_patcher.core.models import VideoInfo
+
+    window = make_main_window(qtbot, monkeypatch, tmp_path)
+    item = QueueItem(path=tmp_path / "clip.mp4")
+    item.info = VideoInfo(
+        path=item.path,
+        codec="av1",
+        width=1920,
+        height=1080,
+        avg_fps=Fraction(60),
+        r_fps=Fraction(60),
+        duration_s=10,
+        timescale=60000,
+        nb_frames=600,
+        has_audio=True,
+        stream_count=2,
+        bit_rate=85_000_000,
+    )
+    window.settings.auto_cap_bitrate = True
+    window.settings.bitrate_target_mbps = 10
+
+    window.inspector.set_focused_item(item)
+    assert window.inspector.bitrate_field.text() == "85.0 → 10.0 Mbps"
+
+    window.settings.auto_cap_bitrate = False
+    window.inspector.refresh_readiness()
+    assert window.inspector.bitrate_field.text() == "85.0 Mbps"
     window.close()

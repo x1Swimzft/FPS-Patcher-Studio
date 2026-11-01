@@ -37,6 +37,7 @@ from ..core.platform_profiles import (
     evaluate_readiness,
     get_profile,
 )
+from ..core.preflight import planned_output_bitrate
 from ..core.strategies import UI_PRESETS, migrate_strategy_name
 from ..ui.strings import readiness_check_label, t
 from .icons import get_icon
@@ -186,6 +187,17 @@ class Inspector(QWidget):
         self.timescale_field.setAccessibleName(t("timescale_lbl", lang))
         self.timescale_row = self.output_group.add_row(
             t("timescale_lbl", lang), self.timescale_field
+        )
+
+        self.bitrate_field = QLineEdit()
+        self.bitrate_field.setReadOnly(True)
+        self.bitrate_field.setFixedHeight(theme.entry_height)
+        self.bitrate_field.setFixedWidth(210)
+        self.bitrate_field.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.bitrate_field.setAccessibleName(t("bitrate_lbl", lang))
+        self.bitrate_field.setText("—")
+        self.bitrate_row = self.output_group.add_row(
+            t("bitrate_lbl", lang), self.bitrate_field
         )
 
         self.strategy_combo = QComboBox()
@@ -630,6 +642,9 @@ QWidget#Inspector QProgressBar::chunk {{
         self.target_group.caption.setText(t("target_fps", lang).upper())
         self.output_group.caption.setText(t("output_lbl", lang).upper())
         self.timescale_row.label.setText(t("timescale_lbl", lang))
+        self.bitrate_row.label.setText(t("bitrate_lbl", lang))
+        self.bitrate_field.setAccessibleName(t("bitrate_lbl", lang))
+        self._refresh_bitrate()
         self.strategy_row.label.setText(t("strategy_lbl", lang))
         self.profile_label.setText(t("platform_profile_lbl", lang))
         self.warn_label.setText(t("bxd_pc_warn", lang))
@@ -988,6 +1003,29 @@ QWidget#Inspector QProgressBar::chunk {{
         self.readiness_label.setText(t("readiness_summary", lang))
         self.info_btn.setToolTip(t("readiness_tip", lang))
         self.info_btn.setAccessibleName(t("readiness_tip", lang))
+        self._refresh_bitrate()
+
+    def _refresh_bitrate(self) -> None:
+        info = self._focused_item.info if self._focused_item is not None else None
+        if info is None or info.bit_rate is None:
+            self.bitrate_field.setText("—")
+            self.bitrate_field.setToolTip("")
+            return
+        source = f"{info.bit_rate / 1_000_000:.1f} Mbps"
+        output = planned_output_bitrate(
+            info,
+            cap_bitrate=self.settings.auto_cap_bitrate,
+            target_mbps=self.settings.bitrate_target_mbps,
+        )
+        target = f"{output / 1_000_000:.1f} Mbps" if output is not None else "—"
+        self.bitrate_field.setText(
+            source
+            if output == info.bit_rate
+            else f"{info.bit_rate / 1_000_000:.1f} → {target}"
+        )
+        self.bitrate_field.setToolTip(
+            t("bitrate_estimate_tip", self._lang(), source=source, target=target)
+        )
 
     # ------------------------------------------------------------------ internals
     def _lang(self) -> str:

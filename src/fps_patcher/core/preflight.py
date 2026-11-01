@@ -32,10 +32,10 @@ TARGET_SAMPLE_RATE = 48000
 TARGET_CHANNELS = 2
 TARGET_AUDIO_BITRATE = "192k"
 
-BITRATE_TRIGGER_BPS = 25_000_000  # re-encode only above this
-BITRATE_TARGET = "16M"
-BITRATE_MAXRATE = "18M"
-BITRATE_BUFSIZE = "36M"
+BITRATE_TRIGGER_BPS = 25_000_000  # advisory warning only
+BITRATE_TARGET_MBPS = 16
+BITRATE_TARGET_MBPS_MIN = 1
+BITRATE_TARGET_MBPS_MAX = 24
 
 # Preference order; every candidate is tried and failures fall through to libx264.
 HW_ENCODERS: tuple[str, ...] = ("h264_nvenc", "h264_amf", "h264_qsv")
@@ -73,14 +73,44 @@ def needs_audio_normalize(info: VideoInfo) -> bool:
     return info.audio_channels is not None and info.audio_channels != TARGET_CHANNELS
 
 
-def needs_bitrate_cap(info: VideoInfo) -> bool:
-    return info.bit_rate is not None and info.bit_rate > BITRATE_TRIGGER_BPS
+def target_bitrate_bps(target_mbps: int = BITRATE_TARGET_MBPS) -> int:
+    """Clamped target bitrate in bits/s (1-24 Mbps)."""
+    clamped = max(BITRATE_TARGET_MBPS_MIN, min(BITRATE_TARGET_MBPS_MAX, int(target_mbps)))
+    return clamped * 1_000_000
 
 
-def make_plan(info: VideoInfo, *, normalize_audio: bool, cap_bitrate: bool) -> PreflightPlan:
+def needs_bitrate_cap(
+    info: VideoInfo, target_bps: int = BITRATE_TARGET_MBPS * 1_000_000
+) -> bool:
+    return info.bit_rate is not None and info.bit_rate > target_bps
+
+
+def planned_output_bitrate(
+    info: VideoInfo,
+    *,
+    cap_bitrate: bool,
+    target_mbps: int = BITRATE_TARGET_MBPS,
+) -> int | None:
+    """Estimated output bitrate: the cap target when it applies, else the source."""
+    if info.bit_rate is None:
+        return None
+    target = target_bitrate_bps(target_mbps)
+    if cap_bitrate and needs_bitrate_cap(info, target):
+        return target
+    return info.bit_rate
+
+
+def make_plan(
+    info: VideoInfo,
+    *,
+    normalize_audio: bool,
+    cap_bitrate: bool,
+    target_mbps: int = BITRATE_TARGET_MBPS,
+) -> PreflightPlan:
     return PreflightPlan(
         normalize_audio=normalize_audio and needs_audio_normalize(info),
-        cap_bitrate=cap_bitrate and needs_bitrate_cap(info),
+        cap_bitrate=cap_bitrate
+        and needs_bitrate_cap(info, target_bitrate_bps(target_mbps)),
     )
 
 
@@ -95,13 +125,18 @@ def _audio_args(normalize: bool) -> list[str]:
     return ["-c:a", "copy"]
 
 
-def _video_args(encoder: str | None) -> list[str]:
+def _video_args(encoder: str | None, target_mbps: int) -> list[str]:
     if encoder is None:
         return ["-c:v", "copy"]
+    target = target_bitrate_bps(target_mbps) // 1_000_000
     args = ["-c:v", encoder, "-pix_fmt", "yuv420p"]
     if encoder == SOFTWARE_ENCODER:
         args += ["-preset", "veryfast"]
-    args += ["-b:v", BITRATE_TARGET, "-maxrate", BITRATE_MAXRATE, "-bufsize", BITRATE_BUFSIZE]
+    args += [
+        "-b:v", f"{target}M",
+        "-maxrate", f"{target + 2}M",
+        "-bufsize", f"{target * 2}M",
+    ]  # fmt: skip
     return args
 
 
@@ -112,6 +147,7 @@ def build_preflight_args(
     encoder: str | None = None,
     extra_args: Sequence[str] = (),
     hwaccel: str | None = None,
+    bitrate_target_mbps: int = BITRATE_TARGET_MBPS,
 ) -> list[str]:
     """ffmpeg arguments for one pre-flight pass (audio-only or audio+video)."""
     video_encoder = (encoder or SOFTWARE_ENCODER) if plan.cap_bitrate else None
@@ -122,7 +158,7 @@ def build_preflight_args(
         "-i", str(src),
         "-map", "0:v:0", "-map", "0:a:0?",
         "-map_metadata", "0",
-        *_video_args(video_encoder),
+        *_video_args(video_encoder, bitrate_target_mbps),
         *_audio_args(plan.normalize_audio),
         *extra_args,
         "-progress", "pipe:1",
@@ -334,6 +370,7 @@ def run_preflight(
     extra_args: Sequence[str] = (),
     force_event: threading.Event | None = None,
     on_stdout_line: Callable[[str], None] | None = None,
+    bitrate_target_mbps: int = BITRATE_TARGET_MBPS,
 ) -> Path:
     """Run the pre-flight ffmpeg pass; return the temp file (caller deletes it)."""
     # Unique per invocation so two jobs on the same source never share a temp.
@@ -367,7 +404,15 @@ def run_preflight(
             try:
                 code = run_streaming(
                     paths.ffmpeg,
-                    build_preflight_args(src, dst, plan, encoder, extra_args, hwaccel),
+                    build_preflight_args(
+                        src,
+                        dst,
+                        plan,
+                        encoder,
+                        extra_args,
+                        hwaccel,
+                        bitrate_target_mbps,
+                    ),
                     read_stdout,
                     on_stderr,
                     cancel_event,

@@ -241,6 +241,7 @@ def _cmd_patch(args: argparse.Namespace, settings: Settings) -> int:
                     auto_rename=auto_rename,
                     auto_normalize_audio=bool(args.normalize_audio),
                     auto_cap_bitrate=bool(args.cap_bitrate),
+                    bitrate_target_mbps=settings.bitrate_target_mbps,
                     fix_color_tag=bool(args.tag_bt709),
                     scrub_metadata=bool(args.scrub_metadata),
                     verify_after=settings.verify_after,

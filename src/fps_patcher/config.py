@@ -13,6 +13,11 @@ from pathlib import Path
 from typing import Any
 
 from .core.platform_profiles import DEFAULT_PROFILE_ID, PLATFORM_PROFILES
+from .core.preflight import (
+    BITRATE_TARGET_MBPS,
+    BITRATE_TARGET_MBPS_MAX,
+    BITRATE_TARGET_MBPS_MIN,
+)
 from .core.strategies import migrate_strategy_name
 
 log = logging.getLogger("fps_patcher")
@@ -128,6 +133,7 @@ class Settings:
     stop_on_error: bool = False
     auto_normalize_audio: bool = True
     auto_cap_bitrate: bool = False
+    bitrate_target_mbps: int = 16
     check_updates_on_start: bool = True
 
     # V2 FFmpeg
@@ -276,6 +282,14 @@ class Settings:
             self.bxd_max_tail_ms = max(0, min(5000, int(self.bxd_max_tail_ms)))
         except (ValueError, TypeError):
             self.bxd_max_tail_ms = 200
+
+        try:
+            self.bitrate_target_mbps = max(
+                BITRATE_TARGET_MBPS_MIN,
+                min(BITRATE_TARGET_MBPS_MAX, int(self.bitrate_target_mbps)),
+            )
+        except (ValueError, TypeError):
+            self.bitrate_target_mbps = BITRATE_TARGET_MBPS
 
         if not self.filename_template:
             self.filename_template = "{name}_{fps}fps"

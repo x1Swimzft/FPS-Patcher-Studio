@@ -179,7 +179,14 @@ STRINGS: dict[str, dict[str, str]] = {
         "stop_on_error": "Stop batch on first error",
         "preflight_section": "Smart Pre-Flight",
         "auto_normalize_audio": "Auto-convert audio to AAC 48 kHz stereo before patching",
-        "auto_cap_bitrate": "Auto-cap bitrate for mobile (<18 Mbps) when source is over 25 Mbps",
+        "auto_cap_bitrate": "Auto-cap video bitrate for mobile when the source is above the target",
+        "bitrate_target_lbl": "Target video bitrate when capping (Mbps)",
+        "bitrate_target_hint": (
+            "Sources at or below this bitrate are copied losslessly. "
+            "The cap re-encodes video to H.264 at the target rate."
+        ),
+        "bitrate_lbl": "Bitrate",
+        "bitrate_estimate_tip": "Source {source} → after patch {target} (estimated)",
         "color_metadata_section": "Color & Metadata Guard",
         "fix_color_tag": "Write a lossless Rec.709 color tag (colr nclx)",
         "scrub_metadata": "Remove editor metadata (udta/meta) from the output",
@@ -276,7 +283,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "status_done": "Done",
         "status_failed": "Error",
         "status_skipped": "Skipped",
-        "check_updates_on_start": "Check for updates on startup",
+        "check_updates_on_start": "Automatically check for updates on startup",
         "update_available_btn": "Update v{version}",
         "update_dialog_title": "Update Available",
         "update_dialog_prompt": (
@@ -538,7 +545,14 @@ STRINGS: dict[str, dict[str, str]] = {
         "stop_on_error": "หยุดการทำงานทันทีหากพบข้อผิดพลาด",
         "preflight_section": "ตรวจและซ่อมไฟล์อัตโนมัติก่อนแพตช์",
         "auto_normalize_audio": "แปลงเสียงเป็น AAC 48 kHz สเตอริโอให้อัตโนมัติก่อนแพตช์",
-        "auto_cap_bitrate": "จำกัด Bitrate สำหรับมือถือ (<18 Mbps) เมื่อไฟล์ต้นฉบับเกิน 25 Mbps",
+        "auto_cap_bitrate": "จำกัดบิตเรตวิดีโอสำหรับมือถือเมื่อต้นฉบับสูงกว่าเป้าหมาย",
+        "bitrate_target_lbl": "บิตเรตวิดีโอเป้าหมายเมื่อจำกัด (Mbps)",
+        "bitrate_target_hint": (
+            "ไฟล์ที่มีบิตเรตเท่าหรือต่ำกว่าเป้าหมายจะถูกคัดลอกแบบไม่สูญเสียคุณภาพ "
+            "ส่วนที่เกินจะถูกเข้ารหัสวิดีโอใหม่เป็น H.264 ที่บิตเรตเป้าหมาย"
+        ),
+        "bitrate_lbl": "บิตเรต",
+        "bitrate_estimate_tip": "ต้นฉบับ {source} → หลังแพตช์ {target} (ค่าประมาณ)",
         "color_metadata_section": "การป้องกันสีและ Metadata",
         "fix_color_tag": "ใส่แท็กสี Rec.709 แบบไม่สูญเสียคุณภาพ (colr nclx)",
         "scrub_metadata": "ลบ Metadata ของโปรแกรมตัดต่อ (udta/meta) ออกจากไฟล์ผลลัพธ์",
@@ -627,7 +641,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "status_done": "เสร็จสิ้น",
         "status_failed": "ข้อผิดพลาด",
         "status_skipped": "ข้าม",
-        "check_updates_on_start": "ตรวจสอบการอัปเดตเมื่อเปิดโปรแกรม",
+        "check_updates_on_start": "ตรวจหาการอัปเดตอัตโนมัติเมื่อเปิดโปรแกรม",
         "update_available_btn": "อัปเดต v{version}",
         "update_dialog_title": "มีอัปเดตเวอร์ชันใหม่",
         "update_dialog_prompt": (

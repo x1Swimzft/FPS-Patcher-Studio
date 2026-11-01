@@ -100,6 +100,7 @@ class MainWindow(QMainWindow):
         self._ff_state = "checking"
         self._ff_detail = ""
         self._update_info: Any = None
+        self._update_prompted = False
         self._probe_running = False
         self._pending_logs: list[tuple[str, str]] = []
         self._latest_progress: ProgressEvent | None = None
@@ -1036,6 +1037,31 @@ class MainWindow(QMainWindow):
     def _on_update_available(self, event: UpdateAvailableEvent) -> None:
         self._update_info = event.info
         self._show_update_button()
+        QTimer.singleShot(0, self._prompt_update_on_startup)
+
+    def _prompt_update_on_startup(self) -> None:
+        info = self._update_info
+        if info is None or self._update_prompted:
+            return
+        self._update_prompted = True
+        if self._confirm_update(info):
+            self._begin_update_download(info)
+
+    def _confirm_update(self, info: Any) -> bool:
+        lang = self.settings.language
+        notes = getattr(info, "notes", "").strip()
+        if len(notes) > 400:
+            notes = notes[:400] + "..."
+        prompt = t(
+            "update_dialog_prompt",
+            lang,
+            version=getattr(info, "version", ""),
+            notes=notes or "-",
+        )
+        answer = QMessageBox.question(
+            self, t("update_dialog_title", lang), prompt
+        )
+        return answer == QMessageBox.StandardButton.Yes
 
     def _show_update_button(self) -> None:
         info = self._update_info
@@ -1056,21 +1082,11 @@ class MainWindow(QMainWindow):
         info = self._update_info
         if info is None:
             return
+        if self._confirm_update(info):
+            self._begin_update_download(info)
+
+    def _begin_update_download(self, info: Any) -> None:
         lang = self.settings.language
-        notes = getattr(info, "notes", "").strip()
-        if len(notes) > 400:
-            notes = notes[:400] + "..."
-        prompt = t(
-            "update_dialog_prompt",
-            lang,
-            version=getattr(info, "version", ""),
-            notes=notes or "-",
-        )
-        answer = QMessageBox.question(
-            self, t("update_dialog_title", lang), prompt
-        )
-        if answer != QMessageBox.StandardButton.Yes:
-            return
         self.update_button.setText(t("update_downloading", lang, percent=0))
         self.update_button.setEnabled(False)
         self.controller.start_update_download(info)

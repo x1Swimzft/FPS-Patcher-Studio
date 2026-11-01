@@ -48,6 +48,7 @@ def _request(path: Path, settings: Settings) -> PatchRequest:
         bxd_max_tail_ms=settings.bxd_max_tail_ms,
         auto_normalize_audio=settings.auto_normalize_audio,
         auto_cap_bitrate=settings.auto_cap_bitrate,
+        bitrate_target_mbps=settings.bitrate_target_mbps,
         fix_color_tag=settings.fix_color_tag,
         scrub_metadata=settings.scrub_metadata,
         verify_after=settings.verify_after,

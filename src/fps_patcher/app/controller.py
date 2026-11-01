@@ -423,6 +423,7 @@ class AppController:
                         bxd_max_tail_ms=self.settings.bxd_max_tail_ms,
                         auto_normalize_audio=self.settings.auto_normalize_audio,
                         auto_cap_bitrate=self.settings.auto_cap_bitrate,
+                        bitrate_target_mbps=self.settings.bitrate_target_mbps,
                         fix_color_tag=self.settings.fix_color_tag,
                         scrub_metadata=self.settings.scrub_metadata,
                         verify_after=self.settings.verify_after,

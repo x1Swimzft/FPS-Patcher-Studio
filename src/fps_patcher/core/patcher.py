@@ -33,7 +33,12 @@ from .models import (
     PatchResult,
     ProgressEvent,
 )
-from .preflight import make_plan, remove_preflight_temp, run_preflight
+from .preflight import (
+    BITRATE_TRIGGER_BPS,
+    make_plan,
+    remove_preflight_temp,
+    run_preflight,
+)
 from .prober import probe
 from .strategies import get_strategy
 from .v4_patcher import MethodV4DirectPatch
@@ -41,6 +46,10 @@ from .verifier import verify, verify_payload_integrity
 from .win_job import NamedMutex
 
 Emit = Callable[[LogEvent | ProgressEvent], None]
+
+
+def _mbps_text(bps: int | None) -> str:
+    return f"{bps / 1_000_000:.1f}" if bps else "?"
 
 
 def validate_input(path: Path) -> None:
@@ -232,18 +241,20 @@ def patch(
     emit(
         LogEvent(
             f"Source: {before.codec} {before.width}x{before.height} "
-            f"{before.fps:.3f} fps, timescale {before.timescale}"
+            f"{before.fps:.3f} fps, {_mbps_text(before.bit_rate)} Mbps, "
+            f"timescale {before.timescale}"
         )
     )
     if before.is_vfr:
         emit(LogEvent("Variable frame rate detected; result may differ per player.", "WARN"))
-    if before.bit_rate is not None and before.bit_rate > 25_000_000:
+    trigger_mbps = BITRATE_TRIGGER_BPS // 1_000_000
+    if before.bit_rate is not None and before.bit_rate > BITRATE_TRIGGER_BPS:
         mbps = before.bit_rate / 1_000_000
         emit(
             LogEvent(
-                f"High bitrate detected ({mbps:.1f} Mbps > 25 Mbps). Bypassed videos stream "
-                "at source quality on TikTok; bitrates >20 Mbps may cause buffering for "
-                "mobile viewers. Recommended: 12-18 Mbps for 1080p.",
+                f"High bitrate detected ({mbps:.1f} Mbps > {trigger_mbps} Mbps). "
+                "Bypassed videos stream at source quality on TikTok; bitrates >20 Mbps "
+                "may cause buffering for mobile viewers. Recommended: 12-18 Mbps for 1080p.",
                 "WARN",
             )
         )
@@ -277,6 +288,7 @@ def patch(
         before,
         normalize_audio=req.auto_normalize_audio,
         cap_bitrate=req.auto_cap_bitrate,
+        target_mbps=req.bitrate_target_mbps,
     )
 
     def on_stdout(line: str) -> None:
@@ -305,7 +317,7 @@ def patch(
                     n
                     for n, on in (
                         ("audio -> AAC 48kHz stereo", plan.normalize_audio),
-                        ("bitrate cap ~16 Mbps", plan.cap_bitrate),
+                        (f"bitrate cap ~{req.bitrate_target_mbps} Mbps", plan.cap_bitrate),
                     )
                     if on
                 )
@@ -319,6 +331,7 @@ def patch(
                     extra_args=extra_args,
                     force_event=force_event,
                     on_stdout_line=on_stdout,
+                    bitrate_target_mbps=req.bitrate_target_mbps,
                 )
                 work_before = probe(work_src, ffprobe_bin)
                 emit(LogEvent("[PREFLIGHT] Done; patching the fixed copy.", "OK"))
@@ -505,7 +518,8 @@ def patch(
     emit(ProgressEvent(1.0))
     done_msg = (
         f"Done{' (experimental, non-standard output)' if experimental else ''} "
-        f"in {elapsed:.2f}s: timescale {before.timescale} -> {after.timescale}. "
+        f"in {elapsed:.2f}s: timescale {before.timescale} -> {after.timescale}, "
+        f"bitrate {_mbps_text(before.bit_rate)} -> {_mbps_text(after.bit_rate)} Mbps. "
         f"Output: {final}"
     )
     emit(LogEvent(done_msg, "WARN" if experimental else "OK"))

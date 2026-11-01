@@ -156,6 +156,7 @@ def test_row_pills_cover_resolution_fps_mode_and_size(
         has_audio=True,
         stream_count=2,
         file_size_bytes=12 * 1024 * 1024,
+        bit_rate=12_000_000,
     )
     item.timescale = 90000
     pills = dict(queue_view.delegate.row_pills(item))
@@ -163,6 +164,7 @@ def test_row_pills_cover_resolution_fps_mode_and_size(
     assert pills["resolution"] == "1920×1080"
     assert pills["fps"] == "30 → 90 fps"
     assert pills["mode"] == "h264 · Mobile"
+    assert pills["bitrate"] == "12.0 Mbps"
     assert pills["size"] == "12.0 MB"
 
 

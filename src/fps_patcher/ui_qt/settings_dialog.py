@@ -51,6 +51,7 @@ from ..config import (
 )
 from ..core.ffmpeg_locator import locate
 from ..core.models import FPS_PRESETS
+from ..core.preflight import BITRATE_TARGET_MBPS_MAX, BITRATE_TARGET_MBPS_MIN
 from ..core.strategies import UI_PRESETS, migrate_strategy_name
 from ..ui.strings import t
 from .icons import get_icon
@@ -869,6 +870,21 @@ class SettingsDialog(QDialog):
             preflight, "auto_normalize_audio", draft.auto_normalize_audio
         )
         self._cap_bitrate = self._switch(preflight, "auto_cap_bitrate", draft.auto_cap_bitrate)
+        self._bitrate_target = self._spin(
+            preflight,
+            "bitrate_target_lbl",
+            max(
+                BITRATE_TARGET_MBPS_MIN,
+                min(BITRATE_TARGET_MBPS_MAX, draft.bitrate_target_mbps),
+            ),
+            BITRATE_TARGET_MBPS_MIN,
+            BITRATE_TARGET_MBPS_MAX,
+            1,
+            " Mbps",
+        )
+        self._bitrate_target.setEnabled(draft.auto_cap_bitrate)
+        self._cap_bitrate.toggled.connect(self._bitrate_target.setEnabled)
+        self._hint(preflight, "bitrate_target_hint")
 
         self._section(preflight, "color_metadata_section")
         self._fix_color = self._switch(preflight, "fix_color_tag", draft.fix_color_tag)
@@ -1289,6 +1305,7 @@ class SettingsDialog(QDialog):
         draft.stop_on_error = self._stop_on_error.isChecked()
         draft.auto_normalize_audio = self._normalize_audio.isChecked()
         draft.auto_cap_bitrate = self._cap_bitrate.isChecked()
+        draft.bitrate_target_mbps = self._bitrate_target.value()
         draft.fix_color_tag = self._fix_color.isChecked()
         draft.scrub_metadata = self._scrub_metadata.isChecked()
 

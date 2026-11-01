@@ -20,6 +20,8 @@ from fps_patcher.core.preflight import (
     make_plan,
     needs_audio_normalize,
     needs_bitrate_cap,
+    planned_output_bitrate,
+    target_bitrate_bps,
 )
 
 
@@ -62,10 +64,25 @@ def test_needs_audio_normalize(kw: dict[str, Any], expected: bool) -> None:
     assert needs_audio_normalize(_info(**kw)) is expected
 
 
-def test_needs_bitrate_cap_threshold() -> None:
-    assert not needs_bitrate_cap(_info(bit_rate=25_000_000))
-    assert needs_bitrate_cap(_info(bit_rate=25_000_001))
+def test_needs_bitrate_cap_uses_target() -> None:
+    assert not needs_bitrate_cap(_info(bit_rate=16_000_000))
+    assert needs_bitrate_cap(_info(bit_rate=16_000_001))
+    assert not needs_bitrate_cap(_info(bit_rate=20_000_000), target_bps=25_000_000)
     assert not needs_bitrate_cap(_info(bit_rate=None))
+
+
+def test_planned_output_bitrate_follows_cap_target() -> None:
+    high = _info(bit_rate=40_000_000)
+    low = _info(bit_rate=12_000_000)
+    assert planned_output_bitrate(high, cap_bitrate=True, target_mbps=12) == 12_000_000
+    assert planned_output_bitrate(high, cap_bitrate=False, target_mbps=12) == 40_000_000
+    assert planned_output_bitrate(low, cap_bitrate=True, target_mbps=16) == 12_000_000
+    assert planned_output_bitrate(_info(bit_rate=None), cap_bitrate=True) is None
+
+
+def test_target_bitrate_is_clamped() -> None:
+    assert target_bitrate_bps(0) == 1_000_000
+    assert target_bitrate_bps(99) == 24_000_000
 
 
 def test_make_plan_respects_toggles() -> None:
@@ -90,6 +107,16 @@ def test_bitrate_cap_args_use_encoder_and_copy_good_audio() -> None:
     assert args[args.index("-c:v") + 1] == "h264_nvenc"
     assert args[args.index("-maxrate") + 1] == "18M"
     assert args[args.index("-c:a") + 1] == "copy"
+
+
+def test_bitrate_cap_args_use_custom_target() -> None:
+    plan = PreflightPlan(False, True)
+    args = build_preflight_args(
+        Path("in.mp4"), Path("o.mp4"), plan, "libx264", bitrate_target_mbps=10
+    )
+    assert args[args.index("-b:v") + 1] == "10M"
+    assert args[args.index("-maxrate") + 1] == "12M"
+    assert args[args.index("-bufsize") + 1] == "20M"
 
 
 def test_bitrate_cap_args_try_hardware_decode_before_input() -> None:

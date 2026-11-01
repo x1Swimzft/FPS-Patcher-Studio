@@ -172,6 +172,22 @@ def test_density_writes_layout_density_and_roundtrips(qtbot: Any, appdata: Path)
     assert saved.layout_density == "Comfortable"
 
 
+def test_bitrate_target_applies_with_auto_cap(qtbot: Any, appdata: Path) -> None:
+    settings = Settings(
+        reduce_motion=True, auto_cap_bitrate=False, bitrate_target_mbps=16
+    )
+    dialog = _dialog(qtbot, settings)
+
+    assert not dialog._bitrate_target.isEnabled()
+    dialog._cap_bitrate.setChecked(True)
+    assert dialog._bitrate_target.isEnabled()
+    dialog._bitrate_target.setValue(12)
+    dialog._apply()
+
+    assert settings.auto_cap_bitrate is True
+    assert settings.bitrate_target_mbps == 12
+
+
 def test_legacy_json_applies_all_keys_and_cancel_restores_theme(
     qtbot: Any, appdata: Path
 ) -> None:

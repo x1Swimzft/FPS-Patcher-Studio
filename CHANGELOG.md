@@ -2,6 +2,21 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
+## [Unreleased]
+
+### Added
+- Queue rows and the Inspector now show the source video bitrate and, when auto-cap applies, the estimated post-patch bitrate (`source → target`).
+- `bitrate_target_mbps` setting (1-24 Mbps, default 16) controls the auto-cap target across the GUI, CLI and quick-patch. Sources at or below the target are still copied losslessly.
+- The startup update check now opens the update dialog automatically when a newer release exists. It still asks for confirmation before downloading or installing.
+
+### Changed
+- Patch console logs now report the source and output bitrate alongside the timescale.
+
+### Verification
+- `uv run ruff check src tests tools` clean.
+- `uv run mypy src tests tools` clean (95 files).
+- `uv run pytest -q` 412 passed.
+
 ## [1.1.0] - 2026-11-01
 
 ### Fixed: AV1 bitrate-cap preflight

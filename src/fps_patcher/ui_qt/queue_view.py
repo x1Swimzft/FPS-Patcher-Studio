@@ -70,6 +70,7 @@ from PySide6.QtWidgets import (
 from ..app.queue_model import QueueItem
 from ..core.models import FPS_PRESETS, SUPPORTED_EXTENSIONS
 from ..core.platform_profiles import ReadinessReport, evaluate_readiness
+from ..core.preflight import planned_output_bitrate
 from ..core.strategies import UI_PRESETS, migrate_strategy_name
 from ..ui.strings import readiness_check_label, t
 from .icons import get_icon
@@ -107,6 +108,12 @@ def _format_size(size: int | None) -> str:
             return f"{value:.0f} {unit}" if unit == "B" else f"{value:.1f} {unit}"
         value /= 1024
     return f"{value:.1f} GB"
+
+
+def _format_bitrate(bps: int | None) -> str:
+    if not bps or bps <= 0:
+        return "—"
+    return f"{bps / 1_000_000:.1f} Mbps"
 
 
 def _format_duration(seconds: float) -> str:
@@ -692,12 +699,30 @@ class QueueDelegate(QStyledItemDelegate):
         target = _fps_text(timescale / 1000) if timescale else "—"
         mode = self._owner.strategy_short_label(item.strategy)
         size = _format_size(info.file_size_bytes if info is not None else None)
-        return [
+        source_bps = info.bit_rate if info is not None else None
+        output_bps = (
+            planned_output_bitrate(
+                info,
+                cap_bitrate=self._owner.settings.auto_cap_bitrate,
+                target_mbps=self._owner.settings.bitrate_target_mbps,
+            )
+            if info is not None
+            else None
+        )
+        source_br = _format_bitrate(source_bps)
+        pills = [
             ("resolution", resolution),
             ("fps", f"{source} → {target} fps"),
             ("mode", f"{codec} · {mode}"),
             ("size", size),
         ]
+        if source_bps:
+            if output_bps is not None and output_bps != source_bps:
+                bitrate = f"{source_br} → {_format_bitrate(output_bps)}"
+            else:
+                bitrate = source_br
+            pills.insert(3, ("bitrate", bitrate))
+        return pills
 
     def sizeHint(
         self,

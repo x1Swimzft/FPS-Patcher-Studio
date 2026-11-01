@@ -35,6 +35,7 @@ def test_settings_v2_defaults_and_roundtrip(tmp_path: Path) -> None:
     assert s.qt_v090_migrated is True
     assert s.glass_mode == "Solid"
     assert s.language == "en"
+    assert s.bitrate_target_mbps == 16
 
     target_file = tmp_path / "settings.json"
     s.theme_preset = "Midnight Violet"
@@ -79,6 +80,7 @@ def test_settings_v2_clamping_and_corrupt_recovery(tmp_path: Path) -> None:
         "tint_strength": 9999,  # Should clamp to 100
         "window_alpha": 0.1,  # Should clamp to 0.85
         "ui_scale": -50,  # Should clamp to 50
+        "bitrate_target_mbps": 99,  # Should clamp to 24
         "theme_preset": "NonExistentPreset",  # Fallback to Crimson Gamer
         "glass_mode": "InvalidMode",  # Fallback to Acrylic
         "language": "es",  # Fallback to en
@@ -91,6 +93,7 @@ def test_settings_v2_clamping_and_corrupt_recovery(tmp_path: Path) -> None:
     assert loaded.tint_strength == 100
     assert loaded.window_alpha == 0.85
     assert loaded.ui_scale == 50
+    assert loaded.bitrate_target_mbps == 24
     assert loaded.theme_preset == "Crimson Gamer"
     assert loaded.glass_mode == "Acrylic"
     assert loaded.language == "en"
