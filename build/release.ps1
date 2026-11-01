@@ -102,7 +102,11 @@ Write-Host "== launch smoke test" -ForegroundColor Cyan
 $proc = Start-Process -FilePath $exe -PassThru
 Start-Sleep -Seconds 6
 $alive = -not $proc.HasExited
-if ($alive) { Stop-Process -Id $proc.Id -Force } else { throw "Smoke test failed: exe exited with code $($proc.ExitCode)" }
+if ($alive) {
+    Stop-Process -Id $proc.Id -Force
+    $proc.WaitForExit(10000) | Out-Null
+    Start-Sleep -Milliseconds 500
+} else { throw "Smoke test failed: exe exited with code $($proc.ExitCode)" }
 
 # Ship docs + first-run notes inside the app folder
 foreach ($f in "README.md", "CHANGELOG.md", "SECURITY.md", "BUILDING.md", "THIRD_PARTY_NOTICES.md") { if (Test-Path $f) { Copy-Item $f $appDir -Force } }
