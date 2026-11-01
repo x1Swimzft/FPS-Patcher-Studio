@@ -14,7 +14,7 @@ All notable changes to FPS Patcher Studio are documented in this file.
 - Patch console logs now report the source and output bitrate alongside the timescale.
 
 ### Known limitations
-- Version metadata is now 1.2.0, but no v1.2.0 installer/zip has been built, tagged or published.
+- The v1.2.0 installer and portable zip are published on GitHub Releases. The builds are unsigned, so Windows SmartScreen may warn.
 
 ### Verification
 - `uv run ruff check src tests tools` clean.

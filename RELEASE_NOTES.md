@@ -3,8 +3,8 @@
 ## v1.2.0 - 2026-11-01 (bitrate planning + startup update prompt)
 
 Prepared on `fix/v1.0.1`. Version 1.2.0 adds bitrate visibility and a target control,
-plus an automatic update prompt at startup. The v1.0.0 artifacts in `release/`
-remain the current binaries until this version is built and tagged.
+plus an automatic update prompt at startup. The installer and portable zip are
+published on GitHub Releases. The builds are unsigned.
 
 ### Highlights
 
@@ -27,8 +27,8 @@ remain the current binaries until this version is built and tagged.
 - `uv run ruff check src tests tools` — clean.
 - `uv run mypy src tests tools` — clean (95 files).
 - `uv run pytest -q` — 412 passed.
-- Not verified: manual GUI/watch/Explorer/DPI checks, a frozen v1.2.0 build, code
-  signing, and a real Windows machine without a development environment.
+- The Windows build passed its launch smoke test.
+- Not verified: manual GUI/watch/Explorer/DPI checks and code signing.
 
 ## v1.1.0 - 2026-11-01 (defect fixes + AV1 preflight)
 
