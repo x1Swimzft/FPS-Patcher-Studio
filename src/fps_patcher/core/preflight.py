@@ -40,6 +40,9 @@ BITRATE_BUFSIZE = "36M"
 # Preference order; every candidate is tried and failures fall through to libx264.
 HW_ENCODERS: tuple[str, ...] = ("h264_nvenc", "h264_amf", "h264_qsv")
 SOFTWARE_ENCODER = "libx264"
+# Generic Windows GPU decode. Software decode of high-bitrate AV1 is slower than
+# realtime, so the cap pass tries this first and retries without it on failure.
+HW_DECODER = "d3d11va"
 
 Emit = Callable[[LogEvent], None]
 
@@ -108,11 +111,14 @@ def build_preflight_args(
     plan: PreflightPlan,
     encoder: str | None = None,
     extra_args: Sequence[str] = (),
+    hwaccel: str | None = None,
 ) -> list[str]:
     """ffmpeg arguments for one pre-flight pass (audio-only or audio+video)."""
     video_encoder = (encoder or SOFTWARE_ENCODER) if plan.cap_bitrate else None
+    input_args = ["-hwaccel", hwaccel] if hwaccel and plan.cap_bitrate else []
     return [
         "-hide_banner", "-nostdin", "-y",
+        *input_args,
         "-i", str(src),
         "-map", "0:v:0", "-map", "0:a:0?",
         "-map_metadata", "0",
@@ -327,6 +333,7 @@ def run_preflight(
     *,
     extra_args: Sequence[str] = (),
     force_event: threading.Event | None = None,
+    on_stdout_line: Callable[[str], None] | None = None,
 ) -> Path:
     """Run the pre-flight ffmpeg pass; return the temp file (caller deletes it)."""
     # Unique per invocation so two jobs on the same source never share a temp.
@@ -337,15 +344,19 @@ def run_preflight(
     marker = _claim_preflight_owner(src, dst)
     released = False
     try:
-        candidates: list[str | None]
+        attempts: list[tuple[str | None, str | None]]
         if plan.cap_bitrate:
-            candidates = list(encoder_candidates(list_h264_encoders(paths.ffmpeg)))
+            encoders = list(encoder_candidates(list_h264_encoders(paths.ffmpeg)))
+            attempts = [(HW_DECODER, e) for e in encoders] + [(None, e) for e in encoders]
         else:
-            candidates = [None]
+            attempts = [(None, None)]
 
         last_tail: list[str] = []
-        for encoder in candidates:
+        read_stdout = on_stdout_line or (lambda _line: None)
+        for hwaccel, encoder in attempts:
             label = encoder or "audio only"
+            if hwaccel:
+                label += f" ({hwaccel} decode)"
             emit(LogEvent(f"[PREFLIGHT] ffmpeg pass ({label})"))
             tail: list[str] = []
 
@@ -356,8 +367,8 @@ def run_preflight(
             try:
                 code = run_streaming(
                     paths.ffmpeg,
-                    build_preflight_args(src, dst, plan, encoder, extra_args),
-                    lambda _line: None,
+                    build_preflight_args(src, dst, plan, encoder, extra_args, hwaccel),
+                    read_stdout,
                     on_stderr,
                     cancel_event,
                     force_event,

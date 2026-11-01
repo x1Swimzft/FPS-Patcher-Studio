@@ -1,14 +1,20 @@
 # Release Notes
 
-## v1.0.1 - Unreleased (defect fixes)
+## v1.1.0 - 2026-11-01 (defect fixes + AV1 preflight)
 
-Prepared on `fix/v1.0.1`. This is a defect-fix release: no new features, no
-telemetry, and no version bump or release build yet. The v1.0.0 artifacts in
-`release/` remain the current binaries until this version is approved, built and
-tagged.
+Prepared on `fix/v1.0.1`. Version 1.1.0 combines the v1.0.0 defect fixes with an
+AV1 preflight acceleration fix: no new features, no telemetry. The v1.0.0
+artifacts in `release/` remain the current binaries until this version is built
+and tagged.
 
 ### Highlights
 
+- **AV1 bitrate cap no longer hangs** — with `auto_cap_bitrate` enabled, the
+  preflight decode now tries `-hwaccel d3d11va` before the input and falls back to
+  software decoding if the hardware path fails. On an 85 Mbps AV1 1920x1080p60
+  clip the preflight dropped from ~101 s to ~13 s, and its progress lines now
+  reach the console instead of being buffered. Direct AV1 patching without the
+  cap is unchanged and stays lossless.
 - **Persisted settings now work** — the eight settings that v1.0.0 stored but never
   read now have runtime consumers:
   - `verify_after` skips post-patch verification when disabled;
@@ -56,8 +62,8 @@ tagged.
 
 - `uv run ruff check src tests tools` — clean.
 - `uv run mypy src tests tools` — clean (95 files).
-- `uv run pytest -q` — 403 passed (baseline 375).
-- Not verified: manual GUI/watch/Explorer/DPI checks, a frozen v1.0.1 build, code
+- `uv run pytest -q` — 405 passed (baseline 375).
+- Not verified: manual GUI/watch/Explorer/DPI checks, a frozen v1.1.0 build, code
   signing, and a real Windows machine without a development environment.
 
 ## v1.0.0 - Consolidation (2026-10-25)

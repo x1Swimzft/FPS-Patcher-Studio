@@ -92,6 +92,22 @@ def test_bitrate_cap_args_use_encoder_and_copy_good_audio() -> None:
     assert args[args.index("-c:a") + 1] == "copy"
 
 
+def test_bitrate_cap_args_try_hardware_decode_before_input() -> None:
+    plan = PreflightPlan(False, True)
+    args = build_preflight_args(
+        Path("in.mp4"), Path("o.mp4"), plan, "h264_nvenc", hwaccel="d3d11va"
+    )
+    assert args.index("-hwaccel") < args.index("-i")
+    assert args[args.index("-hwaccel") + 1] == "d3d11va"
+
+
+def test_audio_only_args_ignore_hardware_decode() -> None:
+    args = build_preflight_args(
+        Path("in.mov"), Path("out.mov"), PreflightPlan(True, False), hwaccel="d3d11va"
+    )
+    assert "-hwaccel" not in args
+
+
 def test_encoder_candidates_order_and_fallback() -> None:
     assert encoder_candidates(["libx264", "h264_qsv", "h264_nvenc"]) == [
         "h264_nvenc",

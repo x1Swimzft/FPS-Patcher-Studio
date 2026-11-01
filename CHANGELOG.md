@@ -2,7 +2,12 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
-## [1.0.1] - Unreleased
+## [1.1.0] - 2026-11-01
+
+### Fixed: AV1 bitrate-cap preflight
+- `auto_cap_bitrate` no longer stalls on high-bitrate AV1 sources. Preflight now tries `-hwaccel d3d11va` before `-i` and falls back to software decoding when the hardware path fails.
+- Preflight progress lines are forwarded to the UI console instead of being buffered and swallowed.
+- Measured on an 85 Mbps AV1 1920x1080p60 clip: the cap preflight dropped from ~101 s to ~13 s. Direct AV1 patching without the cap remains lossless.
 
 ### Fixed: v1.0.0 defect sweep
 - **Settings now have runtime consumers**: `verify_after`, `backup_original`, `preserve_mtime`, `stop_on_error`, `extra_ffmpeg_args`, `log_to_file`, `confirm_overwrite` and `notify_done` are wired through the GUI, CLI and watch paths.
@@ -26,12 +31,12 @@ All notable changes to FPS Patcher Studio are documented in this file.
 ### Known limitations
 - No setting was hidden: all eight newly wired settings already have UI controls and consumers.
 - `notify_done` defaults to `none`, so watch-folder and manual batch completion are silent until the user selects `sound` or `toast`.
-- Version metadata is still 1.0.0 and no v1.0.1 installer/zip has been built, tagged or published; those steps await approval.
+- Version metadata is now 1.1.0, but no v1.1.0 installer/zip has been built, tagged or published; those steps await approval.
 
 ### Verification
 - `uv run ruff check src tests tools` clean.
 - `uv run mypy src tests tools` clean (95 files).
-- `uv run pytest -q` 403 passed.
+- `uv run pytest -q` 405 passed.
 
 ## [1.0.0] - 2026-10-25
 

@@ -318,6 +318,7 @@ def patch(
                     cancel_event,
                     extra_args=extra_args,
                     force_event=force_event,
+                    on_stdout_line=on_stdout,
                 )
                 work_before = probe(work_src, ffprobe_bin)
                 emit(LogEvent("[PREFLIGHT] Done; patching the fixed copy.", "OK"))
