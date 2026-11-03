@@ -1,5 +1,37 @@
 # Release Notes
 
+## v1.4.0 - 2026-11-04 (zero-copy prober)
+
+Version 1.4.0 makes direct probing memory-safe: it reads box headers and the
+`moov` payload instead of loading the whole file. **This version is source-only;
+it has not been built or tagged, manual QA is pending, and builds remain
+unsigned.**
+
+### Highlights
+
+- **Zero-copy probing** — `probe_direct` seeks through top-level MP4/MOV boxes and
+  loads only the `moov` payload, capped at 64 MiB. `mdat` is never read into RAM,
+  so probing a large file no longer allocates memory proportional to its size.
+- **Metadata without ffprobe** — file size and bitrate come from `os.stat`
+  (bitrate is still whole-file size ÷ duration). Color tags from `colr`
+  (`nclx`/`nclc`) and audio sample rate/channels from `stsd` are now read
+  directly, so readiness and preflight keep working when ffprobe is unavailable.
+
+### Known limitations
+
+- Only the first visual sample entry is inspected; `rICC`/`prof` color profiles
+  and SPS/VUI values are not parsed, so `pix_fmt` remains unknown in direct mode.
+- Audio rate/channels use the version-0 sample-entry offsets even for QuickTime
+  v1/v2 entries.
+- The Nuitka benchmark remains blocked: no MSVC v143 (`vswhere.exe` absent,
+  `cl.exe` missing). No size, cold-start or AV numbers were measured and the
+  release pipeline is unchanged.
+
+### Verification
+
+- Automated gates only. Manual QA has not been executed, and no v1.4.0 build has
+  been built, tagged or published.
+
 ## v1.3.1 - 2026-11-03 (in-app self-update)
 
 Version 1.3.1 turns the update check into a full in-app self-update: the app shows

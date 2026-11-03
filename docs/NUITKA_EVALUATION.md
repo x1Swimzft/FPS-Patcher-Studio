@@ -13,6 +13,8 @@
 | Inno Setup 7 | present (`C:\Program Files\Inno Setup 7\ISCC.exe`) |
 | Nuitka build attempted | **no** — no C compiler, so no size, cold-start or AV number below is measured |
 
+Rechecked 2026-11-04: `vswhere.exe` and `cl.exe` are still absent; no v1.4.0 benchmark was possible.
+
 Nothing in this document is a measurement of the Qt build. Earlier revisions of this file
 carried Tk-era numbers (`--enable-plugin=tk-inter`, CustomTkinter, "0 false positives",
 "~32 MB", "0.4.0.0") that no longer describe this project; they have been removed.

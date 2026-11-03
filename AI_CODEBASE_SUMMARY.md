@@ -1,4 +1,4 @@
-# AI Codebase Summary — FPS Patcher Studio (v1.3.1)
+# AI Codebase Summary — FPS Patcher Studio (v1.4.0)
 
 > **Purpose**: Master architecture, codebase map, state lifecycle, and operational guide for autonomous AI agents and engineers working on **FPS Patcher Studio**.
 
@@ -8,13 +8,13 @@
 
 - **Repository**: `fps-patcher-studio`
 - **Root Path**: `E:\Project\fps-patcher-studio`
-- **Current Version**: `1.3.1` (2026-11-03)
+- **Current Version**: `1.4.0` (2026-11-04)
 - **Python Target**: Python 3.11+
 - **Desktop Stack**: PySide6 `6.12.0`, Pillow, PyInstaller one-folder build
 - **Primary Domain**: High-precision ISO-BMFF (MP4/MOV/M4V) container timing patcher. It modifies video timescales, sample duration tables (`stts`), composition offsets (`ctts`), track/movie headers (`mvhd`, `tkhd`, `mdhd`), and edit lists (`edts`/`elst`) losslessly at the binary atom level **without re-encoding video frames** unless the optional bitrate cap is enabled.
 - **User Interface**: Qt is the only UI (`src/fps_patcher/ui_qt/`), with English and Thai localization, light/dark themes, seven theme presets, drag-and-drop, thumbnails, and a bottom activity console.
 - **Headless Surface**: `src/fps_patcher/cli.py` (`--cli patch|probe|score`), plus `--quick-patch` for the Explorer verb.
-- **Release Status**: v1.3.1 is source-only (not built or tagged). v1.2.0 is the last published release on GitHub Releases and is **unsigned**. SignPath is documented but not active.
+- **Release Status**: v1.4.0 is source-only (not built or tagged). v1.2.0 is the last published release on GitHub Releases and is **unsigned**. SignPath is documented but not active.
 
 ---
 
@@ -31,7 +31,7 @@ E:\Project\fps-patcher-studio\
 │   ├── version_info.txt            # Windows PE version metadata
 │   └── fps_patcher.manifest        # DPI/long-path aware application manifest
 ├── src\fps_patcher\
-│   ├── __init__.py                 # __version__ = "1.3.1", APP_NAME
+│   ├── __init__.py                 # __version__ = "1.4.0", APP_NAME
 │   ├── __main__.py                 # Entry dispatch: --cli, --quick-patch, Qt GUI
 │   ├── cli.py                      # Headless CLI: patch | probe | score
 │   ├── config.py                   # Settings persistence and clamping
@@ -93,7 +93,7 @@ E:\Project\fps-patcher-studio\
 │   └── make_icon.py
 ├── docs\                           # Policies, roadmap, signing, handoff checklists
 ├── release\                        # Built installers, zips, checksums, SBOM
-├── pyproject.toml                  # Version 1.3.1, PySide6 pin, tool config
+├── pyproject.toml                  # Version 1.4.0, PySide6 pin, tool config
 ├── uv.lock                         # Locked dependency graph
 ├── README.md
 ├── CHANGELOG.md
@@ -331,6 +331,35 @@ progress, and **Update now** / **Skip this version** / **Cancel**.
   is for QA only.
 
 v1.3.1 has not been built or tagged; section 11 of
+`docs/handoff/manual-test-v1.0.1.md` lists the manual checks and they are not
+executed.
+
+### 7.7 v1.4.0 Changes (zero-copy prober)
+
+`core/prober.py::probe_direct` no longer calls `Path.read_bytes()`. It opens the
+file, walks top-level box headers with seek/read, and loads only the `moov`
+payload, capped at 64 MiB; `mdat` is never read into RAM.
+
+- **Size and bitrate** (`path.stat().st_size`): `file_size_bytes` and `bit_rate`
+  come from the filesystem, and bitrate remains whole-file size ÷ duration.
+- **Color tags** (`colr`): `nclx`/`nclc` primaries, transfer and matrix are mapped
+  to ffprobe-style names (e.g. 9/16/9 → `bt2020` / `smpte2084` / `bt2020nc`).
+  Unspecified (2), unknown codes, missing `colr`, and `rICC`/`prof` map to `None`.
+- **Audio fields** (`stsd`): the audio sample entry provides
+  `audio_sample_rate` and `audio_channels` (version-0 offsets). Readiness and
+  preflight therefore get color and audio metadata without ffprobe.
+- **Unchanged**: codec, width/height, fps, timescale, frames, audio codec and
+  `stream_count` parsing is the same, and the real-clip test still passes.
+  `pix_fmt` is still not inferred in direct mode because VUI/SPS parsing is out
+  of scope.
+- **Tests**: `tests/test_prober_direct.py` covers moov-at-end, moov-at-front,
+  64-bit/size-0 boxes, color tags, audio fields, oversized/truncated boxes and
+  OSError handling.
+- **Nuitka**: the benchmark was rechecked on 2026-11-04, but `vswhere.exe` and
+  `cl.exe` are absent, so no build/size/cold-start numbers were measured and the
+  release pipeline is unchanged.
+
+v1.4.0 is source-only and has not been built or tagged; section 12 of
 `docs/handoff/manual-test-v1.0.1.md` lists the manual checks and they are not
 executed.
 

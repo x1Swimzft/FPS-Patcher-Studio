@@ -2,6 +2,24 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
+## [1.4.0] - 2026-11-04
+
+### Changed
+- `probe_direct` now walks top-level MP4/MOV boxes with seek/read and loads only the `moov` payload (64 MiB cap) instead of reading the whole file into RAM. `mdat` is never loaded.
+- File size and bitrate come from `os.stat`; bitrate remains whole-file size ÷ duration.
+
+### Added
+- Direct probing reads `colr` (`nclx`/`nclc`) color tags and audio sample rate/channels from `stsd`, so readiness and preflight keep working without ffprobe.
+- Synthetic MP4 tests cover moov-at-end, moov-at-front, 64-bit/size-0 boxes, color tags, audio fields, oversized/truncated boxes and OSError handling.
+
+### Known limitations
+- Only the first visual sample entry is inspected; `rICC`/`prof` color profiles and SPS/VUI values are not parsed, and `pix_fmt` is still unknown in direct mode.
+- Audio rate/channels use the version-0 sample-entry offsets even for QuickTime v1/v2 entries.
+- The Nuitka benchmark remains blocked: no MSVC v143 (`vswhere.exe` absent, `cl.exe` missing). No size, cold-start or AV numbers were measured and the release pipeline is unchanged.
+
+### Verification
+- Automated gates only; no manual QA and no v1.4.0 build or tag.
+
 ## [1.3.1] - 2026-11-03
 
 ### Added

@@ -1,20 +1,21 @@
-# Handoff & Product Roadmap — FPS Patcher Studio (`v0.5.1` ➔ `v1.3.1`)
+# Handoff & Product Roadmap — FPS Patcher Studio (`v0.5.1` ➔ `v1.4.0`)
 
 **Generated**: 2026-10-24  
 **Repository**: `https://github.com/x1Swimzft/FPS-Patcher-Studio`  
 **Workspace**: `E:\Project\fps-patcher-studio`  
-**Current Base Version**: `v1.3.1` (2026-11-03)
+**Current Base Version**: `v1.4.0` (2026-11-04)
 
-> **Status at v1.3.1:** Qt (PySide6) is the only UI; the Tk/CustomTkinter UI is
+> **Status at v1.4.0:** Qt (PySide6) is the only UI; the Tk/CustomTkinter UI is
 > gone. Phase 1 shipped in v0.6.0 and still lives in `core/preflight.py`,
 > `core/patcher.py` and `core/updater.py` — no rewrite is needed. Phase 2 (watch
 > folder, Explorer verb, Rec.709 color guard, metadata scrub) and Phase 3
 > (platform profiles + readiness) are delivered, and the headless CLI (4.2) is
 > live. Nuitka (4.1) was evaluated but **not adopted**: see
 > `docs/NUITKA_EVALUATION.md` for the checklist and why no build was measured in
-> this environment. The v1.2.0 release is published but **unsigned**; v1.3.1 is
-> source-only and has not been built or tagged, and its self-update signature gate
-> waits on SignPath. The v0.5.1
+> this environment; the benchmark is still blocked by missing MSVC v143
+> (`vswhere.exe` and `cl.exe` are absent). The v1.2.0 release is published but
+> **unsigned**; v1.4.0 is source-only and has not been built or tagged, and its
+> self-update signature gate waits on SignPath. The v0.5.1
 > Tk analysis below is kept as history and no longer describes the code.
 
 ---
@@ -164,9 +165,10 @@ When minimizing, restoring, maximizing, or Alt-Tabbing back to `FPS Patcher Stud
   - ใช้ `docs/handoff/manual-test-v1.0.1.md` รวม section 9 “v1.2.0 additions (not executed)” ซึ่งครอบคลุม bitrate pill, Inspector Bitrate, ช่วง 1-24 Mbps, พฤติกรรม auto-cap และ startup update prompt
   - `v1.2.1` เพิ่ม section 10 “v1.2.1 additions (not executed)” ครอบคลุม Quick Patch/watch-folder timescale, `mask_diagnostic_paths` และการตรวจถ้อยคำ Tk — ยังไม่มีใครรัน
   - `v1.3.1` เพิ่ม section 11 “v1.3.1 additions (not executed)” ครอบคลุม self-update ทั้ง installed/portable, ยกเลิกกลางดาวน์โหลด, skip, ปิดตอนกำลัง patch, tamper และเคส signed/unsigned — ยังไม่มีใครรัน
+  - `v1.4.0` เพิ่ม section 12 “v1.4.0 additions (not executed)” ครอบคลุม zero-copy direct probing, color/audio metadata โดยไม่มี ffprobe, หน่วยความจำกับไฟล์ 4K ขนาดใหญ่, ไฟล์เสีย และสถานะ Nuitka ที่ยัง blocked — ยังไม่มีใครรัน
   - ห้ามลง PASS จาก code inspection; ต้องมีคนรันจริงและบันทึกผล/artifact/SHA-256 ใน sign-off table
 - **5.3 SignPath code signing — ⛔ ยังไม่เปิดใช้ (blocked)**:
-  - `v1.2.0` ที่เผยแพร่ยังเป็น **unsigned**; Windows SmartScreen อาจขึ้น “Unknown publisher” และ `v1.3.1` ก็ยัง unsigned และยังไม่ถูก build หรือ release
+  - `v1.2.0` ที่เผยแพร่ยังเป็น **unsigned**; Windows SmartScreen อาจขึ้น “Unknown publisher” และ `v1.3.1`/`v1.4.0` ก็ยัง unsigned และยังไม่ถูก build หรือ release
   - self-update ตรวจ Authenticode ก่อนรันตัวติดตั้ง จึงจะปฏิเสธ build ที่ยัง unsigned จนกว่า SignPath จะใช้งานได้ (`FPS_PATCHER_ALLOW_UNSIGNED_UPDATE=1` เป็น override สำหรับ QA เท่านั้น)
   - ต้องรอ owner สมัคร/ได้รับอนุมัติ SignPath, สร้าง project และตั้งค่า `SIGNPATH_ENABLED=true`, `SIGNPATH_ORG_ID` และ secret `SIGNPATH_API_TOKEN` ตาม `docs/CODE_SIGNING_SIGNPATH.md`
   - ห้ามเขียนเอกสารหรือประกาศว่า signed จนกว่า workflow จะสร้าง artifact ที่มีลายเซ็นจริงและตรวจด้วย `Get-AuthenticodeSignature` แล้ว

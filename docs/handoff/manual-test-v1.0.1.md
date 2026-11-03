@@ -244,3 +244,20 @@ must be recorded separately. Code inspection and automated tests are not results
 
 **Status:** not executed. A human on real Windows must record results, and the
 signed and unsigned cases must be recorded separately.
+
+## 12. v1.4.0 additions (not executed)
+
+**Status: not executed.** These rows cover zero-copy direct probing and have not
+been run. A human on real Windows must record every result; automated tests and
+code inspection are not results.
+
+| # | Step | Expected | Result | Notes |
+|---|---|---|---|---|
+| Y1 | Temporarily rename/point away ffprobe (or force the direct fallback), add a normal H.264/AAC clip, and probe it. | Codec, resolution, fps, timescale, frames and audio metadata match the ffprobe result recorded beforehand. | | |
+| Y2 | Probe a clip with a `colr` `nclx` box (e.g. 9/16/9), then a file with no `colr`. | Readiness shows the color tags for the first clip; the second shows none and does not crash. | | |
+| Y3 | Probe a large 4K file (>= 1 GB) while watching Task Manager. | Peak memory stays far below the file size and probing completes promptly; record the numbers. | | |
+| Y4 | With ffprobe unavailable, probe a clip with audio. | Audio sample rate and channels are populated, and readiness audio checks use them. | | |
+| Y5 | Probe a truncated or invalid MP4. | A clear ProbeError/dialog is shown; the app does not crash. | | |
+| Y6 | Run the Nuitka benchmark. | Not run on this machine; record the blocked state. Do not invent numbers. | | |
+
+**Status:** not executed. A human on Windows must record results.
