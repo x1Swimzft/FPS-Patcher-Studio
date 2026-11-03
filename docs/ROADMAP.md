@@ -1,18 +1,19 @@
-# Handoff & Product Roadmap — FPS Patcher Studio (`v0.5.1` ➔ `v1.2.0`)
+# Handoff & Product Roadmap — FPS Patcher Studio (`v0.5.1` ➔ `v1.2.1`)
 
 **Generated**: 2026-10-24  
 **Repository**: `https://github.com/x1Swimzft/FPS-Patcher-Studio`  
 **Workspace**: `E:\Project\fps-patcher-studio`  
-**Current Base Version**: `v1.2.0` (2026-11-01)
+**Current Base Version**: `v1.2.1` (2026-11-03)
 
-> **Status at v1.2.0:** Qt (PySide6) is the only UI; the Tk/CustomTkinter UI is
+> **Status at v1.2.1:** Qt (PySide6) is the only UI; the Tk/CustomTkinter UI is
 > gone. Phase 1 shipped in v0.6.0 and still lives in `core/preflight.py`,
 > `core/patcher.py` and `core/updater.py` — no rewrite is needed. Phase 2 (watch
 > folder, Explorer verb, Rec.709 color guard, metadata scrub) and Phase 3
 > (platform profiles + readiness) are delivered, and the headless CLI (4.2) is
 > live. Nuitka (4.1) was evaluated but **not adopted**: see
 > `docs/NUITKA_EVALUATION.md` for the checklist and why no build was measured in
-> this environment. The v1.2.0 release is published but **unsigned**. The v0.5.1
+> this environment. The v1.2.0 release is published but **unsigned**; v1.2.1 is
+> source-only and has not been built or tagged. The v0.5.1
 > Tk analysis below is kept as history and no longer describes the code.
 
 ---
@@ -160,6 +161,7 @@ When minimizing, restoring, maximizing, or Alt-Tabbing back to `FPS Patcher Stud
   - SBOM ของ `v1.2.0` ถูกแนบย้อนหลังเข้า GitHub Release แล้ว (2026-11-03, `FPSPatcherStudio-v1.2.0.cdx.json`) และ checksum ตรงกับไฟล์ที่อัปโหลด
 - **5.2 Manual QA sign-off สำหรับ `v1.2.0` — ⏳ ยังไม่ได้ตรวจ**:
   - ใช้ `docs/handoff/manual-test-v1.0.1.md` รวม section 9 “v1.2.0 additions (not executed)” ซึ่งครอบคลุม bitrate pill, Inspector Bitrate, ช่วง 1-24 Mbps, พฤติกรรม auto-cap และ startup update prompt
+  - `v1.2.1` เพิ่ม section 10 “v1.2.1 additions (not executed)” ครอบคลุม Quick Patch/watch-folder timescale, `mask_diagnostic_paths` และการตรวจถ้อยคำ Tk — ยังไม่มีใครรัน
   - ห้ามลง PASS จาก code inspection; ต้องมีคนรันจริงและบันทึกผล/artifact/SHA-256 ใน sign-off table
 - **5.3 SignPath code signing — ⛔ ยังไม่เปิดใช้ (blocked)**:
   - `v1.2.0` ที่เผยแพร่ยังเป็น **unsigned**; Windows SmartScreen อาจขึ้น “Unknown publisher”

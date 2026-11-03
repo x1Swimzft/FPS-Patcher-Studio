@@ -207,3 +207,20 @@ the audio pass cannot be mistaken for the video path.
 **Rules for section 9:** one result per row; do not copy the expected text into
 Result; record the artifact name, SHA-256, Windows build, and scaling in section 8
 when this pass is executed.
+
+## 10. v1.2.1 additions (not executed)
+
+**Status: not executed.** These rows were added for v1.2.1 and have not been run.
+Leave every Result cell blank until a human tester on real Windows records the
+observed outcome. Code inspection is not a result.
+
+| # | Step | Expected | Result | Notes |
+|---|---|---|---|---|
+| W1 | Set Target FPS to `120 FPS`, then run Explorer Quick Patch (or `--quick-patch`) on a clip and probe the output. | Output timescale is 120000 and its duration matches the source. | | |
+| W2 | Select the custom Target FPS option, enter a custom timescale, repeat the Quick Patch. | Output uses that custom timescale value. | | |
+| W3 | Set Target FPS to `120 FPS` and drop a clip into the watch folder. | The watch batch patches at 120000, not 60000. | | |
+| W4 | Set `mask_diagnostic_paths` to false, force a patch failure, and open the newest `auto_patch_*.log`. Then set it to true and repeat. | First log shows the real source/output paths; second log shows masked paths. | | |
+| W5 | Inspect the module docstrings in `app/controller.py` and `core/platform_profiles.py`. | No Tkinter/Tk wording remains; both describe the Qt/threading model accurately. | | |
+
+**Rules for section 10:** a human on real Windows must record every result;
+automated tests alone do not close these rows.

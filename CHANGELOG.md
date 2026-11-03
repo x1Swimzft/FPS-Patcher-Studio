@@ -2,6 +2,16 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
+## [1.2.1] - 2026-11-03
+
+### Fixed
+- Quick Patch (`--quick-patch` and the Explorer verb) and the watch-folder path now use the saved Target FPS preset or custom timescale instead of the hard-coded 60000.
+- Diagnostic auto-logs from the main patch path now honor `mask_diagnostic_paths`; the setting was previously ignored there (the logger always masked). The repair/forensic path already honored it.
+- Removed stale Tkinter threading comments from `app/controller.py` and `core/platform_profiles.py`.
+
+### Verification
+- Automated gates only; no manual QA has been executed for this version.
+
 ## [1.2.0] - 2026-11-01
 
 ### Added

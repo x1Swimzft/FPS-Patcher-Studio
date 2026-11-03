@@ -1,5 +1,20 @@
 # Release Notes
 
+## v1.2.1 - 2026-11-03 (quick-patch timescale + diagnostic masking)
+
+Version 1.2.1 fixes three issues found after 1.2.0. No features or settings change.
+The builds are unsigned, and manual QA for this version is still pending.
+
+### Fixes
+
+- Quick Patch (`--quick-patch` and the Explorer verb) and the watch-folder path
+  now honor the saved Target FPS preset or custom timescale. They previously
+  used a hard-coded 60000 timescale.
+- Diagnostic auto-logs written by the main patch path now honor
+  `mask_diagnostic_paths`. The setting was ignored there; logs were always
+  masked. The repair/forensic path already honored it.
+- Removed stale Tkinter wording from two internal docstrings.
+
 ## v1.2.0 - 2026-11-01 (bitrate planning + startup update prompt)
 
 Prepared on `fix/v1.0.1`. Version 1.2.0 adds bitrate visibility and a target control,

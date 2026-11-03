@@ -1,9 +1,9 @@
 # Software Supply Chain & Dependency Audit Report
 
-**Project**: `fps-patcher-studio` v1.2.0  
-**Audit Date**: 2026-11-03 15:26:53 UTC  
+**Project**: `fps-patcher-studio` v1.2.1  
+**Audit Date**: 2026-11-03 16:41:11 UTC  
 **Tool**: `tools/generate_sbom.py` (CycloneDX 1.5 Specification)  
-**SBOM Artifact**: [`release/FPSPatcherStudio-v1.2.0.cdx.json`](../release/FPSPatcherStudio-v1.2.0.cdx.json)  
+**SBOM Artifact**: [`release/FPSPatcherStudio-v1.2.1.cdx.json`](../release/FPSPatcherStudio-v1.2.1.cdx.json)  
 
 ---
 
