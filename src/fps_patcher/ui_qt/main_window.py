@@ -67,6 +67,7 @@ from .theme import (
     apply_backdrop,
     update_title_bar_theme,
 )
+from .update_dialog import UpdateDialog
 from .widgets import icon_button, text_button
 
 log = logging.getLogger("fps_patcher.ui_qt.main_window")
@@ -100,6 +101,8 @@ class MainWindow(QMainWindow):
         self._ff_detail = ""
         self._update_info: Any = None
         self._update_prompted = False
+        self._update_dialog: UpdateDialog | None = None
+        self._pending_update_path: Path | None = None
         self._probe_running = False
         self._pending_logs: list[tuple[str, str]] = []
         self._latest_progress: ProgressEvent | None = None
@@ -1043,24 +1046,29 @@ class MainWindow(QMainWindow):
         if info is None or self._update_prompted:
             return
         self._update_prompted = True
-        if self._confirm_update(info):
-            self._begin_update_download(info)
+        if self.settings.skipped_update_version == getattr(info, "version", ""):
+            return
+        self._open_update_dialog(info)
 
-    def _confirm_update(self, info: Any) -> bool:
-        lang = self.settings.language
-        notes = getattr(info, "notes", "").strip()
-        if len(notes) > 400:
-            notes = notes[:400] + "..."
-        prompt = t(
-            "update_dialog_prompt",
-            lang,
-            version=getattr(info, "version", ""),
-            notes=notes or "-",
-        )
-        answer = QMessageBox.question(
-            self, t("update_dialog_title", lang), prompt
-        )
-        return answer == QMessageBox.StandardButton.Yes
+    def _open_update_dialog(self, info: Any) -> None:
+        dialog = self._update_dialog
+        if dialog is None:
+            dialog = UpdateDialog(info, self.settings, self)
+            dialog.update_requested.connect(
+                lambda: self.controller.start_update_download(info)
+            )
+            dialog.skip_requested.connect(lambda: self._on_update_skip(info))
+            dialog.cancel_requested.connect(self.controller.cancel_update_download)
+            self._update_dialog = dialog
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
+
+    def _on_update_skip(self, info: Any) -> None:
+        self.settings.skipped_update_version = getattr(info, "version", "")
+        self.settings.save_async()
+        if self._update_dialog is not None:
+            self._update_dialog.close()
 
     def _show_update_button(self) -> None:
         info = self._update_info
@@ -1078,51 +1086,79 @@ class MainWindow(QMainWindow):
         self.update_button.setVisible(True)
 
     def _on_update_clicked(self) -> None:
+        if self._pending_update_path is not None:
+            self._apply_downloaded_update(self._pending_update_path)
+            return
         info = self._update_info
         if info is None:
             return
-        if self._confirm_update(info):
-            self._begin_update_download(info)
+        self._open_update_dialog(info)
 
-    def _begin_update_download(self, info: Any) -> None:
+    def _apply_downloaded_update(self, path: Path) -> None:
         lang = self.settings.language
-        self.update_button.setText(t("update_downloading", lang, percent=0))
-        self.update_button.setEnabled(False)
-        self.controller.start_update_download(info)
+        if self.controller.busy:
+            self.console.append(t("update_busy_deferred", lang), "INFO")
+            return
+        self._pending_update_path = None
+        try:
+            if path.suffix.lower() == ".zip":
+                from ..core.updater import apply_portable_update
+
+                apply_portable_update(path)
+            else:
+                from ..core.updater import launch_installer
+
+                launch_installer(path)
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                t("app_title", lang),
+                t("update_failed", lang, error=str(exc)),
+            )
+            self._show_update_button()
+            return
+        self.close()
 
     def _on_update_download(self, event: UpdateDownloadEvent) -> None:
         lang = self.settings.language
+        dialog = self._update_dialog
         if event.stage == "downloading":
             self.update_button.setText(
                 t("update_downloading", lang, percent=event.percent)
             )
             self.update_button.setEnabled(False)
+            if dialog is not None:
+                dialog.set_progress(event.percent)
         elif event.stage == "done":
-            self.update_button.setText(t("update_ready_launch", lang))
-            self.update_button.setEnabled(False)
+            if dialog is not None:
+                dialog.download_finished()
             if event.path is None:
                 self._show_update_button()
                 return
-            try:
-                from ..core.updater import launch_installer
-
-                launch_installer(event.path)
-            except Exception as exc:
-                QMessageBox.critical(
-                    self,
-                    t("app_title", lang),
-                    t("update_failed", lang, error=str(exc)),
-                )
-                self._show_update_button()
+            if self.controller.busy:
+                self._pending_update_path = event.path
+                text = t("update_ready_install", lang)
+                self.update_button.setText(text)
+                self.update_button.setToolTip(text)
+                self.update_button.setAccessibleName(text)
+                self.update_button.setEnabled(True)
+                self.console.append(t("update_busy_deferred", lang), "INFO")
                 return
-            self.close()
+            self._apply_downloaded_update(event.path)
+        elif event.stage == "cancelled":
+            if dialog is not None:
+                dialog.download_cancelled()
+            self._show_update_button()
         elif event.stage == "error":
             message = event.error or "Unknown error"
             if "SHA-256" in message:
                 display = t("update_sha256_failed", lang)
             else:
                 display = t("update_failed", lang, error=message)
-            QMessageBox.critical(self, t("app_title", lang), display)
+            if dialog is not None and dialog.isVisible():
+                dialog.download_failed(display)
+            else:
+                QMessageBox.critical(self, t("app_title", lang), display)
             self._show_update_button()
 
     # -------------------------------------------------------------------- close

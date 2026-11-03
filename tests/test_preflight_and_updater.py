@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import hashlib
 import io
+import os
+import subprocess
+import sys
+import threading
 import urllib.error
+import zipfile
 from fractions import Fraction
 from pathlib import Path
 from typing import Any
@@ -451,7 +456,9 @@ def test_controller_start_update_download(
     )
     expected_path = tmp_path / "Setup.exe"
 
-    def mock_download(info: Any, dest: Path, progress: Any = None) -> Path:
+    def mock_download(
+        info: Any, dest: Path, progress: Any = None, cancel_event: Any = None
+    ) -> Path:
         if progress:
             progress(500, 1000)
             progress(1000, 1000)
@@ -489,7 +496,9 @@ def test_controller_start_update_download_error(monkeypatch: pytest.MonkeyPatch)
     from fps_patcher.config import Settings
     from fps_patcher.core.models import UpdateDownloadEvent
 
-    def mock_download_fail(info: Any, dest: Path, progress: Any = None) -> Path:
+    def mock_download_fail(
+        info: Any, dest: Path, progress: Any = None, cancel_event: Any = None
+    ) -> Path:
         raise updater.UpdateError("SHA-256 verification failed")
 
     monkeypatch.setattr("fps_patcher.core.updater.download_update", mock_download_fail)
@@ -500,3 +509,186 @@ def test_controller_start_update_download_error(monkeypatch: pytest.MonkeyPatch)
     assert isinstance(event, UpdateDownloadEvent)
     assert event.stage == "error"
     assert "SHA-256 verification failed" in (event.error or "")
+
+
+# --- v1.3.1: portable updates, cancellation, Authenticode and trampoline
+
+
+def test_detect_install_mode_installed_vs_portable(tmp_path: Path) -> None:
+    assert updater.detect_install_mode(tmp_path) == "portable"
+    (tmp_path / "unins000.exe").write_bytes(b"MZ")
+    assert updater.detect_install_mode(tmp_path) == "installed"
+
+
+def test_pick_asset_portable_uses_zip_only() -> None:
+    assets = [
+        {"name": "FPSPatcherStudio-v1.3.1-Setup.exe"},
+        {"name": "FPSPatcherStudio-v1.3.1-win64.zip"},
+    ]
+    picked = updater._pick_asset(assets, "portable")
+    assert picked is not None and picked["name"].endswith("-win64.zip")
+    assert updater._pick_asset([{"name": "FPSPatcherStudio-v1.3.1-Setup.exe"}], "portable") is None
+
+
+def test_pick_asset_installed_never_falls_back_to_zip() -> None:
+    assets = [{"name": "FPSPatcherStudio-v1.3.1-win64.zip"}]
+    assert updater._pick_asset(assets, "installed") is None
+
+
+def test_download_cancel_closes_response_and_removes_part(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cancel = threading.Event()
+    resp = _FakeResp(b"partial" * 100)
+
+    def cancelling_open(url: str, timeout: float) -> _FakeResp:
+        cancel.set()
+        return resp
+
+    monkeypatch.setattr(updater, "_open", cancelling_open)
+    with pytest.raises(updater.UpdateCancelledError):
+        updater.download_update(_info_for(b"x", None), tmp_path, cancel_event=cancel)
+    assert resp.closed
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_download_truncated_stream_is_an_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    resp = _FakeResp(b"short")
+    resp.headers["Content-Length"] = "4096"
+    monkeypatch.setattr(updater, "_open", lambda url, timeout: resp)
+    with pytest.raises(updater.UpdateError, match="Download incomplete"):
+        updater.download_update(_info_for(b"x" * 4096, None), tmp_path)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_verify_authenticode_accepts_valid_signature(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(updater, "_winverifytrust", lambda path: 0)
+    updater.verify_authenticode(Path("FPSPatcherStudio.exe"))
+
+
+def test_verify_authenticode_rejects_invalid_signature(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(updater, "_winverifytrust", lambda path: 0x800B0100)
+    with pytest.raises(updater.UpdateError, match=r"0x800B0100"):
+        updater.verify_authenticode(Path("FPSPatcherStudio.exe"))
+
+
+def test_verify_authenticode_env_override_skips_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setenv("FPS_PATCHER_ALLOW_UNSIGNED_UPDATE", "1")
+    monkeypatch.setattr(updater, "_winverifytrust", lambda path: 0x800B0100)
+    updater.verify_authenticode(Path("FPSPatcherStudio.exe"))
+
+
+def test_launch_installer_silent_flags_and_verification(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    verified: list[Path] = []
+    spawned: list[tuple[list[str], dict[str, Any]]] = []
+
+    def fake_verify(path: Path) -> None:
+        verified.append(path)
+
+    def fake_popen(args: list[str], **kwargs: Any) -> None:
+        spawned.append((args, kwargs))
+
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(updater, "verify_authenticode", fake_verify)
+    monkeypatch.setattr(subprocess, "Popen", fake_popen)
+    installer = Path("C:/Temp/FPSPatcherStudio-Setup.exe")
+
+    updater.launch_installer(installer)
+
+    assert verified == [installer]
+    args, kwargs = spawned[0]
+    assert args == [str(installer), "/SILENT", "/CLOSEAPPLICATIONS", "/RESTARTAPPLICATIONS"]
+    assert kwargs["shell"] is False
+    assert kwargs["close_fds"] is True
+
+
+def test_apply_portable_update_stages_zip_and_writes_trampoline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    zip_path = tmp_path / "FPSPatcherStudio-v1.3.1-win64.zip"
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr("FPSPatcherStudio/FPSPatcherStudio.exe", b"MZ")
+        archive.writestr("FPSPatcherStudio/README.md", b"readme")
+
+    download_dir = tmp_path / "downloads"
+    app_dir = tmp_path / "app"
+    app_dir.mkdir()
+    spawned: list[list[str]] = []
+
+    def fake_popen(args: list[str], **kwargs: Any) -> None:
+        spawned.append(args)
+
+    monkeypatch.setattr(updater, "default_download_dir", lambda: download_dir)
+    monkeypatch.setattr(subprocess, "Popen", fake_popen)
+
+    trampoline = updater.apply_portable_update(
+        zip_path, app_dir=app_dir, pid=4321, verify_signature=False
+    )
+
+    staging = download_dir / "staging"
+    assert (staging / "FPSPatcherStudio" / "FPSPatcherStudio.exe").read_bytes() == b"MZ"
+    assert trampoline == download_dir / "apply_update.cmd"
+    script = trampoline.read_text(encoding="utf-8")
+    assert 'robocopy "%SRC%" "%DST%" /E /MOVE /R:5 /W:1 /NFL /NDL /NJH /NJS' in script
+    assert "PID eq %PID%" in script
+    assert "4321" in script
+    assert 'start "" "%DST%\\FPSPatcherStudio.exe"' in script
+    assert f'rmdir /s /q "{staging}" 2>NUL' in script
+    assert spawned == [["cmd.exe", "/c", str(trampoline)]]
+
+
+def test_apply_portable_update_defaults_to_current_pid(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    zip_path = tmp_path / "FPSPatcherStudio-win64.zip"
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr("FPSPatcherStudio/FPSPatcherStudio.exe", b"MZ")
+
+    download_dir = tmp_path / "downloads"
+    app_dir = tmp_path / "app"
+    app_dir.mkdir()
+    monkeypatch.setattr(updater, "default_download_dir", lambda: download_dir)
+    monkeypatch.setattr(subprocess, "Popen", lambda *args, **kwargs: None)
+
+    trampoline = updater.apply_portable_update(
+        zip_path, app_dir=app_dir, verify_signature=False
+    )
+
+    script = trampoline.read_text(encoding="utf-8")
+    assert f'set "PID={os.getpid()}"' in script
+    assert ":wait" in script
+    assert script.index(":wait") < script.index("robocopy")
+
+
+def test_apply_portable_update_rejects_zip_slip(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    zip_path = tmp_path / "evil.zip"
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr("../evil.exe", b"MZ")
+
+    download_dir = tmp_path / "downloads"
+    monkeypatch.setattr(updater, "default_download_dir", lambda: download_dir)
+    monkeypatch.setattr(
+        subprocess, "Popen", lambda *args, **kwargs: pytest.fail("must not spawn")
+    )
+
+    with pytest.raises(updater.UpdateError, match="unsafe path"):
+        updater.apply_portable_update(
+            zip_path, app_dir=tmp_path / "app", verify_signature=False
+        )
+    assert not (download_dir / "evil.exe").exists()
+    assert not (tmp_path / "evil.exe").exists()

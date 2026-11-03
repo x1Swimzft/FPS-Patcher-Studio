@@ -10,7 +10,7 @@ import pytest
 
 pytest.importorskip("PySide6")
 
-from PySide6.QtWidgets import QMessageBox, QWidget  # noqa: E402
+from PySide6.QtWidgets import QWidget  # noqa: E402
 
 from fps_patcher.config import THEME_PRESETS  # noqa: E402
 from fps_patcher.core.models import UpdateAvailableEvent  # noqa: E402
@@ -399,19 +399,16 @@ def test_update_available_prompts_on_startup(
 
     window = make_main_window(qtbot, monkeypatch, tmp_path)
     info = SimpleNamespace(version="9.9.9", notes="Bug fixes")
-    prompts: list[str] = []
 
-    def ask(*args: Any, **_kwargs: Any) -> QMessageBox.StandardButton:
-        prompts.append(str(args[2]))
-        return QMessageBox.StandardButton.No
-
-    monkeypatch.setattr(QMessageBox, "question", ask)
     window._on_update_available(UpdateAvailableEvent(info))
     qtbot.wait(20)
 
-    assert len(prompts) == 1
-    assert "9.9.9" in prompts[0]
+    dialog = window._update_dialog
+    assert dialog is not None
+    assert "9.9.9" in dialog.version_label.text()
+    assert dialog.notes.toPlainText() == "Bug fixes"
     assert not window.update_button.isHidden()
+    dialog.close()
     window.close()
 
 
@@ -426,14 +423,15 @@ def test_update_prompt_yes_starts_download(
     info = SimpleNamespace(version="9.9.9", notes="Bug fixes")
     started: list[Any] = []
     monkeypatch.setattr(window.controller, "start_update_download", started.append)
-    monkeypatch.setattr(
-        QMessageBox, "question", lambda *args, **kwargs: QMessageBox.StandardButton.Yes
-    )
 
     window._on_update_available(UpdateAvailableEvent(info))
     qtbot.wait(20)
 
+    dialog = window._update_dialog
+    assert dialog is not None
+    dialog.update_button.click()
     assert started == [info]
+    dialog.close()
     window.close()
 
 

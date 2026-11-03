@@ -158,6 +158,7 @@ class Settings:
     confirm_overwrite: bool = True
     notify_done: str = "none"
     language: str = "en"
+    skipped_update_version: str = ""
 
     # Phase 2: watch folder, Explorer verb, lossless color/metadata guard
     watch_folder_enabled: bool = False

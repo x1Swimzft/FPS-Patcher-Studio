@@ -295,6 +295,17 @@ STRINGS: dict[str, dict[str, str]] = {
         "update_ready_launch": "Launching installer...",
         "update_failed": "Update failed: {error}",
         "update_sha256_failed": "Update package failed SHA-256 verification and was discarded.",
+        "update_now_btn": "Update now",
+        "update_skip_btn": "Skip this version",
+        "update_cancel_btn": "Cancel",
+        "update_mode_label": "Install type",
+        "update_mode_installed": "Installed build",
+        "update_mode_portable": "Portable build",
+        "update_ready_install": "Update ready — click Update to install",
+        "update_busy_deferred": (
+            "Update downloaded; it will install after the current batch finishes."
+        ),
+        "update_cancelled": "Update download cancelled.",
         # Compact Qt shell additions
         "settings_title": "Settings",
         "forensic_original": "Original file",
@@ -653,6 +664,15 @@ STRINGS: dict[str, dict[str, str]] = {
         "update_ready_launch": "กำลังเปิดตัวติดตั้ง...",
         "update_failed": "การอัปเดตล้มเหลว: {error}",
         "update_sha256_failed": "ไฟล์อัปเดตไม่ผ่านการตรวจสอบความถูกต้อง SHA-256 จึงถูกลบออก",
+        "update_now_btn": "อัปเดตเลย",
+        "update_skip_btn": "ข้ามเวอร์ชันนี้",
+        "update_cancel_btn": "ยกเลิก",
+        "update_mode_label": "ประเภทการติดตั้ง",
+        "update_mode_installed": "เวอร์ชันติดตั้ง",
+        "update_mode_portable": "เวอร์ชันพกพา",
+        "update_ready_install": "อัปเดตพร้อมติดตั้ง — กดปุ่มอัปเดตเพื่อติดตั้ง",
+        "update_busy_deferred": "ดาวน์โหลดอัปเดตแล้ว จะติดตั้งให้เมื่องานปัจจุบันเสร็จสิ้น",
+        "update_cancelled": "ยกเลิกการดาวน์โหลดอัปเดตแล้ว",
         # Compact Qt shell additions
         "settings_title": "ตั้งค่า",
         "forensic_original": "ไฟล์ต้นฉบับ",

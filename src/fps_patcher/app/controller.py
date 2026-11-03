@@ -61,6 +61,8 @@ class AppController:
         self._cancel = threading.Event()
         self._worker: threading.Thread | None = None
         self._ff_download: threading.Thread | None = None
+        self._update_cancel = threading.Event()
+        self._update_worker: threading.Thread | None = None
 
         mig = getattr(self.settings, "migrated_strategy_from", None)
         if mig:
@@ -641,15 +643,26 @@ class AppController:
 
     def start_update_download(self, info: Any) -> None:
         """Download update in background thread and emit progress/completion events."""
-        threading.Thread(
+        if self._update_worker is not None and self._update_worker.is_alive():
+            return
+        self._update_cancel.clear()
+        self._update_worker = threading.Thread(
             target=self._update_download_worker,
             args=(info,),
             daemon=True,
             name="fps-updater-download",
-        ).start()
+        )
+        self._update_worker.start()
+
+    def cancel_update_download(self) -> None:
+        self._update_cancel.set()
 
     def _update_download_worker(self, info: Any) -> None:
-        from ..core.updater import default_download_dir, download_update
+        from ..core.updater import (
+            UpdateCancelledError,
+            default_download_dir,
+            download_update,
+        )
 
         try:
             dest = default_download_dir()
@@ -657,8 +670,15 @@ class AppController:
             def _progress(done: int, total: int) -> None:
                 self.emit(UpdateDownloadEvent("downloading", done, total))
 
-            path = download_update(info, dest, progress=_progress)
+            path = download_update(
+                info,
+                dest,
+                progress=_progress,
+                cancel_event=self._update_cancel,
+            )
             self.emit(UpdateDownloadEvent("done", path=path))
+        except UpdateCancelledError:
+            self.emit(UpdateDownloadEvent("cancelled"))
         except Exception as exc:
             self.emit(UpdateDownloadEvent("error", error=str(exc)))
 
