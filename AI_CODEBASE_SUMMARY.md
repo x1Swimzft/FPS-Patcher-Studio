@@ -1,4 +1,4 @@
-# AI Codebase Summary — FPS Patcher Studio (v1.2.1)
+# AI Codebase Summary — FPS Patcher Studio (v1.3.1)
 
 > **Purpose**: Master architecture, codebase map, state lifecycle, and operational guide for autonomous AI agents and engineers working on **FPS Patcher Studio**.
 
@@ -8,13 +8,13 @@
 
 - **Repository**: `fps-patcher-studio`
 - **Root Path**: `E:\Project\fps-patcher-studio`
-- **Current Version**: `1.2.1` (2026-11-03)
+- **Current Version**: `1.3.1` (2026-11-03)
 - **Python Target**: Python 3.11+
 - **Desktop Stack**: PySide6 `6.12.0`, Pillow, PyInstaller one-folder build
 - **Primary Domain**: High-precision ISO-BMFF (MP4/MOV/M4V) container timing patcher. It modifies video timescales, sample duration tables (`stts`), composition offsets (`ctts`), track/movie headers (`mvhd`, `tkhd`, `mdhd`), and edit lists (`edts`/`elst`) losslessly at the binary atom level **without re-encoding video frames** unless the optional bitrate cap is enabled.
 - **User Interface**: Qt is the only UI (`src/fps_patcher/ui_qt/`), with English and Thai localization, light/dark themes, seven theme presets, drag-and-drop, thumbnails, and a bottom activity console.
 - **Headless Surface**: `src/fps_patcher/cli.py` (`--cli patch|probe|score`), plus `--quick-patch` for the Explorer verb.
-- **Release Status**: v1.2.1 is source-only (not built or tagged). v1.2.0 is published on GitHub Releases and is **unsigned**. SignPath is documented but not active.
+- **Release Status**: v1.3.1 is source-only (not built or tagged). v1.2.0 is the last published release on GitHub Releases and is **unsigned**. SignPath is documented but not active.
 
 ---
 
@@ -31,7 +31,7 @@ E:\Project\fps-patcher-studio\
 │   ├── version_info.txt            # Windows PE version metadata
 │   └── fps_patcher.manifest        # DPI/long-path aware application manifest
 ├── src\fps_patcher\
-│   ├── __init__.py                 # __version__ = "1.2.1", APP_NAME
+│   ├── __init__.py                 # __version__ = "1.3.1", APP_NAME
 │   ├── __main__.py                 # Entry dispatch: --cli, --quick-patch, Qt GUI
 │   ├── cli.py                      # Headless CLI: patch | probe | score
 │   ├── config.py                   # Settings persistence and clamping
@@ -69,6 +69,7 @@ E:\Project\fps-patcher-studio\
 │   └── ui_qt\                      # Qt (PySide6) presentation layer
 │       ├── app.py                  # QApplication + MainWindow entry
 │       ├── main_window.py          # Shell, toolbar, wiring, startup update prompt
+│       ├── update_dialog.py        # Self-update dialog: notes, progress, skip/cancel
 │       ├── bridge.py               # ControllerBridge: event queue -> Qt signals
 │       ├── queue_view.py           # QListView/model delegate queue and drag-drop
 │       ├── inspector.py            # FPS/preset/output/bitrate/readiness panel
@@ -92,7 +93,7 @@ E:\Project\fps-patcher-studio\
 │   └── make_icon.py
 ├── docs\                           # Policies, roadmap, signing, handoff checklists
 ├── release\                        # Built installers, zips, checksums, SBOM
-├── pyproject.toml                  # Version 1.2.1, PySide6 pin, tool config
+├── pyproject.toml                  # Version 1.3.1, PySide6 pin, tool config
 ├── uv.lock                         # Locked dependency graph
 ├── README.md
 ├── CHANGELOG.md
@@ -129,6 +130,7 @@ no second UI toolkit in the runtime.
 | File | Responsibility |
 | --- | --- |
 | `main_window.py` | `QMainWindow` shell: toolbar, queue/inspector split, console drawer, shortcuts, watcher drain, update button and startup prompt, settings/forensic dialogs. |
+| `update_dialog.py` | Self-update dialog: release notes, install type, download progress, Update now / Skip this version / Cancel; reports install-ready state. |
 | `bridge.py` | `ControllerBridge(QObject)`. Drains `controller.events` with a single-shot `QTimer` on the GUI thread and re-emits typed Qt signals (`log`, `progress`, `probe_done`, `patch_done`, `queue_changed`, `ffmpeg`, `update_available`, `update_download`, `drained`). Poll interval is 50 ms while busy, 200 ms idle; `DRAIN_LIMIT = 500`. Also owns the worker-thread seam for forensic tasks. |
 | `queue_view.py` | `QueueView` with a `QListView` + `QStyledItemDelegate`. Paints row pills (resolution, FPS source → target, codec · preset, bitrate, size), thumbnails, readiness badge, selection, context actions, and native drag-and-drop. |
 | `inspector.py` | Target FPS/timescale, strategy preset, output options, read-only **Bitrate** field, readiness card, per-item override card, and the single progress/start/cancel rail. |
@@ -269,7 +271,7 @@ Event types: `LogEvent`, `ProgressEvent`, `ProbeDoneEvent`, `PatchDoneEvent`, `Q
 
 ---
 
-## 7. v1.2.0 Changes (verified in code)
+## 7. Release Changes (verified in code)
 
 ### 7.1 Bitrate plan in the queue and Inspector
 
@@ -303,6 +305,34 @@ exceeds the target.
 ### 7.5 Base from v1.1.0
 
 The v1.2.0 release also carries the v1.1.0 fixes: runtime wiring for `verify_after`, `backup_original`, `preserve_mtime`, `stop_on_error`, `extra_ffmpeg_args`, `log_to_file`, `confirm_overwrite`, and `notify_done`; two-stage Ctrl+C; updater response cleanup; Thai readiness labels; and the AV1 preflight acceleration.
+
+### 7.6 v1.3.1 Changes (in-app self-update, source-only)
+
+v1.3.1 replaces the confirmation message box with a dedicated `UpdateDialog`
+(`ui_qt/update_dialog.py`): release notes, detected install type, download
+progress, and **Update now** / **Skip this version** / **Cancel**.
+
+- **Install paths** (`core/updater.py`): an installed build (presence of
+  `unins000.exe`) downloads the Setup EXE and launches it with
+  `/SILENT /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS`. A portable build downloads
+  the `-win64.zip`, stages it, and writes a detached cmd trampoline that waits for
+  the app PID to exit, swaps files with `robocopy`, then relaunches the new build.
+- **Cancellation**: an in-flight download can be cancelled; the partial `.part`
+  file is removed.
+- **Skip**: `skipped_update_version` is persisted in settings and suppresses only
+  the startup prompt. The toolbar update button remains available.
+- **Busy deferral**: if a download completes while a patch batch is running, the
+  install is deferred. The app does not close, the installer is not launched, and
+  the toolbar shows an install-ready button until the batch finishes.
+- **Signature gate**: after the existing SHA-256 check, the downloaded installer
+  or portable executable is verified with Authenticode before execution. Current
+  releases are unsigned, so they are rejected until SignPath signing is live.
+  `FPS_PATCHER_ALLOW_UNSIGNED_UPDATE=1` skips the check with a logged warning and
+  is for QA only.
+
+v1.3.1 has not been built or tagged; section 11 of
+`docs/handoff/manual-test-v1.0.1.md` lists the manual checks and they are not
+executed.
 
 ---
 

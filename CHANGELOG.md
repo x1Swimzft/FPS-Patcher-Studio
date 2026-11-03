@@ -2,6 +2,24 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
+## [1.3.1] - 2026-11-03
+
+### Added
+- In-app self-update dialog with release notes, download progress, Update now, Skip this version and Cancel.
+- Installed vs portable update detection. Installed builds run the Setup EXE silently; portable builds stage the win64 zip and swap files via a detached trampoline after the app exits.
+- Cancellable update downloads; partial `.part` files are deleted.
+- `skipped_update_version` persists and suppresses the startup prompt only.
+
+### Security
+- Downloaded installers/portable executables are checked with Authenticode before execution, in addition to the existing SHA-256 check. Current unsigned builds are rejected until SignPath signing is active; `FPS_PATCHER_ALLOW_UNSIGNED_UPDATE=1` is a QA-only override.
+
+### Changed
+- The startup update prompt is now a dialog, not a message box.
+- An update that finishes during a patch batch is deferred until the app is idle; the app never closes while patching.
+
+### Verification
+- Automated gates only; manual QA has not been executed and no v1.3.1 build has been tagged or published.
+
 ## [1.2.1] - 2026-11-03
 
 ### Fixed

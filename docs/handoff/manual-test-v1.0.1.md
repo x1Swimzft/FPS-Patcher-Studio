@@ -224,3 +224,23 @@ observed outcome. Code inspection is not a result.
 
 **Rules for section 10:** a human on real Windows must record every result;
 automated tests alone do not close these rows.
+
+## 11. v1.3.1 additions (not executed)
+
+**Status: not executed.** These rows cover in-app self-update and have not been
+run. A human on real Windows must record each result; signed and unsigned cases
+must be recorded separately. Code inspection and automated tests are not results.
+
+| # | Step | Expected | Result | Notes |
+|---|---|---|---|---|
+| X1 | On an installed build (`unins000.exe` present), use a newer signed release and click **Update now**. | Downloads the Setup EXE, verifies SHA-256 + Authenticode, runs the silent install, the app closes, updates and relaunches. | | |
+| X2 | On a portable build (no `unins000.exe`), use a newer signed release. | Downloads the `-win64.zip`, stages it, verifies the exe signature, the app exits, the trampoline swaps files and relaunches the new version; staging and the script are cleaned up. | | |
+| X3 | Cancel mid-download. | Download aborts, the `.part` file is deleted, the dialog returns to the ready state, and no error popup appears. | | |
+| X4 | Click **Skip this version**, then restart the app. | No startup popup for that version; the toolbar update button still works. | | |
+| X5 | Start a long batch, then let a download finish while the batch runs. | The app does not close and does not kill FFmpeg; installation is deferred; the ready button works after the batch. | | |
+| X6 | Tamper with the downloaded installer, or use an unsigned build without the override. | Authenticode blocks execution and an error is shown. | | |
+| X7 | With `FPS_PATCHER_ALLOW_UNSIGNED_UPDATE=1` on an unsigned build whose SHA-256 matches, run the update. | The update proceeds (QA only; record the SHA-256 and the override). | | |
+| X8 | After a silent installed update, watch for the app to return. | The app relaunches; record the observation if it does not (Inno `[Run]` currently uses `skipifsilent`). | | |
+
+**Status:** not executed. A human on real Windows must record results, and the
+signed and unsigned cases must be recorded separately.

@@ -1,5 +1,45 @@
 # Release Notes
 
+## v1.3.1 - 2026-11-03 (in-app self-update)
+
+Version 1.3.1 turns the update check into a full in-app self-update: the app shows
+release notes, downloads the right artifact for the install type, verifies it, and
+installs it. **This version has not been built or tagged yet, manual QA is pending,
+and builds remain unsigned until SignPath is live.** Do not treat the notes below as
+a shipped-release announcement.
+
+### Highlights
+
+- **Update dialog** — the startup prompt is now a dialog with release notes, the
+  detected install type, download progress, and **Update now** / **Skip this
+  version** / **Cancel**. It replaces the old message box.
+- **Installed vs portable** — an installed build (with `unins000.exe`) downloads the
+  Setup EXE and runs it silently with `/SILENT /CLOSEAPPLICATIONS
+  /RESTARTAPPLICATIONS`. A portable build downloads the `-win64.zip`, stages it, and
+  a detached cmd trampoline waits for the app PID to exit, swaps files with
+  `robocopy`, then relaunches.
+- **Cancellable downloads** — a cancelled download aborts cleanly and its partial
+  `.part` file is deleted.
+- **Skip is remembered** — `skipped_update_version` persists and suppresses only the
+  startup prompt; the toolbar update button stays available.
+- **Patching is never interrupted** — if a download finishes during a patch batch,
+  installation is deferred: the app does not close, the installer does not launch,
+  and the toolbar shows an install-ready button until the batch ends.
+
+### Security
+
+- Downloaded installers and portable executables are verified with Authenticode
+  before execution, after the existing SHA-256 check.
+- Current releases are **unsigned**, so Authenticode verification rejects them. That
+  is expected until SignPath signing is active.
+- `FPS_PATCHER_ALLOW_UNSIGNED_UPDATE=1` skips the signature check (with a warning
+  in the log). It exists for QA only and must not be used for normal installs.
+
+### Verification
+
+- Automated gates only. Manual QA has not been executed, and no v1.3.1 build has
+  been built, tagged or published.
+
 ## v1.2.1 - 2026-11-03 (quick-patch timescale + diagnostic masking)
 
 Version 1.2.1 fixes three issues found after 1.2.0. No features or settings change.
