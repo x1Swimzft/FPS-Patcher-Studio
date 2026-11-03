@@ -77,7 +77,7 @@ class Inspector(QWidget):
     profile_changed = Signal()
     strategy_changed = Signal()
     target_changed = Signal()
-    override_changed = Signal(object, object, object)
+    override_changed = Signal(object, object, object, object)
 
     def __init__(
         self,
@@ -343,6 +343,15 @@ class Inspector(QWidget):
         self.override_preset_combo.addItems(list(self._label_to_strategy))
         self._override_form_layout.addWidget(self.override_preset_combo)
 
+        self.override_profile_label = QLabel(t("inspector_override_profile", lang))
+        self.override_profile_label.setProperty("role", "caption")
+        self._override_form_layout.addWidget(self.override_profile_label)
+        self.override_profile_combo = QComboBox()
+        self.override_profile_combo.setFixedHeight(theme.combo_height)
+        self.override_profile_combo.setAccessibleName(t("inspector_override_profile", lang))
+        self._override_form_layout.addWidget(self.override_profile_combo)
+        self._populate_override_profiles()
+
         override_buttons = QWidget()
         override_button_row = QHBoxLayout(override_buttons)
         override_button_row.setContentsMargins(0, 0, 0, 0)
@@ -467,6 +476,7 @@ class Inspector(QWidget):
         self._override_form_layout.setSpacing(theme.outer)
         self.override_fps_edit.setFixedHeight(theme.entry_height)
         self.override_preset_combo.setFixedHeight(theme.combo_height)
+        self.override_profile_combo.setFixedHeight(theme.combo_height)
         self._footer_layout.setContentsMargins(
             theme.outer, theme.spacing, theme.outer, theme.outer
         )
@@ -672,11 +682,14 @@ QWidget#Inspector QProgressBar::chunk {{
         self.override_fps_edit.setPlaceholderText(t("inspector_override_fps", lang))
         self.override_preset_label.setText(t("inspector_override_preset", lang))
         self.override_preset_combo.setAccessibleName(t("inspector_override_preset", lang))
+        self.override_profile_label.setText(t("inspector_override_profile", lang))
+        self.override_profile_combo.setAccessibleName(t("inspector_override_profile", lang))
         self.override_apply_btn.setText(t("override_apply_btn", lang))
         self.override_clear_btn.setText(t("override_clear_btn", lang))
         self.override_hint.setText(t("inspector_override_hint", lang))
         self.segments.set_items(self._segment_items(), self._preset_display(self._preset))
         self._populate_profiles()
+        self._populate_override_profiles()
         self._progress_caption()
         self._refresh_override_card()
 
@@ -931,7 +944,11 @@ QWidget#Inspector QProgressBar::chunk {{
         self.override_form.setVisible(has_item)
         if item is None:
             return
-        active = item.timescale is not None or item.strategy is not None
+        active = (
+            item.timescale is not None
+            or item.strategy is not None
+            or item.platform_profile is not None
+        )
         self.override_switch.blockSignals(True)
         self.override_switch.setChecked(active)
         self.override_switch.blockSignals(False)
@@ -940,12 +957,21 @@ QWidget#Inspector QProgressBar::chunk {{
         self.override_preset_combo.setCurrentText(
             self._override_preset_label(item.strategy)
         )
-        self.override_state.setText(
-            t(
+        profile_index = self.override_profile_combo.findData(item.platform_profile)
+        self.override_profile_combo.setCurrentIndex(max(0, profile_index))
+        lang = self._lang()
+        profile_label = self._profile_label(item.platform_profile)
+        if active and item.platform_profile is not None:
+            state = t("inspector_override_active_profile", lang, profile=profile_label)
+            hint = t("inspector_override_hint_profile", lang, profile=profile_label)
+        else:
+            state = t(
                 "inspector_override_active" if active else "inspector_override_inactive",
-                self._lang(),
+                lang,
             )
-        )
+            hint = t("inspector_override_hint", lang)
+        self.override_state.setText(state)
+        self.override_hint.setText(hint)
         self._sync_override_state()
 
     def _override_toggled(self, checked: bool) -> None:
@@ -957,10 +983,12 @@ QWidget#Inspector QProgressBar::chunk {{
         )
         self.override_fps_edit.setEnabled(enabled)
         self.override_preset_combo.setEnabled(enabled)
+        self.override_profile_combo.setEnabled(enabled)
         self.override_apply_btn.setEnabled(enabled)
         has_override = self._focused_item is not None and (
             self._focused_item.timescale is not None
             or self._focused_item.strategy is not None
+            or self._focused_item.platform_profile is not None
         )
         self.override_clear_btn.setEnabled(has_override and not self._busy)
 
@@ -982,7 +1010,8 @@ QWidget#Inspector QProgressBar::chunk {{
         strategy = self._label_to_strategy.get(self.override_preset_combo.currentText())
         if strategy is None:
             strategy = self.strategy()
-        self.override_changed.emit(item.path, timescale, strategy)
+        profile = self.override_profile_combo.currentData()
+        self.override_changed.emit(item.path, timescale, strategy, profile)
         self._refresh_override_card()
 
     def _clear_override(self) -> None:
@@ -990,16 +1019,15 @@ QWidget#Inspector QProgressBar::chunk {{
         if item is None or self._busy:
             return
         self.override_fps_edit.setStyleSheet("")
-        self.override_changed.emit(item.path, None, None)
+        self.override_changed.emit(item.path, None, None, None)
         self._refresh_override_card()
 
     def refresh_readiness(self) -> None:
         lang = self._lang()
         self._report = None
         if self._focused_item is not None:
-            self._report = evaluate_readiness(
-                self._focused_item.info, self.settings.platform_profile
-            )
+            profile = self._focused_item.platform_profile or self.settings.platform_profile
+            self._report = evaluate_readiness(self._focused_item.info, profile)
         self.readiness_label.setText(t("readiness_summary", lang))
         self.info_btn.setToolTip(t("readiness_tip", lang))
         self.info_btn.setAccessibleName(t("readiness_tip", lang))
@@ -1168,6 +1196,20 @@ QWidget#Inspector QProgressBar::chunk {{
         self.settings.save_async()
         self.refresh_readiness()
         self.profile_changed.emit()
+
+    def _populate_override_profiles(self) -> None:
+        lang = self._lang()
+        self.override_profile_combo.blockSignals(True)
+        self.override_profile_combo.clear()
+        self.override_profile_combo.addItem(t("override_use_global", lang), None)
+        for profile in PLATFORM_PROFILES.values():
+            self.override_profile_combo.addItem(t(profile.label_key, lang), profile.profile_id)
+        self.override_profile_combo.blockSignals(False)
+
+    def _profile_label(self, profile_id: str | None) -> str:
+        if not profile_id:
+            return t("override_use_global", self._lang())
+        return t(get_profile(profile_id).label_key, self._lang())
 
     # ------------------------------------------------------------------ popover
     def _open_readiness(self) -> None:

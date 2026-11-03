@@ -32,6 +32,7 @@ from PySide6.QtCore import (
     Signal,
 )
 from PySide6.QtGui import (
+    QAction,
     QColor,
     QDragEnterEvent,
     QDragLeaveEvent,
@@ -69,7 +70,12 @@ from PySide6.QtWidgets import (
 
 from ..app.queue_model import QueueItem
 from ..core.models import SUPPORTED_EXTENSIONS
-from ..core.platform_profiles import ReadinessReport, evaluate_readiness
+from ..core.platform_profiles import (
+    PLATFORM_PROFILES,
+    ReadinessReport,
+    evaluate_readiness,
+    get_profile,
+)
 from ..core.preflight import planned_output_bitrate
 from ..core.strategies import UI_PRESETS, migrate_strategy_name
 from ..ui.strings import readiness_check_label, t
@@ -1010,6 +1016,10 @@ class QueueDelegate(QStyledItemDelegate):
             overrides.append(f"{item.timescale} ts")
         if item.strategy is not None:
             overrides.append(item.strategy)
+        if item.platform_profile is not None:
+            overrides.append(
+                self._owner.tr(get_profile(item.platform_profile).label_key)
+            )
         if overrides:
             caption += "  " + self._owner.tr("override_status_active", details=", ".join(overrides))
         return caption, False
@@ -1198,7 +1208,9 @@ class QueueView(QWidget):
     def readiness(self, item: QueueItem) -> ReadinessReport | None:
         if item.info is None:
             return None
-        profile = getattr(self.settings, "platform_profile", "generic")
+        profile = item.platform_profile
+        if not profile:
+            profile = str(getattr(self.settings, "platform_profile", "generic"))
         cached = self._readiness_cache.get(item.item_id)
         if cached is not None and cached[0] == id(item.info) and cached[1] == profile:
             return cached[2]
@@ -1580,9 +1592,25 @@ class QueueView(QWidget):
             preset_menu.addAction(preset.label): key
             for key, preset in UI_PRESETS.items()
         }
+        profile_menu = menu.addMenu(self.tr("set_platform_profile"))
+        profile_actions: dict[QAction, str | None] = {}
+        profile_choices: list[tuple[str, str | None]] = [
+            (self.tr("override_use_global"), None)
+        ]
+        profile_choices.extend(
+            (self.tr(profile.label_key), profile.profile_id)
+            for profile in PLATFORM_PROFILES.values()
+        )
+        for label, profile_id in profile_choices:
+            action = profile_menu.addAction(label)
+            action.setCheckable(True)
+            action.setChecked(item.platform_profile == profile_id)
+            profile_actions[action] = profile_id
         clear_override = menu.addAction(self.tr("override_clear_btn"))
         clear_override.setEnabled(
-            item.timescale is not None or item.strategy is not None
+            item.timescale is not None
+            or item.strategy is not None
+            or item.platform_profile is not None
         )
         menu.addSeparator()
         move_up = menu.addAction(self.tr("move_up"))
@@ -1625,8 +1653,16 @@ class QueueView(QWidget):
             )
             self.model.refresh()
             self.selection_changed.emit()
+        elif chosen in profile_actions:
+            self.controller.items.set_override(
+                item.path, platform_profile=profile_actions[chosen]
+            )
+            self.model.refresh()
+            self.selection_changed.emit()
         elif chosen is clear_override:
-            self.controller.items.set_override(item.path, timescale=None, strategy=None)
+            self.controller.items.set_override(
+                item.path, timescale=None, strategy=None, platform_profile=None
+            )
             self.model.refresh()
             self.selection_changed.emit()
         elif chosen is move_up:

@@ -66,7 +66,20 @@ def output_base_for(req: PatchRequest) -> Path:
     """Deterministic output name before collision handling."""
     is_x1t = req.strategy.startswith(("bxd-", "x1t-"))
     out_ext = ".mp4" if (is_x1t and req.src.suffix.lower() == ".mov") else req.src.suffix
-    return req.out_dir / f"{req.src.stem}_ts{req.timescale}{out_ext}"
+    if not req.filename_template:
+        return req.out_dir / f"{req.src.stem}_ts{req.timescale}{out_ext}"
+    # config imports core.models, so import here to keep the module graph acyclic.
+    from ..config import render_filename_template
+
+    name = render_filename_template(
+        req.filename_template,
+        req.src.stem,
+        round(req.timescale / 1000),
+        timescale=req.timescale,
+        platform=req.platform_profile,
+        strategy=req.strategy,
+    )
+    return req.out_dir / f"{name}{out_ext}"
 
 
 def output_path_for(req: PatchRequest, base: Path | None = None) -> Path:

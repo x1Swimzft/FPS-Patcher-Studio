@@ -34,6 +34,10 @@ def _request(path: Path, settings: Settings) -> PatchRequest:
         out_dir=Path(settings.output_dir) if settings.output_dir else path.parent,
         timescale=settings.target_timescale(),
         strategy=settings.strategy,
+        filename_template=(
+            settings.filename_template if settings.use_filename_template else ""
+        ),
+        platform_profile=settings.platform_profile,
         overwrite=overwrite,
         auto_rename=settings.auto_rename or settings.confirm_overwrite,
         v4_strict_lossless=settings.v4_strict_lossless,

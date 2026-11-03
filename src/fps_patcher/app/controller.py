@@ -408,11 +408,20 @@ class AppController:
                         else src.parent
                     )
                     qi = self.items.get(src)
+                    eff_profile = (
+                        qi.platform_profile if qi and qi.platform_profile else None
+                    ) or self.settings.platform_profile
                     req = PatchRequest(
                         src=src,
                         out_dir=out_dir,
                         timescale=(qi.timescale if qi and qi.timescale else timescale),
                         strategy=(qi.strategy if qi and qi.strategy else strategy),
+                        filename_template=(
+                            self.settings.filename_template
+                            if self.settings.use_filename_template
+                            else ""
+                        ),
+                        platform_profile=eff_profile,
                         overwrite=eff_overwrite,
                         auto_rename=eff_auto_rename,
                         v4_strict_lossless=self.settings.v4_strict_lossless,

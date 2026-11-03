@@ -16,6 +16,13 @@ from ..core.models import SUPPORTED_EXTENSIONS, VideoInfo
 ItemStatus = Literal["pending", "probing", "ready", "patching", "done", "failed", "skipped"]
 
 
+class _Unset:
+    """Override field the caller did not pass; explicit ``None`` clears it."""
+
+
+_UNSET = _Unset()
+
+
 def _id_for_resolved(resolved: Path) -> str:
     digest = hashlib.sha256(str(resolved).encode("utf-8")).hexdigest()
     return f"{digest[:3]}_{digest[3:9]}"
@@ -37,6 +44,7 @@ class QueueItem:
     # per-item overrides; None = use global setting
     timescale: int | None = None
     strategy: str | None = None
+    platform_profile: str | None = None
     progress: float = 0.0
     _resolved: Path | None = field(default=None, repr=False)
     item_id: str = field(init=False)
@@ -177,12 +185,23 @@ class InputQueue:
         return n
 
     def set_override(
-        self, path: Path, *, timescale: int | None = None, strategy: str | None = None
+        self,
+        path: Path,
+        *,
+        timescale: int | None | _Unset = _UNSET,
+        strategy: str | None | _Unset = _UNSET,
+        platform_profile: str | None | _Unset = _UNSET,
     ) -> None:
+        """Set or clear per-item overrides; omitted fields keep their value."""
         item = self.get(path)
-        if item is not None:
+        if item is None:
+            return
+        if not isinstance(timescale, _Unset):
             item.timescale = timescale
+        if not isinstance(strategy, _Unset):
             item.strategy = strategy
+        if not isinstance(platform_profile, _Unset):
+            item.platform_profile = platform_profile
 
     def reset_for_run(self, paths: list[Path]) -> None:
         """Reset item status, error, progress, and output before patching."""
@@ -212,6 +231,7 @@ class InputQueue:
                 "selected": i.selected,
                 "timescale": i.timescale,
                 "strategy": i.strategy,
+                "platform_profile": i.platform_profile,
             })
         return data
 
@@ -265,11 +285,18 @@ class InputQueue:
                     item.selected = bool(entry.get("selected"))
             raw_strat = entry.get("strategy")
             eff_strat = raw_strat if isinstance(raw_strat, str) and raw_strat else None
-            if entry.get("timescale") is not None or eff_strat is not None:
+            raw_profile = entry.get("platform_profile")
+            eff_profile = raw_profile if isinstance(raw_profile, str) and raw_profile else None
+            if (
+                entry.get("timescale") is not None
+                or eff_strat is not None
+                or eff_profile is not None
+            ):
                 queue.set_override(
                     p,
                     timescale=entry.get("timescale"),
                     strategy=eff_strat,
+                    platform_profile=eff_profile,
                 )
         if migrate_legacy:
             queue.migrate_legacy_overrides()

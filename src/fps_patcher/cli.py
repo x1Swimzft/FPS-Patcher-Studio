@@ -159,6 +159,18 @@ def _parser() -> argparse.ArgumentParser:
         default=None,
         help="Patch strategy (default from settings).",
     )
+    patch_cmd.add_argument(
+        "--template",
+        type=str,
+        default=None,
+        help="Output filename template (default: settings, or legacy _ts naming).",
+    )
+    patch_cmd.add_argument(
+        "--profile",
+        choices=profile_ids(),
+        default=None,
+        help="Platform profile (default from settings).",
+    )
     patch_cmd.add_argument("--output", type=Path, default=None, help="Output directory.")
     patch_cmd.add_argument("--normalize-audio", action="store_true")
     patch_cmd.add_argument("--cap-bitrate", action="store_true")
@@ -194,6 +206,12 @@ def _cmd_patch(args: argparse.Namespace, settings: Settings) -> int:
         print("error: --timescale must be positive", file=sys.stderr)
         return EXIT_USAGE
     strategy = args.strategy or settings.strategy
+    filename_template = (
+        args.template
+        if args.template is not None
+        else (settings.filename_template if settings.use_filename_template else "")
+    )
+    profile = args.profile or settings.platform_profile
     overwrite = bool(args.overwrite)
     auto_rename = not overwrite
 
@@ -237,6 +255,8 @@ def _cmd_patch(args: argparse.Namespace, settings: Settings) -> int:
                     out_dir=output_dir,
                     timescale=timescale,
                     strategy=strategy,
+                    filename_template=filename_template,
+                    platform_profile=profile,
                     overwrite=overwrite,
                     auto_rename=auto_rename,
                     auto_normalize_audio=bool(args.normalize_audio),

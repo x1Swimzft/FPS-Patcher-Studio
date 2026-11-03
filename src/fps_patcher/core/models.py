@@ -81,6 +81,9 @@ class PatchRequest:
     preserve_mtime: bool = True
     mask_diagnostic_paths: bool = True
     extra_ffmpeg_args: str = ""
+    # Empty template keeps the legacy ``_ts<timescale>`` output name.
+    filename_template: str = ""
+    platform_profile: str = "generic"
 
 
 @dataclass(frozen=True)

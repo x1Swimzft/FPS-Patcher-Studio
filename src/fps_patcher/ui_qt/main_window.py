@@ -650,6 +650,13 @@ class MainWindow(QMainWindow):
         self._latest_progress = None
         was_watch = self._watch_batch_active
 
+        if self._watcher is not None:
+            watched = event.batch_results or (
+                [event.result] if event.result is not None else []
+            )
+            for result in watched:
+                self._watcher.record_own_output(result.output)
+
         if self._watch_batch_active:
             self._watch_batch_active = False
             if event.cancelled:
@@ -752,11 +759,15 @@ class MainWindow(QMainWindow):
         path: object,
         timescale: int | None,
         strategy: str | None,
+        profile: str | None,
     ) -> None:
         if path is None:
             return
         self.controller.items.set_override(
-            Path(str(path)), timescale=timescale, strategy=strategy
+            Path(str(path)),
+            timescale=timescale,
+            strategy=strategy,
+            platform_profile=profile,
         )
         self.queue_view.refresh()
         self.queue_view.refresh_profile()
@@ -845,6 +856,11 @@ class MainWindow(QMainWindow):
             else self.inspector.strategy() or self.settings.strategy
         )
         if self.settings.overwrite and self.settings.confirm_overwrite:
+            filename_template = (
+                self.settings.filename_template
+                if self.settings.use_filename_template
+                else ""
+            )
             existing = 0
             for item in self.controller.items.snapshot_for_run(only_selected):
                 out_dir = (
@@ -858,6 +874,9 @@ class MainWindow(QMainWindow):
                         out_dir=out_dir,
                         timescale=item.timescale or effective_timescale,
                         strategy=item.strategy or effective_strategy,
+                        filename_template=filename_template,
+                        platform_profile=item.platform_profile
+                        or self.settings.platform_profile,
                     )
                 )
                 if base.exists():

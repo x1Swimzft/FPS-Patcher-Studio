@@ -775,12 +775,19 @@ class SettingsDialog(QDialog):
             reset=True,
         )
         self._template = self._entry(paths, "filename_template", draft.filename_template)
+        self._use_template = self._switch(
+            paths, "use_filename_template", draft.use_filename_template
+        )
+        self._hint(paths, "use_filename_template_help")
         self._hint(paths, "template_help")
         self._template_preview = QLabel()
         self._template_preview.setProperty("role", "caption")
         self._template_preview.setWordWrap(True)
         paths.addWidget(self._template_preview)
         self._template.textChanged.connect(self._update_template_preview)
+        self._use_template.toggled.connect(self._template.setEnabled)
+        self._use_template.toggled.connect(self._update_template_preview)
+        self._template.setEnabled(self._use_template.isChecked())
         self._update_template_preview()
 
         workflow = self._card(grid, 1, 1)
@@ -800,9 +807,22 @@ class SettingsDialog(QDialog):
             explorer, "explorer_menu_enable", draft.explorer_menu
         )
 
-    def _update_template_preview(self, _value: str = "") -> None:
+    def _update_template_preview(self, _value: object = "") -> None:
+        if not self._use_template.isChecked():
+            self._template_preview.setText(
+                self._tr(
+                    "template_preview_legacy", preview="sample_clip_ts60000.mp4"
+                )
+            )
+            return
         template = self._template.text().strip() or "{name}_{fps}fps"
-        rendered = render_filename_template(template, "sample_clip", 60)
+        rendered = render_filename_template(
+            template,
+            "sample_clip",
+            60,
+            platform="tiktok",
+            strategy="bxd-mobile",
+        )
         self._template_preview.setText(self._tr("template_preview", preview=f"{rendered}.mp4"))
 
     # -------------------------------------------------------------- patching
@@ -1279,6 +1299,7 @@ class SettingsDialog(QDialog):
 
         draft.output_dir = self._out_dir.text().strip()
         draft.filename_template = self._template.text().strip() or "{name}_{fps}fps"
+        draft.use_filename_template = self._use_template.isChecked()
         draft.open_when_done = self._open_done.isChecked()
         draft.preserve_mtime = self._preserve_mtime.isChecked()
         draft.watch_folder = self._watch_dir.text().strip()

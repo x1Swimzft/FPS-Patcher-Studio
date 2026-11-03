@@ -147,8 +147,13 @@ STRINGS: dict[str, dict[str, str]] = {
         "browse": "Browse…",
         "reset": "Reset",
         "filename_template": "Filename Template",
+        "use_filename_template": "Use filename template",
+        "use_filename_template_help": (
+            "When off, outputs keep the legacy _ts<timescale> name."
+        ),
         "template_preview": "Preview: {preview}",
-        "template_help": "Tokens: {name}, {fps}, {timescale}, {date}",
+        "template_preview_legacy": "Template off. Legacy name: {preview}",
+        "template_help": "Tokens: {name}, {fps}, {timescale}, {date}, {platform}, {strategy}",
         "open_when_done": "Open output folder when batch completed",
         "preserve_mtime": "Preserve original file modification timestamps",
         "watch_folder_section": "Watch Folder & Explorer",
@@ -274,6 +279,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "copy_path": "Copy Full Path",
         "set_fps": "Set FPS Override",
         "set_strategy": "Set Preset Override",
+        "set_platform_profile": "Platform Profile",
         "move_up": "Move Up",
         "move_down": "Move Down",
         "status_pending": "Pending",
@@ -364,7 +370,13 @@ STRINGS: dict[str, dict[str, str]] = {
         "inspector_override_inactive": "Using inspector defaults",
         "inspector_override_fps": "Item timescale",
         "inspector_override_preset": "Item preset",
+        "inspector_override_profile": "Item platform profile",
+        "inspector_override_active_profile": "Override active · {profile}",
         "inspector_override_hint": "Applies only to the selected queue item.",
+        "inspector_override_hint_profile": (
+            "Platform profile {profile} applies only to the selected queue item."
+        ),
+        "override_use_global": "Use global",
         "forensic_repair": "Repair",
         "forensic_export_json": "Export JSON",
         "forensic_export_report": "Export Report",
@@ -524,8 +536,13 @@ STRINGS: dict[str, dict[str, str]] = {
         "browse": "เลือกโฟลเดอร์…",
         "reset": "รีเซ็ต",
         "filename_template": "รูปแบบชื่อไฟล์ปลายทาง",
+        "use_filename_template": "ใช้รูปแบบชื่อไฟล์ที่กำหนด",
+        "use_filename_template_help": "เมื่อปิด ระบบจะใช้ชื่อแบบเดิม (_ts<timescale>)",
         "template_preview": "ตัวอย่าง: {preview}",
-        "template_help": "ตัวแปรที่ใช้ได้: {name}, {fps}, {timescale}, {date}",
+        "template_preview_legacy": "ปิดใช้รูปแบบชื่อไฟล์ — ชื่อแบบเดิม: {preview}",
+        "template_help": (
+            "ตัวแปรที่ใช้ได้: {name}, {fps}, {timescale}, {date}, {platform}, {strategy}"
+        ),
         "open_when_done": "เปิดโฟลเดอร์ปลายทางเมื่อเสร็จสิ้นทั้งหมด",
         "preserve_mtime": "คงเวลาแก้ไขไฟล์เดิมไว้ (Preserve Timestamp)",
         "watch_folder_section": "โฟลเดอร์เฝ้าดูและเมนู Explorer",
@@ -643,6 +660,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "copy_path": "คัดลอกเส้นทางไฟล์",
         "set_fps": "กำหนด FPS เฉพาะไฟล์นี้",
         "set_strategy": "กำหนดพรีเซ็ตเฉพาะไฟล์นี้",
+        "set_platform_profile": "โปรไฟล์แพลตฟอร์มเฉพาะไฟล์นี้",
         "move_up": "เลื่อนขึ้น",
         "move_down": "เลื่อนลง",
         "status_pending": "รอดำเนินการ",
@@ -731,7 +749,13 @@ STRINGS: dict[str, dict[str, str]] = {
         "inspector_override_inactive": "ใช้ค่าเริ่มต้นจาก Inspector",
         "inspector_override_fps": "Timescale ของไฟล์",
         "inspector_override_preset": "พรีเซ็ตของไฟล์",
+        "inspector_override_profile": "โปรไฟล์แพลตฟอร์มของไฟล์",
+        "inspector_override_active_profile": "เปิดใช้การแทนที่ · {profile}",
         "inspector_override_hint": "มีผลกับไฟล์ที่เลือกในคิวเท่านั้น",
+        "inspector_override_hint_profile": (
+            "โปรไฟล์แพลตฟอร์ม {profile} มีผลกับไฟล์ที่เลือกในคิวเท่านั้น"
+        ),
+        "override_use_global": "ใช้ค่าทั่วไป",
         "forensic_repair": "ซ่อมไฟล์",
         "forensic_export_json": "ส่งออก JSON",
         "forensic_export_report": "ส่งออกรายงาน",

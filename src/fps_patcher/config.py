@@ -66,8 +66,12 @@ def render_filename_template(
     fps: int,
     timescale: int = 90000,
     date_str: str | None = None,
+    *,
+    platform: str = "",
+    strategy: str = "",
 ) -> str:
-    """Format filename template tokens: {name}, {fps}, {timescale}, {date}."""
+    """Format filename template tokens: {name}, {fps}, {timescale}, {date},
+    {platform}, {strategy}."""
     if not date_str:
         date_str = datetime.now().strftime("%Y%m%d")
     template = template or "{name}_{fps}fps"
@@ -77,6 +81,8 @@ def render_filename_template(
             fps=fps,
             timescale=timescale,
             date=date_str,
+            platform=platform,
+            strategy=strategy,
         )
     except Exception:
         rendered = f"{original_stem}_{fps}fps"
@@ -125,6 +131,7 @@ class Settings:
 
     # V2 Output
     filename_template: str = "{name}_{fps}fps"
+    use_filename_template: bool = False
     open_when_done: bool = False
     preserve_mtime: bool = True
 

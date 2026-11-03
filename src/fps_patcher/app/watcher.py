@@ -24,7 +24,18 @@ from ..core.models import SUPPORTED_EXTENSIONS
 log = logging.getLogger("fps_patcher.watcher")
 
 _OWN_OUTPUT_RE = re.compile(r"_ts\d+( \(\d+\))?$", re.IGNORECASE)
+# Template outputs: clip_60fps, clip_tiktok_60fps, clip_60fps (1).
+_TEMPLATE_OUTPUT_RE = re.compile(r"_(?:[a-z0-9_-]+_)?\d+fps(?: \(\d+\))?$", re.IGNORECASE)
 _TEMP_SUFFIXES = (".tmp", ".part", ".crdownload", ".preflight")
+
+# shortcut: recorded keys live for the process lifetime; prune if a watch
+# session runs for days with thousands of outputs.
+_RECORDED_OUTPUTS: set[str] = set()
+_RECORDED_LOCK = threading.Lock()
+
+
+def _output_key(path: Path) -> str:
+    return os.path.normcase(os.path.abspath(path))
 
 
 @dataclass
@@ -74,13 +85,22 @@ class FolderWatcher:
         self._is_locked = _is_locked
 
     @staticmethod
+    def record_own_output(path: Path) -> None:
+        """Remember a just-written output so scans never re-ingest it."""
+        with _RECORDED_LOCK:
+            _RECORDED_OUTPUTS.add(_output_key(path))
+
+    @staticmethod
     def is_own_output(path: Path) -> bool:
         name = path.name.lower()
         if name.startswith(".") or name.startswith("~$"):
             return True
         if path.suffix.lower() not in SUPPORTED_EXTENSIONS:
             return True
-        if _OWN_OUTPUT_RE.search(path.stem):
+        with _RECORDED_LOCK:
+            if _output_key(path) in _RECORDED_OUTPUTS:
+                return True
+        if _OWN_OUTPUT_RE.search(path.stem) or _TEMPLATE_OUTPUT_RE.search(path.stem):
             return True
         if ".preflight" in name or ".colr" in name:
             return True
