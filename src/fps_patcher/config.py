@@ -141,6 +141,9 @@ class Settings:
     stop_on_error: bool = False
     auto_normalize_audio: bool = True
     auto_cap_bitrate: bool = False
+    auto_fix_vfr: bool = False
+    auto_fix_codec: bool = False
+    auto_cap_resolution: bool = False
     bitrate_target_mbps: int = 16
     check_updates_on_start: bool = True
 
@@ -314,7 +317,15 @@ class Settings:
             self.filename_template = "{name}_{fps}fps"
 
         self.watch_folder = str(getattr(self, "watch_folder", "") or "").strip()
-        for name in ("watch_folder_enabled", "explorer_menu", "fix_color_tag", "scrub_metadata"):
+        for name in (
+            "watch_folder_enabled",
+            "explorer_menu",
+            "fix_color_tag",
+            "scrub_metadata",
+            "auto_fix_vfr",
+            "auto_fix_codec",
+            "auto_cap_resolution",
+        ):
             raw = getattr(self, name, False)
             if raw in (False, None, 0, "", "0", "false", "False"):
                 setattr(self, name, False)

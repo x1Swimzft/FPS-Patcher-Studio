@@ -76,6 +76,14 @@ STRINGS: dict[str, dict[str, str]] = {
         "readiness_log_title": "[READINESS] {profile}: {score}/100 — {status}",
         "readiness_log_check": "[READINESS] {check}: {status} — {detail}",
         "readiness_log_recommend": "[READINESS]   Recommendation: {recommendation}",
+        "remediate_btn": "Auto-Fix for this profile (re-encode)",
+        "remediate_confirm": (
+            "Fixing these checks re-encodes the video to H.264. "
+            "This is not lossless and may reduce visual quality. Continue?"
+        ),
+        "remediate_done": (
+            "Auto-fix enabled. Review it in Settings → Smart Pre-Flight, then patch when ready."
+        ),
         "warn_high_bitrate": (
             "High bitrate detected ({mbps:.1f} Mbps > 25 Mbps). Bypassed videos stream "
             "at source quality on TikTok; bitrates >20 Mbps may cause buffering for "
@@ -185,6 +193,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "preflight_section": "Smart Pre-Flight",
         "auto_normalize_audio": "Auto-convert audio to AAC 48 kHz stereo before patching",
         "auto_cap_bitrate": "Auto-cap video bitrate for mobile when the source is above the target",
+        "settings_auto_fix_vfr": "Convert variable frame rate (VFR) to constant frame rate (CFR)",
+        "settings_auto_fix_codec": "Fall back to H.264 when the video codec is not accepted",
+        "settings_auto_cap_resolution": "Cap resolution and aspect ratio to the platform target",
+        "settings_lossy_hint": (
+            "These options re-encode video, are not lossless, and are off by default."
+        ),
         "bitrate_target_lbl": "Target video bitrate when capping (Mbps)",
         "bitrate_target_hint": (
             "Sources at or below this bitrate are copied losslessly. "
@@ -484,6 +498,15 @@ STRINGS: dict[str, dict[str, str]] = {
         "readiness_log_title": "[READINESS] {profile}: {score}/100 — {status}",
         "readiness_log_check": "[READINESS] {check}: {status} — {detail}",
         "readiness_log_recommend": "[READINESS]   คำแนะนำ: {recommendation}",
+        "remediate_btn": "แก้ไขอัตโนมัติสำหรับโปรไฟล์นี้ (เข้ารหัสวิดีโอใหม่)",
+        "remediate_confirm": (
+            "การแก้ไขรายการเหล่านี้จะเข้ารหัสวิดีโอใหม่เป็น H.264 "
+            "ซึ่งไม่ใช่การรักษาคุณภาพแบบไม่สูญเสียและอาจทำให้คุณภาพภาพลดลง ดำเนินการต่อหรือไม่?"
+        ),
+        "remediate_done": (
+            "เปิดใช้การแก้ไขอัตโนมัติแล้ว ตรวจสอบได้ที่การตั้งค่า → ตรวจและซ่อมไฟล์อัตโนมัติก่อนแพตช์ "
+            "แล้วจึงแพตช์เมื่อพร้อม"
+        ),
         "warn_high_bitrate": (
             "ตรวจพบบิตเรตสูง ({mbps:.1f} Mbps > 25 Mbps) วิดีโอที่ใช้ bypass "
             "จะเล่นด้วยบิตเรตต้นฉบับบน TikTok หากเกิน 20 Mbps อาจทำให้ผู้ชมบนมือถือหมุนค้าง "
@@ -593,6 +616,13 @@ STRINGS: dict[str, dict[str, str]] = {
         "preflight_section": "ตรวจและซ่อมไฟล์อัตโนมัติก่อนแพตช์",
         "auto_normalize_audio": "แปลงเสียงเป็น AAC 48 kHz สเตอริโอให้อัตโนมัติก่อนแพตช์",
         "auto_cap_bitrate": "จำกัดบิตเรตวิดีโอสำหรับมือถือเมื่อต้นฉบับสูงกว่าเป้าหมาย",
+        "settings_auto_fix_vfr": "แปลงอัตราเฟรมแบบแปรผัน (VFR) เป็นอัตราเฟรมคงที่ (CFR)",
+        "settings_auto_fix_codec": "สลับไปใช้ H.264 เมื่อโคเดกของวิดีโอไม่เป็นที่ยอมรับ",
+        "settings_auto_cap_resolution": "จำกัดความละเอียดและอัตราส่วนภาพให้ตรงกับเป้าหมายของแพลตฟอร์ม",
+        "settings_lossy_hint": (
+            "ตัวเลือกเหล่านี้เข้ารหัสวิดีโอใหม่ ไม่รักษาคุณภาพแบบไม่สูญเสีย "
+            "และปิดไว้เป็นค่าเริ่มต้น"
+        ),
         "bitrate_target_lbl": "บิตเรตวิดีโอเป้าหมายเมื่อจำกัด (Mbps)",
         "bitrate_target_hint": (
             "ไฟล์ที่มีบิตเรตเท่าหรือต่ำกว่าเป้าหมายจะถูกคัดลอกแบบไม่สูญเสียคุณภาพ "

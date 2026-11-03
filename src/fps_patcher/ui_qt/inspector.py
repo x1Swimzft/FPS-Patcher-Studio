@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QScrollArea,
     QSizePolicy,
@@ -36,6 +37,7 @@ from ..core.platform_profiles import (
     ReadinessReport,
     evaluate_readiness,
     get_profile,
+    remediable_checks,
 )
 from ..core.preflight import planned_output_bitrate
 from ..core.strategies import UI_PRESETS, migrate_strategy_name
@@ -67,6 +69,16 @@ _CHECK_STATUS_TOKEN = {
     "error": "danger",
     "unknown": "muted",
 }
+
+# Failed readiness check -> Settings switch that repairs it in pre-flight.
+_REMEDIATION_SETTINGS = {
+    "audio": "auto_normalize_audio",
+    "bitrate": "auto_cap_bitrate",
+    "frame_rate": "auto_fix_vfr",
+    "video_codec": "auto_fix_codec",
+    "frame_geometry": "auto_cap_resolution",
+}
+_VIDEO_LOSSY_CHECKS = frozenset({"bitrate", "frame_rate", "video_codec", "frame_geometry"})
 
 
 class Inspector(QWidget):
@@ -1254,7 +1266,10 @@ QScrollArea, QWidget#PopoverBody {{ background: transparent; border: none; }}
             empty.setWordWrap(True)
             content_layout.addWidget(empty)
         else:
-            profile = get_profile(self.settings.platform_profile)
+            focused_profile = (
+                self._focused_item.platform_profile if self._focused_item is not None else None
+            )
+            profile = get_profile(focused_profile or self.settings.platform_profile)
             badge = QLabel(
                 t(
                     "readiness_badge",
@@ -1288,6 +1303,16 @@ QScrollArea, QWidget#PopoverBody {{ background: transparent; border: none; }}
                     )
                     recommendation.setWordWrap(True)
                     content_layout.addWidget(recommendation)
+            failed = remediable_checks(report)
+            if failed:
+                button = text_button(
+                    t("remediate_btn", lang),
+                    theme,
+                    lambda: self._apply_remediation(failed, pop),
+                    variant="primary",
+                )
+                button.setObjectName("remediate_button")
+                content_layout.addWidget(button)
         content_layout.addStretch(1)
 
         scroll = QScrollArea()
@@ -1302,6 +1327,30 @@ QScrollArea, QWidget#PopoverBody {{ background: transparent; border: none; }}
 
         pop.show_for(self.info_btn)
         self._popover = pop
+
+    def _apply_remediation(self, failed: tuple[str, ...], pop: Popover) -> None:
+        lang = self._lang()
+        video_lossy = bool(_VIDEO_LOSSY_CHECKS.intersection(failed))
+        if video_lossy:
+            answer = QMessageBox.warning(
+                self,
+                t("readiness_info_title", lang),
+                t("remediate_confirm", lang),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+        for check_id in failed:
+            setting = _REMEDIATION_SETTINGS.get(check_id)
+            if setting is not None:
+                setattr(self.settings, setting, True)
+        self.settings.save_async()
+        pop.close()
+        pop.deleteLater()
+        if self._popover is pop:
+            self._popover = None
+        self.readiness_label.setText(t("remediate_done", lang))
 
     # Alias for callers that use the qss.apply_theme wording.
     apply_theme = set_theme

@@ -890,6 +890,16 @@ class SettingsDialog(QDialog):
             preflight, "auto_normalize_audio", draft.auto_normalize_audio
         )
         self._cap_bitrate = self._switch(preflight, "auto_cap_bitrate", draft.auto_cap_bitrate)
+        self._fix_vfr = self._switch(
+            preflight, "settings_auto_fix_vfr", draft.auto_fix_vfr
+        )
+        self._fix_codec = self._switch(
+            preflight, "settings_auto_fix_codec", draft.auto_fix_codec
+        )
+        self._cap_resolution = self._switch(
+            preflight, "settings_auto_cap_resolution", draft.auto_cap_resolution
+        )
+        self._hint(preflight, "settings_lossy_hint")
         self._bitrate_target = self._spin(
             preflight,
             "bitrate_target_lbl",
@@ -1326,6 +1336,9 @@ class SettingsDialog(QDialog):
         draft.stop_on_error = self._stop_on_error.isChecked()
         draft.auto_normalize_audio = self._normalize_audio.isChecked()
         draft.auto_cap_bitrate = self._cap_bitrate.isChecked()
+        draft.auto_fix_vfr = self._fix_vfr.isChecked()
+        draft.auto_fix_codec = self._fix_codec.isChecked()
+        draft.auto_cap_resolution = self._cap_resolution.isChecked()
         draft.bitrate_target_mbps = self._bitrate_target.value()
         draft.fix_color_tag = self._fix_color.isChecked()
         draft.scrub_metadata = self._scrub_metadata.isChecked()

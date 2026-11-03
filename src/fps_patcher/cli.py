@@ -176,6 +176,9 @@ def _parser() -> argparse.ArgumentParser:
     patch_cmd.add_argument("--output", type=Path, default=None, help="Output directory.")
     patch_cmd.add_argument("--normalize-audio", action="store_true")
     patch_cmd.add_argument("--cap-bitrate", action="store_true")
+    patch_cmd.add_argument("--fix-vfr", action="store_true")
+    patch_cmd.add_argument("--fix-codec", action="store_true")
+    patch_cmd.add_argument("--cap-resolution", action="store_true")
     patch_cmd.add_argument("--tag-bt709", action="store_true", help="Tag untagged SDR as Rec.709.")
     patch_cmd.add_argument("--scrub-metadata", action="store_true")
     overwrite = patch_cmd.add_mutually_exclusive_group()
@@ -227,6 +230,15 @@ def _cmd_patch(args: argparse.Namespace, settings: Settings) -> int:
     profile = args.profile or settings.platform_profile
     overwrite = bool(args.overwrite)
     auto_rename = not overwrite
+    fix_vfr = bool(args.fix_vfr or settings.auto_fix_vfr)
+    fix_codec = bool(args.fix_codec or settings.auto_fix_codec)
+    cap_resolution = bool(args.cap_resolution or settings.auto_cap_resolution)
+    if fix_vfr or fix_codec or cap_resolution:
+        print(
+            "[WARN] Lossy video re-encode enabled (VFR/codec/resolution auto-fix). "
+            "The video stream will be re-encoded to H.264.",
+            file=sys.stderr,
+        )
 
     cancel = threading.Event()
     force = threading.Event()
@@ -274,6 +286,9 @@ def _cmd_patch(args: argparse.Namespace, settings: Settings) -> int:
                     auto_rename=auto_rename,
                     auto_normalize_audio=bool(args.normalize_audio),
                     auto_cap_bitrate=bool(args.cap_bitrate),
+                    auto_fix_vfr=fix_vfr,
+                    auto_fix_codec=fix_codec,
+                    auto_cap_resolution=cap_resolution,
                     bitrate_target_mbps=settings.bitrate_target_mbps,
                     fix_color_tag=bool(args.tag_bt709),
                     scrub_metadata=bool(args.scrub_metadata),
