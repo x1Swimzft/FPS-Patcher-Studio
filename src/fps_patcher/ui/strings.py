@@ -162,6 +162,11 @@ STRINGS: dict[str, dict[str, str]] = {
         "template_preview": "Preview: {preview}",
         "template_preview_legacy": "Template off. Legacy name: {preview}",
         "template_help": "Tokens: {name}, {fps}, {timescale}, {date}, {platform}, {strategy}",
+        "export_platforms_lbl": "Multi-platform export",
+        "export_platforms_help": (
+            "Select 2 or more platforms to write one file per platform in a single run. "
+            "A per-item profile override disables fan-out for that item."
+        ),
         "open_when_done": "Open output folder when batch completed",
         "preserve_mtime": "Preserve original file modification timestamps",
         "watch_folder_section": "Watch Folder & Explorer",
@@ -584,6 +589,11 @@ STRINGS: dict[str, dict[str, str]] = {
         "template_preview_legacy": "ปิดใช้รูปแบบชื่อไฟล์ — ชื่อแบบเดิม: {preview}",
         "template_help": (
             "ตัวแปรที่ใช้ได้: {name}, {fps}, {timescale}, {date}, {platform}, {strategy}"
+        ),
+        "export_platforms_lbl": "ส่งออกหลายแพลตฟอร์ม",
+        "export_platforms_help": (
+            "เลือก 2 แพลตฟอร์มขึ้นไปเพื่อสร้างไฟล์แยกตามแพลตฟอร์มในการรันครั้งเดียว "
+            "หากกำหนดโปรไฟล์เฉพาะไฟล์ รายการนั้นจะไม่ถูกส่งออกหลายแพลตฟอร์ม"
         ),
         "open_when_done": "เปิดโฟลเดอร์ปลายทางเมื่อเสร็จสิ้นทั้งหมด",
         "preserve_mtime": "คงเวลาแก้ไขไฟล์เดิมไว้ (Preserve Timestamp)",

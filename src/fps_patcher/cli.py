@@ -18,13 +18,13 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__
-from .config import Settings
+from .config import Settings, platform_export_template
 from .core.errors import FFmpegNotFoundError, FPSPatcherError, PatchCancelledError
 from .core.ffmpeg_locator import FFmpegPaths, locate
 from .core.job_history import load_history, undo_job
 from .core.models import FPS_PRESETS, SUPPORTED_EXTENSIONS, LogEvent, PatchRequest, VideoInfo
 from .core.patcher import patch
-from .core.platform_profiles import evaluate_readiness, profile_ids
+from .core.platform_profiles import DEFAULT_PROFILE_ID, evaluate_readiness, profile_ids
 from .core.prober import probe
 from .core.strategies import get_strategy
 
@@ -167,11 +167,18 @@ def _parser() -> argparse.ArgumentParser:
         default=None,
         help="Output filename template (default: settings, or legacy _ts naming).",
     )
-    patch_cmd.add_argument(
+    profile_group = patch_cmd.add_mutually_exclusive_group()
+    profile_group.add_argument(
         "--profile",
         choices=profile_ids(),
         default=None,
         help="Platform profile (default from settings).",
+    )
+    profile_group.add_argument(
+        "--platforms",
+        metavar="IDS",
+        default=None,
+        help="Comma-separated platform IDs to export one output per platform.",
     )
     patch_cmd.add_argument("--output", type=Path, default=None, help="Output directory.")
     patch_cmd.add_argument("--normalize-audio", action="store_true")
@@ -212,6 +219,21 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def _cmd_patch(args: argparse.Namespace, settings: Settings) -> int:
+    if args.platforms is not None and args.profile is not None:
+        print("error: --platforms and --profile are mutually exclusive", file=sys.stderr)
+        return EXIT_USAGE
+    platforms: list[str] | None = None
+    if args.platforms is not None:
+        valid = [pid for pid in profile_ids() if pid != DEFAULT_PROFILE_ID]
+        requested = [part.strip() for part in args.platforms.split(",")]
+        if any(part not in valid for part in requested):
+            print(
+                f"error: --platforms must be a comma-separated list of: {', '.join(valid)}",
+                file=sys.stderr,
+            )
+            return EXIT_USAGE
+        platforms = list(dict.fromkeys(requested))
+
     ffmpeg = _locate_ffmpeg(settings)
     timescale = (
         args.timescale
@@ -228,6 +250,15 @@ def _cmd_patch(args: argparse.Namespace, settings: Settings) -> int:
         else (settings.filename_template if settings.use_filename_template else "")
     )
     profile = args.profile or settings.platform_profile
+    if platforms is not None:
+        targets = platforms
+    elif args.profile is None and len(settings.export_platforms) > 1:
+        targets = list(settings.export_platforms)
+    else:
+        targets = [profile]
+    multi = len(targets) > 1
+    if multi:
+        filename_template = platform_export_template(filename_template)
     overwrite = bool(args.overwrite)
     auto_rename = not overwrite
     fix_vfr = bool(args.fix_vfr or settings.auto_fix_vfr)
@@ -265,63 +296,77 @@ def _cmd_patch(args: argparse.Namespace, settings: Settings) -> int:
             if cancel.is_set():
                 cancelled = True
                 break
-            entry: dict[str, Any] = {
-                "input": str(source),
-                "ok": False,
-                "output": None,
-                "error": None,
-            }
-            try:
-                output_dir = args.output or (
-                    Path(settings.output_dir) if settings.output_dir else source.parent
-                )
-                request = PatchRequest(
-                    src=source,
-                    out_dir=output_dir,
-                    timescale=timescale,
-                    strategy=strategy,
-                    filename_template=filename_template,
-                    platform_profile=profile,
-                    overwrite=overwrite,
-                    auto_rename=auto_rename,
-                    auto_normalize_audio=bool(args.normalize_audio),
-                    auto_cap_bitrate=bool(args.cap_bitrate),
-                    auto_fix_vfr=fix_vfr,
-                    auto_fix_codec=fix_codec,
-                    auto_cap_resolution=cap_resolution,
-                    bitrate_target_mbps=settings.bitrate_target_mbps,
-                    fix_color_tag=bool(args.tag_bt709),
-                    scrub_metadata=bool(args.scrub_metadata),
-                    verify_after=settings.verify_after,
-                    backup_original=settings.backup_original,
-                    preserve_mtime=settings.preserve_mtime,
-                    mask_diagnostic_paths=settings.mask_diagnostic_paths,
-                    extra_ffmpeg_args=settings.extra_ffmpeg_args,
-                )
-                result = patch(
-                    request,
-                    ffmpeg,
-                    _emit_stderr,
-                    cancel,
-                    force_event=force,
-                )
-                entry["ok"] = True
-                entry["output"] = str(result.output)
-                if not args.json:
-                    print(f"Patched: {result.output}")
-            except PatchCancelledError:
-                entry["error"] = "cancelled"
-                files.append(entry)
-                cancelled = True
-                break
-            except (FPSPatcherError, OSError) as exc:
-                entry["error"] = str(exc)
-                files.append(entry)
-                print(f"Failed: {source}: {exc}", file=sys.stderr)
-                if settings.stop_on_error:
+            output_dir = args.output or (
+                Path(settings.output_dir) if settings.output_dir else source.parent
+            )
+            source_failed = False
+            for target_index, target in enumerate(targets):
+                if target_index and cancel.is_set():
+                    cancelled = True
                     break
-                continue
-            files.append(entry)
+                entry: dict[str, Any] = {
+                    "input": str(source),
+                    "ok": False,
+                    "output": None,
+                    "error": None,
+                }
+                if multi:
+                    entry["platform"] = target
+                try:
+                    request = PatchRequest(
+                        src=source,
+                        out_dir=output_dir,
+                        timescale=timescale,
+                        strategy=strategy,
+                        filename_template=filename_template,
+                        platform_profile=target,
+                        overwrite=overwrite,
+                        auto_rename=auto_rename,
+                        auto_normalize_audio=bool(args.normalize_audio),
+                        auto_cap_bitrate=bool(args.cap_bitrate),
+                        auto_fix_vfr=fix_vfr,
+                        auto_fix_codec=fix_codec,
+                        auto_cap_resolution=cap_resolution,
+                        bitrate_target_mbps=settings.bitrate_target_mbps,
+                        fix_color_tag=bool(args.tag_bt709),
+                        scrub_metadata=bool(args.scrub_metadata),
+                        verify_after=settings.verify_after,
+                        backup_original=settings.backup_original,
+                        preserve_mtime=settings.preserve_mtime,
+                        mask_diagnostic_paths=settings.mask_diagnostic_paths,
+                        extra_ffmpeg_args=settings.extra_ffmpeg_args,
+                    )
+                    result = patch(
+                        request,
+                        ffmpeg,
+                        _emit_stderr,
+                        cancel,
+                        force_event=force,
+                    )
+                    entry["ok"] = True
+                    entry["output"] = str(result.output)
+                    if not args.json:
+                        print(
+                            f"Patched ({target}): {result.output}"
+                            if multi
+                            else f"Patched: {result.output}"
+                        )
+                except PatchCancelledError:
+                    entry["error"] = "cancelled"
+                    files.append(entry)
+                    cancelled = True
+                    break
+                except (FPSPatcherError, OSError) as exc:
+                    entry["error"] = str(exc)
+                    files.append(entry)
+                    print(f"Failed: {source}: {exc}", file=sys.stderr)
+                    source_failed = True
+                    break
+                files.append(entry)
+            if cancelled:
+                break
+            if source_failed and settings.stop_on_error:
+                break
     finally:
         signal.signal(signal.SIGINT, previous)
 

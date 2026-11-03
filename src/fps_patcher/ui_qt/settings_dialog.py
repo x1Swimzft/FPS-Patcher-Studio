@@ -15,6 +15,7 @@ from PySide6.QtCore import QPropertyAnimation, QSignalBlocker, QSize, Qt, Signal
 from PySide6.QtGui import QKeyEvent, QMouseEvent
 from PySide6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QComboBox,
     QDialog,
     QFileDialog,
@@ -51,6 +52,7 @@ from ..config import (
 )
 from ..core.ffmpeg_locator import locate
 from ..core.models import FPS_PRESETS
+from ..core.platform_profiles import PLATFORM_PROFILES
 from ..core.preflight import BITRATE_TARGET_MBPS_MAX, BITRATE_TARGET_MBPS_MIN
 from ..core.strategies import UI_PRESETS, migrate_strategy_name
 from ..ui.strings import t
@@ -185,6 +187,7 @@ class SettingsDialog(QDialog):
         self._themed_widgets: list[Any] = []
         self._swatches: list[tuple[QPushButton, str]] = []
         self._preset_cards: dict[str, _PresetCard] = {}
+        self._export_checks: dict[str, QCheckBox] = {}
         self._search_rows: list[tuple[QPushButton, str]] = []
         self._last_tab = "appearance"
         self._ff_status: QLabel | None = None
@@ -790,6 +793,17 @@ class SettingsDialog(QDialog):
         self._template.setEnabled(self._use_template.isChecked())
         self._update_template_preview()
 
+        self._section(paths, "export_platforms_lbl")
+        self._export_checks = {}
+        for profile in PLATFORM_PROFILES.values():
+            if profile.profile_id == "generic":
+                continue
+            check = QCheckBox(t(profile.label_key, draft.language))
+            check.setChecked(profile.profile_id in draft.export_platforms)
+            self._export_checks[profile.profile_id] = check
+            paths.addWidget(check)
+        self._hint(paths, "export_platforms_help")
+
         workflow = self._card(grid, 1, 1)
         self._open_done = self._switch(workflow, "open_when_done", draft.open_when_done)
         self._preserve_mtime = self._switch(workflow, "preserve_mtime", draft.preserve_mtime)
@@ -1310,6 +1324,11 @@ class SettingsDialog(QDialog):
         draft.output_dir = self._out_dir.text().strip()
         draft.filename_template = self._template.text().strip() or "{name}_{fps}fps"
         draft.use_filename_template = self._use_template.isChecked()
+        draft.export_platforms = [
+            profile_id
+            for profile_id in PLATFORM_PROFILES
+            if profile_id in self._export_checks and self._export_checks[profile_id].isChecked()
+        ]
         draft.open_when_done = self._open_done.isChecked()
         draft.preserve_mtime = self._preserve_mtime.isChecked()
         draft.watch_folder = self._watch_dir.text().strip()

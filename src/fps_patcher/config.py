@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from .core.models import FPS_PRESETS
-from .core.platform_profiles import DEFAULT_PROFILE_ID, PLATFORM_PROFILES
+from .core.platform_profiles import DEFAULT_PROFILE_ID, PLATFORM_PROFILES, profile_ids
 from .core.preflight import (
     BITRATE_TARGET_MBPS,
     BITRATE_TARGET_MBPS_MAX,
@@ -90,6 +90,13 @@ def render_filename_template(
     for bad in r'\/:*?"<>|':
         rendered = rendered.replace(bad, "_")
     return rendered.strip() or f"{original_stem}_{fps}fps"
+
+
+def platform_export_template(template: str) -> str:
+    """Template for multi-platform fan-out, keeping one output per platform."""
+    if not template:
+        return "{name}_ts{timescale}_{platform}"
+    return template if "{platform}" in template else template + "_{platform}"
 
 
 @dataclass
@@ -179,6 +186,8 @@ class Settings:
 
     # Phase 3: global platform profile for readiness checks (read-only)
     platform_profile: str = DEFAULT_PROFILE_ID
+    # Slice 5: fan one input out to several platform profiles in one run.
+    export_platforms: list[str] = field(default_factory=list)
 
     # Transient runtime notice (not persisted)
     migrated_strategy_from: str | None = field(default=None, init=False, repr=False, compare=False)
@@ -267,6 +276,17 @@ class Settings:
             self.language = "en"
         if self.platform_profile not in PLATFORM_PROFILES:
             self.platform_profile = DEFAULT_PROFILE_ID
+        valid_exports = {pid for pid in profile_ids() if pid != DEFAULT_PROFILE_ID}
+        if not isinstance(self.export_platforms, list):
+            self.export_platforms = []
+        else:
+            self.export_platforms = list(
+                dict.fromkeys(
+                    pid
+                    for pid in self.export_platforms
+                    if isinstance(pid, str) and pid in valid_exports
+                )
+            )
 
         try:
             self.tint_strength = max(0, min(100, int(self.tint_strength)))

@@ -13,7 +13,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from ..config import Settings
+from ..config import Settings, platform_export_template
 from ..core.errors import (
     FFmpegNotFoundError,
     FPSPatcherError,
@@ -410,124 +410,179 @@ class AppController:
                         else src.parent
                     )
                     qi = self.items.get(src)
-                    eff_profile = (
-                        qi.platform_profile if qi and qi.platform_profile else None
-                    ) or self.settings.platform_profile
-                    req = PatchRequest(
-                        src=src,
-                        out_dir=out_dir,
-                        timescale=(qi.timescale if qi and qi.timescale else timescale),
-                        strategy=(qi.strategy if qi and qi.strategy else strategy),
-                        filename_template=(
-                            self.settings.filename_template
-                            if self.settings.use_filename_template
-                            else ""
-                        ),
-                        platform_profile=eff_profile,
-                        overwrite=eff_overwrite,
-                        auto_rename=eff_auto_rename,
-                        v4_strict_lossless=self.settings.v4_strict_lossless,
-                        v4_preserve_video=self.settings.v4_preserve_video,
-                        v4_preserve_audio=self.settings.v4_preserve_audio,
-                        v4_sync_mvhd=self.settings.v4_sync_mvhd,
-                        v4_export_report=self.settings.v4_export_report,
-                        v4_dry_run=self.settings.v4_dry_run,
-                        bxd_padding_bytes=self.settings.bxd_padding_bytes,
-                        bxd_max_tail_ms=self.settings.bxd_max_tail_ms,
-                        auto_normalize_audio=self.settings.auto_normalize_audio,
-                        auto_cap_bitrate=self.settings.auto_cap_bitrate,
-                        auto_fix_vfr=self.settings.auto_fix_vfr,
-                        auto_fix_codec=self.settings.auto_fix_codec,
-                        auto_cap_resolution=self.settings.auto_cap_resolution,
-                        bitrate_target_mbps=self.settings.bitrate_target_mbps,
-                        fix_color_tag=self.settings.fix_color_tag,
-                        scrub_metadata=self.settings.scrub_metadata,
-                        verify_after=self.settings.verify_after,
-                        backup_original=self.settings.backup_original,
-                        preserve_mtime=self.settings.preserve_mtime,
-                        mask_diagnostic_paths=self.settings.mask_diagnostic_paths,
-                        extra_ffmpeg_args=self.settings.extra_ffmpeg_args,
+                    item_profile = qi.platform_profile if qi and qi.platform_profile else None
+                    eff_profile = item_profile or self.settings.platform_profile
+                    eff_timescale = qi.timescale if qi and qi.timescale else timescale
+                    eff_strategy = qi.strategy if qi and qi.strategy else strategy
+                    base_template = (
+                        self.settings.filename_template
+                        if self.settings.use_filename_template
+                        else ""
+                    )
+                    if item_profile:
+                        targets = [item_profile]
+                    elif len(self.settings.export_platforms) > 1:
+                        targets = list(self.settings.export_platforms)
+                    else:
+                        targets = [eff_profile]
+                    multi = len(targets) > 1
+                    template = (
+                        platform_export_template(base_template) if multi else base_template
                     )
 
                     self.emit(LogEvent(f"[{idx}/{total_files}] Starting patch for {src.name}"))
 
-                    def file_emit(
-                        evt: LogEvent | ProgressEvent,
-                        cur_idx: int = idx,
-                        cur_src: Path = src,
-                    ) -> None:
-                        if isinstance(evt, ProgressEvent):
-                            overall = ((cur_idx - 1) + evt.fraction) / total_files
-                            self.emit(
-                                ProgressEvent(
-                                    fraction=overall,
-                                    file_fraction=evt.fraction,
-                                    current_file=cur_src,
-                                    file_index=cur_idx,
-                                    total_files=total_files,
-                                )
-                            )
-                        else:
-                            self.emit(evt)
-
                     file_failed = False
+                    last_output: Path | None = None
                     try:
                         self.items.set_status(src, "patching")
                         self.emit(QueueChangedEvent("patching"))
-                        res = patch(req, ff, file_emit, self._cancel)
-                        batch_results.append(res)
-                        self.items.set_status(src, "done", output=res.output)
-                        self.emit(QueueChangedEvent("done"))
-                    except PatchCancelledError as exc:
-                        cancelled = True
-                        last_error = str(exc)
-                        self.emit(LogEvent(f"[{idx}/{total_files}] Cancelled {src.name}", "WARN"))
-                        break
-                    except OutputFileExistsError as exc:
-                        file_failed = True
-                        last_error = str(exc)
-                        failed.append((src, str(exc)))
-                        self.items.set_status(src, "failed", error=str(exc))
-                        self.emit(
-                            LogEvent(
-                                f"[{idx}/{total_files}] Output exists error for {src.name}: {exc}",
-                                "ERROR",
+                        for target_index, target in enumerate(targets):
+                            if target_index and self._cancel.is_set():
+                                cancelled = True
+                                self.emit(
+                                    LogEvent(
+                                        f"[{idx}/{total_files}] Cancelled {src.name} "
+                                        f"before {target}",
+                                        "WARN",
+                                    )
+                                )
+                                break
+
+                            def file_emit(
+                                evt: LogEvent | ProgressEvent,
+                                cur_idx: int = idx,
+                                cur_src: Path = src,
+                                target_idx: int = target_index,
+                                target_count: int = len(targets),
+                            ) -> None:
+                                if isinstance(evt, ProgressEvent):
+                                    within = (target_idx + evt.fraction) / target_count
+                                    overall = ((cur_idx - 1) + within) / total_files
+                                    self.emit(
+                                        ProgressEvent(
+                                            fraction=overall,
+                                            file_fraction=within,
+                                            current_file=cur_src,
+                                            file_index=cur_idx,
+                                            total_files=total_files,
+                                        )
+                                    )
+                                else:
+                                    self.emit(evt)
+
+                            req = PatchRequest(
+                                src=src,
+                                out_dir=out_dir,
+                                timescale=eff_timescale,
+                                strategy=eff_strategy,
+                                filename_template=template,
+                                platform_profile=target,
+                                overwrite=eff_overwrite,
+                                auto_rename=eff_auto_rename,
+                                v4_strict_lossless=self.settings.v4_strict_lossless,
+                                v4_preserve_video=self.settings.v4_preserve_video,
+                                v4_preserve_audio=self.settings.v4_preserve_audio,
+                                v4_sync_mvhd=self.settings.v4_sync_mvhd,
+                                v4_export_report=self.settings.v4_export_report,
+                                v4_dry_run=self.settings.v4_dry_run,
+                                bxd_padding_bytes=self.settings.bxd_padding_bytes,
+                                bxd_max_tail_ms=self.settings.bxd_max_tail_ms,
+                                auto_normalize_audio=self.settings.auto_normalize_audio,
+                                auto_cap_bitrate=self.settings.auto_cap_bitrate,
+                                auto_fix_vfr=self.settings.auto_fix_vfr,
+                                auto_fix_codec=self.settings.auto_fix_codec,
+                                auto_cap_resolution=self.settings.auto_cap_resolution,
+                                bitrate_target_mbps=self.settings.bitrate_target_mbps,
+                                fix_color_tag=self.settings.fix_color_tag,
+                                scrub_metadata=self.settings.scrub_metadata,
+                                verify_after=self.settings.verify_after,
+                                backup_original=self.settings.backup_original,
+                                preserve_mtime=self.settings.preserve_mtime,
+                                mask_diagnostic_paths=self.settings.mask_diagnostic_paths,
+                                extra_ffmpeg_args=self.settings.extra_ffmpeg_args,
                             )
-                        )
-                    except PatchError as exc:
-                        file_failed = True
-                        last_error = str(exc)
-                        last_stderr = exc.stderr_tail
-                        failed.append((src, str(exc)))
-                        self.items.set_status(src, "failed", error=str(exc))
-                        self.emit(
-                            LogEvent(f"[{idx}/{total_files}] Failed {src.name}: {exc}", "ERROR")
-                        )
-                    except FPSPatcherError as exc:
-                        file_failed = True
-                        last_error = str(exc)
-                        failed.append((src, str(exc)))
-                        self.items.set_status(src, "failed", error=str(exc))
-                        self.emit(
-                            LogEvent(
-                                f"[{idx}/{total_files}] Verification failed for {src.name}: {exc}",
-                                "ERROR",
-                            )
-                        )
-                    except Exception as exc:
-                        log.exception("Unexpected patch failure in batch")
-                        file_failed = True
-                        last_error = f"Unexpected error: {exc}"
-                        failed.append((src, last_error))
-                        self.items.set_status(src, "failed", error=last_error)
-                        self.emit(
-                            LogEvent(
-                                f"[{idx}/{total_files}] Unexpected error {src.name}: {exc}",
-                                "ERROR",
-                            )
-                        )
+
+                            try:
+                                res = patch(req, ff, file_emit, self._cancel)
+                                batch_results.append(res)
+                                last_output = res.output
+                                if qi is not None:
+                                    qi.output = res.output
+                                if multi:
+                                    self.emit(
+                                        LogEvent(f"Output ({target}): {res.output}")
+                                    )
+                            except PatchCancelledError as exc:
+                                cancelled = True
+                                last_error = str(exc)
+                                self.emit(
+                                    LogEvent(
+                                        f"[{idx}/{total_files}] Cancelled {src.name}",
+                                        "WARN",
+                                    )
+                                )
+                                break
+                            except OutputFileExistsError as exc:
+                                file_failed = True
+                                last_error = str(exc)
+                                failed.append((src, str(exc)))
+                                self.items.set_status(src, "failed", error=str(exc))
+                                self.emit(
+                                    LogEvent(
+                                        f"[{idx}/{total_files}] Output exists error for "
+                                        f"{src.name}: {exc}",
+                                        "ERROR",
+                                    )
+                                )
+                                break
+                            except PatchError as exc:
+                                file_failed = True
+                                last_error = str(exc)
+                                last_stderr = exc.stderr_tail
+                                failed.append((src, str(exc)))
+                                self.items.set_status(src, "failed", error=str(exc))
+                                self.emit(
+                                    LogEvent(
+                                        f"[{idx}/{total_files}] Failed {src.name}: {exc}",
+                                        "ERROR",
+                                    )
+                                )
+                                break
+                            except FPSPatcherError as exc:
+                                file_failed = True
+                                last_error = str(exc)
+                                failed.append((src, str(exc)))
+                                self.items.set_status(src, "failed", error=str(exc))
+                                self.emit(
+                                    LogEvent(
+                                        f"[{idx}/{total_files}] Verification failed for "
+                                        f"{src.name}: {exc}",
+                                        "ERROR",
+                                    )
+                                )
+                                break
+                            except Exception as exc:
+                                log.exception("Unexpected patch failure in batch")
+                                file_failed = True
+                                last_error = f"Unexpected error: {exc}"
+                                failed.append((src, last_error))
+                                self.items.set_status(src, "failed", error=last_error)
+                                self.emit(
+                                    LogEvent(
+                                        f"[{idx}/{total_files}] Unexpected error "
+                                        f"{src.name}: {exc}",
+                                        "ERROR",
+                                    )
+                                )
+                                break
                     finally:
                         self.current_patching_path = None
+                    if cancelled:
+                        break
+                    if last_output is not None and not file_failed:
+                        self.items.set_status(src, "done", output=last_output)
+                        self.emit(QueueChangedEvent("done"))
                     if file_failed and self.settings.stop_on_error:
                         self.emit(
                             LogEvent(
