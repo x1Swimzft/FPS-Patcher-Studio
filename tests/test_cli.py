@@ -13,8 +13,10 @@ import pytest
 
 from fps_patcher.cli import main
 from fps_patcher.config import Settings
+from fps_patcher.core import job_history
 from fps_patcher.core.errors import PatchCancelledError
 from fps_patcher.core.ffmpeg_locator import FFmpegPaths
+from fps_patcher.core.models import PatchRequest
 
 
 def _settings(ff: FFmpegPaths, output: Path) -> Settings:
@@ -278,3 +280,84 @@ def test_cli_patch_maps_options_to_request(
     assert request.scrub_metadata is True
     assert request.overwrite is True
     assert request.auto_rename is False
+
+
+def _record_cli_job(
+    history: Path, output: Path, backup: Path | None = None
+) -> str:
+    req = PatchRequest(
+        src=output,
+        out_dir=output.parent,
+        timescale=60000,
+        platform_profile="tiktok",
+    )
+    result = SimpleNamespace(src=output, output=output, backup_path=backup)
+    job = job_history.record_job(result, req, history_path=history)  # type: ignore[arg-type]
+    assert job is not None
+    return job.job_id
+
+
+def test_cli_history_json(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: Any
+) -> None:
+    history = tmp_path / "job_history.json"
+    output = tmp_path / "out.mp4"
+    output.write_bytes(b"patched")
+    job_id = _record_cli_job(history, output)
+    monkeypatch.setattr(job_history, "_default_history_path", lambda: history)
+
+    code = main(["history", "--json"], Settings())
+    payload = json.loads(capsys.readouterr().out)
+
+    assert code == 0
+    assert isinstance(payload, list) and len(payload) == 1
+    assert payload[0]["job_id"] == job_id
+    assert payload[0]["output"] == str(output)
+    assert payload[0]["backup"] is None
+    assert payload[0]["rolled_back"] is False
+    assert set(payload[0]) == {
+        "job_id",
+        "timestamp",
+        "src",
+        "output",
+        "backup",
+        "timescale",
+        "strategy",
+        "platform_profile",
+        "rolled_back",
+    }
+
+
+def test_cli_undo_last_json_restores_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: Any
+) -> None:
+    history = tmp_path / "job_history.json"
+    output = tmp_path / "out.mp4"
+    backup = tmp_path / "out.mp4.bak"
+    output.write_bytes(b"patched")
+    backup.write_bytes(b"original")
+    job_id = _record_cli_job(history, output, backup)
+    monkeypatch.setattr(job_history, "_default_history_path", lambda: history)
+
+    code = main(["undo", "--last", "--json"], Settings())
+    payload = json.loads(capsys.readouterr().out)
+
+    assert code == 0
+    assert payload["ok"] is True
+    assert payload["command"] == "undo"
+    assert payload["output"] == str(output)
+    assert payload["job"]["job_id"] == job_id
+    assert payload["job"]["rolled_back"] is True
+    assert output.read_bytes() == b"original"
+    assert not backup.exists()
+
+
+def test_cli_undo_missing_job_exits_nonzero(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: Any
+) -> None:
+    monkeypatch.setattr(
+        job_history, "_default_history_path", lambda: tmp_path / "job_history.json"
+    )
+
+    assert main(["undo", "--last"], Settings()) == 1
+    assert "error" in capsys.readouterr().err

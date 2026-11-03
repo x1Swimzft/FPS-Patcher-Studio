@@ -95,6 +95,8 @@ class PatchResult:
     elapsed_s: float
     # True when output is non-standard (e.g. X1T ghost samples / trailing bytes).
     experimental: bool = False
+    # .bak copy of a replaced output, when one was made.
+    backup_path: Path | None = None
 
 
 LogLevel = Literal["INFO", "OK", "WARN", "ERROR", "DEBUG"]

@@ -391,6 +391,25 @@ STRINGS: dict[str, dict[str, str]] = {
         "forensic_analyzing": "Analyzing…",
         "forensic_repairing": "Repairing…",
         "forensic_exporting": "Exporting…",
+        # Job history & rollback
+        "history_title": "Job History",
+        "history_btn": "History",
+        "history_time": "Time",
+        "history_source": "Source",
+        "history_output": "Output",
+        "history_backup": "Backup",
+        "history_status": "Status",
+        "history_available": "Available",
+        "history_rolled_back": "Rolled back",
+        "history_empty": "No patch history yet.",
+        "history_rollback": "Roll Back",
+        "history_refresh": "Refresh",
+        "history_close": "Close",
+        "history_rollback_confirm": (
+            "Roll back this patch and restore the backup? This cannot be undone."
+        ),
+        "history_rollback_done": "Rollback complete. Restored: {path}",
+        "history_rollback_failed": "Rollback failed: {error}",
     },
     "th": {
         # App & Header
@@ -770,6 +789,26 @@ STRINGS: dict[str, dict[str, str]] = {
         "forensic_analyzing": "กำลังวิเคราะห์…",
         "forensic_repairing": "กำลังซ่อมไฟล์…",
         "forensic_exporting": "กำลังส่งออก…",
+        # Job history & rollback
+        "history_title": "ประวัติการแปลงไฟล์",
+        "history_btn": "ประวัติ",
+        "history_time": "เวลา",
+        "history_source": "ไฟล์ต้นฉบับ",
+        "history_output": "ไฟล์ผลลัพธ์",
+        "history_backup": "ไฟล์สำรอง",
+        "history_status": "สถานะ",
+        "history_available": "พร้อมย้อนกลับ",
+        "history_rolled_back": "ย้อนกลับแล้ว",
+        "history_empty": "ยังไม่มีประวัติการแปลงไฟล์",
+        "history_rollback": "ย้อนกลับ",
+        "history_refresh": "รีเฟรช",
+        "history_close": "ปิด",
+        "history_rollback_confirm": (
+            "ต้องการย้อนกลับการแปลงไฟล์นี้และคืนค่าจากไฟล์สำรองหรือไม่? "
+            "การดำเนินการนี้ไม่สามารถยกเลิกได้"
+        ),
+        "history_rollback_done": "ย้อนกลับสำเร็จ คืนค่าแล้ว: {path}",
+        "history_rollback_failed": "ย้อนกลับไม่สำเร็จ: {error}",
     },
 }
 

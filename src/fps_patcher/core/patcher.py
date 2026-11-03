@@ -287,6 +287,7 @@ def patch(
     base = output_base_for(req)
     dest_lock = _DestinationLock(base)
     tmp: Path | None = None
+    backup: Path | None = None
 
     emit(LogEvent(f"Strategy: {strategy.label}"))
 
@@ -551,12 +552,18 @@ def patch(
     except Exception:
         pass
 
-    return PatchResult(
+    result = PatchResult(
         src=src,
         output=final,
         before=before,
         after=after,
         elapsed_s=elapsed,
         experimental=experimental,
+        backup_path=backup,
     )
+    # Lazy import keeps the core module graph acyclic.
+    from .job_history import record_job
+
+    record_job(result, req)
+    return result
 

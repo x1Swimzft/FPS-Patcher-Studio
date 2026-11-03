@@ -13,6 +13,7 @@ import signal
 import sys
 import threading
 from collections.abc import Sequence
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,7 @@ from . import __version__
 from .config import Settings
 from .core.errors import FFmpegNotFoundError, FPSPatcherError, PatchCancelledError
 from .core.ffmpeg_locator import FFmpegPaths, locate
+from .core.job_history import load_history, undo_job
 from .core.models import FPS_PRESETS, SUPPORTED_EXTENSIONS, LogEvent, PatchRequest, VideoInfo
 from .core.patcher import patch
 from .core.platform_profiles import evaluate_readiness, profile_ids
@@ -192,6 +194,17 @@ def _parser() -> argparse.ArgumentParser:
     score_cmd.add_argument("--profile", choices=profile_ids(), default="generic")
     score_cmd.add_argument("--json", action="store_true")
     score_cmd.set_defaults(func=_cmd_score)
+
+    history_cmd = sub.add_parser("history", help="List recent patch jobs.")
+    history_cmd.add_argument("--limit", type=int, default=20)
+    history_cmd.add_argument("--json", action="store_true")
+    history_cmd.set_defaults(func=_cmd_history)
+
+    undo_cmd = sub.add_parser("undo", help="Restore a patch job's output from its backup.")
+    undo_cmd.add_argument("job_id", nargs="?", default=None)
+    undo_cmd.add_argument("--last", action="store_true", help="Roll back the newest job.")
+    undo_cmd.add_argument("--json", action="store_true")
+    undo_cmd.set_defaults(func=_cmd_undo)
     return parser
 
 
@@ -391,6 +404,38 @@ def _cmd_score(args: argparse.Namespace, settings: Settings) -> int:
         print(f"  {check.label}: {check.status} — {check.detail}")
         if check.recommendation:
             print(f"    {check.recommendation}")
+    return EXIT_OK
+
+
+def _cmd_history(args: argparse.Namespace, _settings: Settings) -> int:
+    jobs = load_history(limit=args.limit)
+    if args.json:
+        print(json.dumps([asdict(job) for job in jobs], ensure_ascii=False))
+        return EXIT_OK
+    for job in jobs:
+        marker = "  [rolled back]" if job.rolled_back else ""
+        print(f"{job.timestamp}  {job.job_id}  {job.output}{marker}")
+    return EXIT_OK
+
+
+def _cmd_undo(args: argparse.Namespace, _settings: Settings) -> int:
+    if args.job_id is not None and args.last:
+        print("error: pass either a job id or --last, not both", file=sys.stderr)
+        return EXIT_USAGE
+    try:
+        job = undo_job(args.job_id)
+    except (FPSPatcherError, OSError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_FILE_ERROR
+    if args.json:
+        print(
+            json.dumps(
+                {"ok": True, "command": "undo", "output": job.output, "job": asdict(job)},
+                ensure_ascii=False,
+            )
+        )
+    else:
+        print(job.output)
     return EXIT_OK
 
 

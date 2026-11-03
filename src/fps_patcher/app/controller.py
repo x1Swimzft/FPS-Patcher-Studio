@@ -23,6 +23,8 @@ from ..core.errors import (
 )
 from ..core.ffmpeg_downloader import DOWNLOAD_URL, download_ffmpeg
 from ..core.ffmpeg_locator import FFmpegPaths, locate
+from ..core.job_history import JobRecord
+from ..core.job_history import undo_job as _undo_job
 from ..core.models import (
     SUPPORTED_EXTENSIONS,
     Event,
@@ -690,6 +692,15 @@ class AppController:
             self.emit(UpdateDownloadEvent("cancelled"))
         except Exception as exc:
             self.emit(UpdateDownloadEvent("error", error=str(exc)))
+
+    def undo_job(self, job_id: str | None = None) -> JobRecord:
+        """Roll back one job (default: latest); refuses while a patch is running."""
+        if self.busy:
+            raise PatchError("Cannot roll back while patching is in progress.")
+        return _undo_job(job_id)
+
+    def undo_last_job(self) -> JobRecord:
+        return self.undo_job()
 
     def cancel(self) -> None:
         if self.busy:

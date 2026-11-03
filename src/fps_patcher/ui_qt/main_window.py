@@ -54,6 +54,7 @@ from ..ui.strings import readiness_check_label, t
 from .bridge import ControllerBridge
 from .console import ConsolePanel
 from .forensic_dialog import ForensicDialog
+from .history_dialog import HistoryDialog
 from .icons import get_icon
 from .inspector import Inspector
 from .motion import MotionController
@@ -225,6 +226,14 @@ class MainWindow(QMainWindow):
         )
         layout.addWidget(self.forensic_button, 0, Qt.AlignmentFlag.AlignVCenter)
 
+        self.history_button = text_button(
+            t("history_btn", lang),
+            theme,
+            self._open_history,
+            height=theme.button_height,
+        )
+        layout.addWidget(self.history_button, 0, Qt.AlignmentFlag.AlignVCenter)
+
         self.output_button = text_button(
             t("open_output_btn", lang),
             theme,
@@ -260,6 +269,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.settings_button, 0, Qt.AlignmentFlag.AlignVCenter)
 
         self.forensic_button.setAccessibleName(t("forensic_btn", lang))
+        self.history_button.setAccessibleName(t("history_btn", lang))
         self.output_button.setAccessibleName(t("open_output_btn", lang))
         self._set_ffmpeg_state("checking")
         return toolbar
@@ -978,6 +988,9 @@ class MainWindow(QMainWindow):
     def _open_forensic(self) -> None:
         ForensicDialog(self.settings, self.theme_manager, self).exec()
 
+    def _open_history(self) -> None:
+        HistoryDialog(self.settings, self.theme_manager, self.controller, self).exec()
+
     def _open_forensic_for(self, path: object) -> None:
         target = Path(str(path))
         params = inspect.signature(ForensicDialog.__init__).parameters
@@ -1044,6 +1057,8 @@ class MainWindow(QMainWindow):
         self.title_label.setText(t("app_title", lang))
         self.forensic_button.setText(t("forensic_btn", lang))
         self.forensic_button.setAccessibleName(t("forensic_btn", lang))
+        self.history_button.setText(t("history_btn", lang))
+        self.history_button.setAccessibleName(t("history_btn", lang))
         self.output_button.setText(t("open_output_btn", lang))
         self.output_button.setAccessibleName(t("open_output_btn", lang))
         self.theme_button.setToolTip(t("toggle_theme_tip", lang))
