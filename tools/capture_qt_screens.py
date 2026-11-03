@@ -240,6 +240,8 @@ def _capture_rich_queue(window_cls: Any, scale: float, root: Path) -> Path:
 
     _clear_queue_file()
     settings = _settings("Crimson Gamer", "dark", "en", scale)
+    # Hero image should demonstrate the v1.2.0 bitrate plan (source -> target).
+    settings.auto_cap_bitrate = True
     window = window_cls(settings)
     window.resize(*MAIN_SIZE)
     window.show()
