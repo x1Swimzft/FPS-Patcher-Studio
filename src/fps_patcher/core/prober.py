@@ -6,7 +6,7 @@ import struct
 import sys
 from fractions import Fraction
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO
 
 from .errors import ProbeError
 from .ffmpeg_locator import locate
@@ -49,6 +49,144 @@ def _file_size(path: Path) -> int | None:
         return path.stat().st_size
     except OSError:
         return None
+
+
+_MAX_MOOV_BYTES = 64 * 1024 * 1024
+
+_COLOR_PRIMARIES: dict[int, str] = {
+    1: "bt709",
+    4: "bt470m",
+    5: "bt470bg",
+    6: "smpte170m",
+    7: "smpte240m",
+    8: "film",
+    9: "bt2020",
+    10: "smpte428",
+    11: "smpte431",
+    12: "smpte432",
+    22: "ebu3213",
+}
+
+_COLOR_TRANSFER: dict[int, str] = {
+    1: "bt709",
+    4: "gamma22",
+    5: "gamma28",
+    6: "smpte170m",
+    7: "smpte240m",
+    8: "linear",
+    9: "log100",
+    10: "log316",
+    11: "iec61966-2-4",
+    12: "bt1361e",
+    13: "iec61966-2-1",
+    14: "bt2020-10",
+    15: "bt2020-12",
+    16: "smpte2084",
+    17: "smpte428",
+    18: "arib-std-b67",
+}
+
+_COLOR_MATRIX: dict[int, str] = {
+    0: "gbr",
+    1: "bt709",
+    4: "fcc",
+    5: "bt470bg",
+    6: "smpte170m",
+    7: "smpte240m",
+    8: "ycgco",
+    9: "bt2020nc",
+    10: "bt2020c",
+    11: "smpte2085",
+    12: "chroma-derived-nc",
+    13: "chroma-derived-c",
+    14: "ictcp",
+}
+
+
+def _find_all_children(data_slice: bytes, target_type: bytes) -> list[tuple[int, int]]:
+    res: list[tuple[int, int]] = []
+    p = 0
+    end = len(data_slice)
+    while p + 8 <= end:
+        s32, typ = struct.unpack_from(">I4s", data_slice, p)
+        hdr = 8
+        if s32 == 1:
+            if p + 16 > end:
+                break
+            s = struct.unpack_from(">Q", data_slice, p + 8)[0]
+            hdr = 16
+        elif s32 == 0:
+            s = end - p
+        else:
+            s = s32
+        if s < hdr or p + s > end:
+            break
+        if typ == target_type:
+            res.append((p + hdr, s - hdr))
+        p += s
+    return res
+
+
+def _find_child(data_slice: bytes, target_type: bytes) -> tuple[int, int] | None:
+    found = _find_all_children(data_slice, target_type)
+    return found[0] if found else None
+
+
+def _parse_colr(box: bytes) -> tuple[str | None, str | None, str | None]:
+    """Map an nclx/nclc colr payload to ffprobe-style color names."""
+    if len(box) < 10 or box[:4] not in (b"nclx", b"nclc"):
+        return None, None, None
+    primaries, transfer, matrix = struct.unpack_from(">HHH", box, 4)
+    return (
+        _COLOR_PRIMARIES.get(primaries),
+        _COLOR_TRANSFER.get(transfer),
+        _COLOR_MATRIX.get(matrix),
+    )
+
+
+def _video_color(stsd_data: bytes) -> tuple[str | None, str | None, str | None]:
+    """Read colr from the first visual sample entry (children start at offset 94)."""
+    if len(stsd_data) < 94:
+        return None, None, None
+    entry_size = struct.unpack_from(">I", stsd_data, 8)[0]
+    entry_end = min(len(stsd_data), 8 + entry_size)
+    if entry_end <= 94:
+        return None, None, None
+    found = _find_child(stsd_data[94:entry_end], b"colr")
+    if found is None:
+        return None, None, None
+    start = 94 + found[0]
+    return _parse_colr(stsd_data[start : start + found[1]])
+
+
+def _find_top_level(fh: BinaryIO, limit: int, target_type: bytes) -> tuple[int, int] | None:
+    """Scan top-level box headers only; return (payload offset, payload size)."""
+    pos = 0
+    while pos + 8 <= limit:
+        fh.seek(pos)
+        raw = fh.read(8)
+        if len(raw) < 8:
+            return None
+        s32, typ = struct.unpack(">I4s", raw)
+        hdr = 8
+        if s32 == 1:
+            if pos + 16 > limit:
+                return None
+            raw64 = fh.read(8)
+            if len(raw64) < 8:
+                return None
+            size = struct.unpack(">Q", raw64)[0]
+            hdr = 16
+        elif s32 == 0:
+            size = limit - pos
+        else:
+            size = s32
+        if size < hdr or pos + size > limit:
+            return None
+        if typ == target_type:
+            return pos + hdr, size - hdr
+        pos += size
+    return None
 
 
 def parse_probe(path: Path, data: dict[str, Any]) -> VideoInfo:
@@ -117,100 +255,42 @@ def probe_direct(path: Path) -> VideoInfo:
         raise ProbeError(f"File not found: {path}")
 
     try:
-        data = path.read_bytes()
+        file_size = path.stat().st_size
+        with path.open("rb") as fh:
+            found = _find_top_level(fh, file_size, b"moov")
+            if found is None:
+                raise ProbeError("Invalid MP4: moov box not found.")
+            moov_pos, moov_size = found
+            if moov_size > _MAX_MOOV_BYTES:
+                raise ProbeError(
+                    f"Invalid MP4: moov atom is {moov_size} bytes "
+                    f"(limit {_MAX_MOOV_BYTES} bytes)."
+                )
+            fh.seek(moov_pos)
+            moov_data = fh.read(moov_size)
+            if len(moov_data) != moov_size:
+                raise ProbeError("Invalid MP4: truncated moov atom.")
     except OSError as exc:
         raise ProbeError(f"Failed to read file: {exc}") from exc
 
-    limit = len(data)
-    pos = 0
-    moov_pos: int | None = None
-    moov_size: int | None = None
-
-    while pos + 8 <= limit:
-        s32, typ = struct.unpack_from(">I4s", data, pos)
-        hdr = 8
-        if s32 == 1:
-            if pos + 16 > limit:
-                break
-            size = struct.unpack_from(">Q", data, pos + 8)[0]
-            hdr = 16
-        elif s32 == 0:
-            size = limit - pos
-        else:
-            size = s32
-        if size < hdr or pos + size > limit:
-            break
-        if typ == b"moov":
-            moov_pos = pos + hdr
-            moov_size = size - hdr
-            break
-        pos += size
-
-    if moov_pos is None or moov_size is None:
-        raise ProbeError("Invalid MP4: moov box not found.")
-
-    def find_child(data_slice: bytes, target_type: bytes) -> tuple[int, int] | None:
-        p = 0
-        end = len(data_slice)
-        while p + 8 <= end:
-            s32, typ = struct.unpack_from(">I4s", data_slice, p)
-            hdr = 8
-            if s32 == 1:
-                if p + 16 > end:
-                    break
-                s = struct.unpack_from(">Q", data_slice, p + 8)[0]
-                hdr = 16
-            elif s32 == 0:
-                s = end - p
-            else:
-                s = s32
-            if s < hdr or p + s > end:
-                break
-            if typ == target_type:
-                return (p + hdr, s - hdr)
-            p += s
-        return None
-
-    def find_all_children(data_slice: bytes, target_type: bytes) -> list[tuple[int, int]]:
-        res: list[tuple[int, int]] = []
-        p = 0
-        end = len(data_slice)
-        while p + 8 <= end:
-            s32, typ = struct.unpack_from(">I4s", data_slice, p)
-            hdr = 8
-            if s32 == 1:
-                if p + 16 > end:
-                    break
-                s = struct.unpack_from(">Q", data_slice, p + 8)[0]
-                hdr = 16
-            elif s32 == 0:
-                s = end - p
-            else:
-                s = s32
-            if s < hdr or p + s > end:
-                break
-            if typ == target_type:
-                res.append((p + hdr, s - hdr))
-            p += s
-        return res
-
-    moov_data = data[moov_pos : moov_pos + moov_size]
-    traks = find_all_children(moov_data, b"trak")
+    traks = _find_all_children(moov_data, b"trak")
     if not traks:
         raise ProbeError("No tracks found in moov atom.")
 
     video_info: dict[str, Any] = {}
     has_audio = False
     audio_codec: str | None = None
+    audio_sample_rate: int | None = None
+    audio_channels: int | None = None
     stream_count = len(traks)
 
     for trak_start, trak_len in traks:
         trak_data = moov_data[trak_start : trak_start + trak_len]
-        mdia = find_child(trak_data, b"mdia")
+        mdia = _find_child(trak_data, b"mdia")
         if not mdia:
             continue
         mdia_data = trak_data[mdia[0] : mdia[0] + mdia[1]]
-        hdlr = find_child(mdia_data, b"hdlr")
+        hdlr = _find_child(mdia_data, b"hdlr")
         if not hdlr or hdlr[1] < 12:
             continue
         handler_type = mdia_data[hdlr[0] + 8 : hdlr[0] + 12]
@@ -218,13 +298,13 @@ def probe_direct(path: Path) -> VideoInfo:
         if handler_type == b"soun":
             has_audio = True
             if audio_codec is None:
-                minf_a = find_child(mdia_data, b"minf")
+                minf_a = _find_child(mdia_data, b"minf")
                 if minf_a:
                     minf_data_a = mdia_data[minf_a[0] : minf_a[0] + minf_a[1]]
-                    stbl_a = find_child(minf_data_a, b"stbl")
+                    stbl_a = _find_child(minf_data_a, b"stbl")
                     if stbl_a:
                         stbl_data_a = minf_data_a[stbl_a[0] : stbl_a[0] + stbl_a[1]]
-                        stsd_a = find_child(stbl_data_a, b"stsd")
+                        stsd_a = _find_child(stbl_data_a, b"stsd")
                         if stsd_a and stsd_a[1] >= 16:
                             stsd_data_a = stbl_data_a[stsd_a[0] : stsd_a[0] + stsd_a[1]]
                             raw_entry = stsd_data_a[12:16].decode("latin1", errors="replace")
@@ -241,10 +321,15 @@ def probe_direct(path: Path) -> VideoInfo:
                                 "ec-3": "eac3",
                                 "opus": "opus",
                             }.get(raw_ac, raw_ac)
+                            if len(stsd_data_a) >= 44:
+                                channels = struct.unpack_from(">H", stsd_data_a, 32)[0]
+                                rate = struct.unpack_from(">I", stsd_data_a, 40)[0] >> 16
+                                audio_channels = channels or None
+                                audio_sample_rate = rate or None
         elif handler_type == b"vide" and not video_info:
-            mdhd = find_child(mdia_data, b"mdhd")
-            tkhd = find_child(trak_data, b"tkhd")
-            minf = find_child(mdia_data, b"minf")
+            mdhd = _find_child(mdia_data, b"mdhd")
+            tkhd = _find_child(trak_data, b"tkhd")
+            minf = _find_child(mdia_data, b"minf")
             timescale = 0
             duration_ticks = 0
             codec = "unknown"
@@ -252,6 +337,9 @@ def probe_direct(path: Path) -> VideoInfo:
             height = 0
             nb_frames = None
             avg_fps = Fraction(0)
+            color_primaries: str | None = None
+            color_transfer: str | None = None
+            color_space: str | None = None
 
             if tkhd and tkhd[1] >= 80:
                 tkhd_data = trak_data[tkhd[0] : tkhd[0] + tkhd[1]]
@@ -272,10 +360,10 @@ def probe_direct(path: Path) -> VideoInfo:
 
             if minf:
                 minf_data = mdia_data[minf[0] : minf[0] + minf[1]]
-                stbl = find_child(minf_data, b"stbl")
+                stbl = _find_child(minf_data, b"stbl")
                 if stbl:
                     stbl_data = minf_data[stbl[0] : stbl[0] + stbl[1]]
-                    stsd = find_child(stbl_data, b"stsd")
+                    stsd = _find_child(stbl_data, b"stsd")
                     if stsd and stsd[1] >= 16:
                         stsd_data = stbl_data[stsd[0] : stsd[0] + stsd[1]]
                         entry_cnt = struct.unpack_from(">I", stsd_data, 4)[0]
@@ -289,15 +377,16 @@ def probe_direct(path: Path) -> VideoInfo:
                                 "av01": "av1",
                                 "mp4v": "mpeg4",
                             }.get(raw_codec, raw_codec)
+                            color_primaries, color_transfer, color_space = _video_color(stsd_data)
 
-                    stsz = find_child(stbl_data, b"stsz")
-                    if stsz and stsz[1] >= 8:
+                    stsz = _find_child(stbl_data, b"stsz")
+                    if stsz and stsz[1] >= 12:
                         stsz_data = stbl_data[stsz[0] : stsz[0] + stsz[1]]
                         _, sample_cnt = struct.unpack_from(">II", stsz_data, 4)
                         nb_frames = sample_cnt
 
-                    stts = find_child(stbl_data, b"stts")
-                    if stts and stts[1] >= 4 and timescale > 0:
+                    stts = _find_child(stbl_data, b"stts")
+                    if stts and stts[1] >= 8 and timescale > 0:
                         stts_data = stbl_data[stts[0] : stts[0] + stts[1]]
                         cnt = struct.unpack_from(">I", stts_data, 4)[0]
                         total_samples = 0
@@ -322,6 +411,9 @@ def probe_direct(path: Path) -> VideoInfo:
                 "duration_s": duration_s,
                 "timescale": timescale,
                 "nb_frames": nb_frames,
+                "color_primaries": color_primaries,
+                "color_transfer": color_transfer,
+                "color_space": color_space,
             }
 
     if not video_info:
@@ -329,7 +421,7 @@ def probe_direct(path: Path) -> VideoInfo:
 
     bit_rate: int | None = None
     if video_info["duration_s"] > 0:
-        bit_rate = int((len(data) * 8) / video_info["duration_s"])
+        bit_rate = int((file_size * 8) / video_info["duration_s"])
 
     return VideoInfo(
         path=path,
@@ -345,7 +437,12 @@ def probe_direct(path: Path) -> VideoInfo:
         stream_count=stream_count,
         audio_codec=audio_codec,
         bit_rate=bit_rate,
-        file_size_bytes=len(data),
+        audio_sample_rate=audio_sample_rate,
+        audio_channels=audio_channels,
+        color_primaries=video_info["color_primaries"],
+        color_transfer=video_info["color_transfer"],
+        color_space=video_info["color_space"],
+        file_size_bytes=file_size,
     )
 
 
