@@ -1,9 +1,9 @@
 # Software Supply Chain & Dependency Audit Report
 
-**Project**: `fps-patcher-studio` v1.0.0  
-**Audit Date**: 2026-10-25 10:58:05 UTC  
+**Project**: `fps-patcher-studio` v1.2.0  
+**Audit Date**: 2026-11-03 15:26:53 UTC  
 **Tool**: `tools/generate_sbom.py` (CycloneDX 1.5 Specification)  
-**SBOM Artifact**: [`release/FPSPatcherStudio-v1.0.0.cdx.json`](../release/FPSPatcherStudio-v1.0.0.cdx.json)  
+**SBOM Artifact**: [`release/FPSPatcherStudio-v1.2.0.cdx.json`](../release/FPSPatcherStudio-v1.2.0.cdx.json)  
 
 ---
 
@@ -24,7 +24,7 @@ These packages are required to run the FPS Patcher Studio desktop application:
 | Package | Version | Declared Spec | License | Purpose / Security Notes |
 | :--- | :--- | :--- | :--- | :--- |
 | `pillow` | `13.0.0` | `pillow>=13.0.0` | HPND / Historical | Imaging library for icons, thumbs, preview decoding |
-| `pyside6` | `6.12.0` | `pyside6==6.12.0` | Unknown | Desktop UI runtime dependency |
+| `pyside6` | `6.12.0` | `pyside6==6.12.0` | LGPL-3.0 | Qt for Python desktop UI runtime (Qt widgets, QtCore, QtGui) |
 
 ---
 
@@ -38,7 +38,7 @@ These packages are used for building, linting, typechecking, and testing:
 | `mypy` | `2.4.0` | `mypy>=2.4.0` | MIT | Static type checker for Python |
 | `pytest` | `9.1.1` | `pytest>=9.1.1` | MIT | Unit and integration test runner |
 | `pytest-mock` | `3.16.0` | `pytest-mock>=3.16.0` | MIT | Thin wrapper around the mock package for pytest |
-| `pytest-qt` | `4.5.0` | `pytest-qt==4.5.0` | Unknown | Dev dependency |
+| `pytest-qt` | `4.5.0` | `pytest-qt==4.5.0` | MIT | Pytest plugin for Qt widget and event-loop testing |
 | `ruff` | `0.16.10` | `ruff>=0.16.10` | MIT / Apache-2.0 | Fast Rust-based Python linter and formatter |
 
 ---
@@ -67,7 +67,7 @@ The following 22 transitive dependencies are pulled by direct runtime and dev pa
 | `pyside6-essentials` | `6.12.0` | `pyside6`, `pyside6-addons`, `pyside6-pdf` | Unknown |
 | `pyside6-pdf` | `6.12.0.140` | `pyside6` | Unknown |
 | `pyside6-webengine` | `6.12.0.140` | `pyside6` | Unknown |
-| `shiboken6` | `6.12.0` | `pyside6-essentials` | Unknown |
+| `shiboken6` | `6.12.0` | `pyside6-essentials` | LGPL-3.0 |
 | `tinycss2` | `1.5.1` | `cairosvg`, `cssselect2` | BSD-3-Clause |
 | `typing-extensions` | `4.16.0` | `mypy`, `pytest-qt` | Python-2.0 |
 | `webencodings` | `0.6.1` | `cssselect2`, `tinycss2` | BSD-3-Clause |

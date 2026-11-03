@@ -1,20 +1,27 @@
-# Handoff & Product Roadmap — FPS Patcher Studio (`v0.5.1` ➔ `v1.0.0`)
+# Handoff & Product Roadmap — FPS Patcher Studio (`v0.5.1` ➔ `v1.2.0`)
 
 **Generated**: 2026-10-24  
 **Repository**: `https://github.com/x1Swimzft/FPS-Patcher-Studio`  
 **Workspace**: `E:\Project\fps-patcher-studio`  
-**Current Base Version**: `v1.0.0` (2026-10-25)
+**Current Base Version**: `v1.2.0` (2026-11-01)
 
-> **Status at v1.0.0:** Qt is the only UI. Phase 2 (watch folder, Explorer verb,
-> Rec.709 color guard, metadata scrub) and Phase 3 (platform profiles + readiness)
-> shipped on the Qt line. The headless CLI (4.2) is delivered. Nuitka (4.1) was
-> evaluated but **not adopted**: see `docs/NUITKA_EVALUATION.md` for the checklist
-> and why no build was measured in this environment. The v0.5.1 Tk analysis below
-> is kept as history and no longer describes the code.
+> **Status at v1.2.0:** Qt (PySide6) is the only UI; the Tk/CustomTkinter UI is
+> gone. Phase 1 shipped in v0.6.0 and still lives in `core/preflight.py`,
+> `core/patcher.py` and `core/updater.py` — no rewrite is needed. Phase 2 (watch
+> folder, Explorer verb, Rec.709 color guard, metadata scrub) and Phase 3
+> (platform profiles + readiness) are delivered, and the headless CLI (4.2) is
+> live. Nuitka (4.1) was evaluated but **not adopted**: see
+> `docs/NUITKA_EVALUATION.md` for the checklist and why no build was measured in
+> this environment. The v1.2.0 release is published but **unsigned**. The v0.5.1
+> Tk analysis below is kept as history and no longer describes the code.
 
 ---
 
-## 🛠️ Urgent Bug Fix (`v0.5.1`): หน้าจอดำแล้วค่อยๆ วาดทีละเมนูเวลาพับจอ (Minimize / Restore / Alt+Tab)
+## 🗄️ Historical (`v0.5.1`): หน้าจอดำแล้วค่อยๆ วาดทีละเมนูเวลาพับจอ (Minimize / Restore / Alt+Tab)
+
+> **History only.** This section describes the removed Tk/CustomTkinter UI and is
+> kept for the record. It no longer matches `src/fps_patcher/ui_qt/`; do not use
+> these file paths or fixes as current guidance.
 
 ### 1. วิเคราะห์สาเหตุ (Root Cause Analysis)
 จากภาพหน้าจอที่เกิดอาการพื้นหลังดำสนิท เห็นแค่แถบสีน้ำเงินบางส่วนแล้วค่อยๆ วาด Widget ทีละชิ้นเมื่อพับจอไปมา เกิดจากจุดอ่อนของ **Tkinter / CustomTkinter บน Windows 10/11 (DWM)** ร่วมกับโค้ดใน `src/fps_patcher/ui/theme.py` และ `src/fps_patcher/ui/main_window.py` ดังนี้:
@@ -76,20 +83,25 @@ When minimizing, restoring, maximizing, or Alt-Tabbing back to `FPS Patcher Stud
 
 ## 🗺️ Master Product Roadmap by Phase (Handoff Reference)
 
-บันทึกแผนงานสำหรับพัฒนาต่อเนื่องในอนาคต แบ่งเป็น 4 เฟสชัดเจน:
+บันทึกแผนงานสำหรับพัฒนาต่อเนื่องในอนาคต แบ่งเป็น 5 เฟสชัดเจน:
 
 ### Phase 1: `v0.6.0` — Smart Pre-Flight & One-Click Auto-Fix
+**สถานะ**: ✅ ส่งมอบแล้วตั้งแต่ `v0.6.0` และยังใช้งานอยู่ใน `v1.2.0` — **ไม่ต้อง rewrite**
+ของเดิมเป็นเพียงเอกสารแผน; โค้ดจริงคือ `src/fps_patcher/core/preflight.py`,
+`src/fps_patcher/core/patcher.py` และ `src/fps_patcher/core/updater.py`
+
 **เป้าหมาย**: แก้ปัญหาผู้ใช้ตั้งค่าไฟล์ต้นฉบับมาผิด (เช่น เสียงเป็น PCM จาก `.mov` หรือ Bitrate สูงเกินจนมือถือหมุน) ให้แอปซ่อมให้อัตโนมัติ
 
-- **1.1 Smart Audio Auto-Normalizer (`src/fps_patcher/core/ffmpeg_runner.py` & `patcher.py`)**:
+- **1.1 Smart Audio Auto-Normalizer (`src/fps_patcher/core/preflight.py`, เรียกจาก `core/patcher.py`)**:
   - หากตรวจพบแทร็กเสียงที่ไม่ใช่ `AAC-LC 48000Hz Stereo` (เช่น `pcm_s16le`, `alac`, `mp3`) ให้รัน FFmpeg แปลงเฉพาะเสียง (`-c:v copy -c:a aac -ar 48000 -ac 2 -b:a 192k`) อัตโนมัติก่อนทำ X1T Patch
-- **1.2 Smart Bitrate Limiter (GPU Hardware Encode Fallback)**:
-  - เพิ่มตัวเลือก **"Auto-Cap Bitrate for Mobile (<18 Mbps)"** เมื่อตรวจพบวิดีโอต้นฉบับที่มี Bitrate สูงเกิน 25 Mbps โดยใช้ `h264_nvenc` / `h264_amf` / `h264_qsv` บีบอัดอย่างรวดเร็วแล้วตามด้วย X1T Bypass
+- **1.2 Smart Bitrate Limiter (`src/fps_patcher/core/preflight.py`)**:
+  - ตั้งเป้าได้ด้วย `bitrate_target_mbps` (1-24 Mbps, ค่าเริ่มต้น 16) และ cap เฉพาะเมื่อต้นฉบับสูงกว่าเป้า; ต้นฉบับที่ต่ำกว่าหรือเท่ากับเป้ายัง copy แบบ lossless
+  - ใช้ `h264_nvenc` / `h264_amf` / `h264_qsv` ก่อน แล้ว fallback เป็น `libx264`; v1.1.0 เพิ่ม `-hwaccel d3d11va` พร้อม fallback สำหรับต้นฉบับ AV1 ที่บิตเรตสูง
 - **1.3 In-App Auto-Updater (`src/fps_patcher/core/updater.py`)**:
   - เช็กเวอร์ชันล่าสุดผ่าน GitHub Releases API (`https://api.github.com/repos/x1Swimzft/FPS-Patcher-Studio/releases/latest`)
-  - แสดงปุ่มอัปเดตบน Toolbar เมื่อมีเวอร์ชันใหม่ ดาวน์โหลดและรันตัวติดตั้งให้อัตโนมัติ
+  - แสดงปุ่มอัปเดตบน Toolbar เมื่อมีเวอร์ชันใหม่ และตั้งแต่ v1.2.0 จะเปิด dialog อัตโนมัติเมื่อเริ่มโปรแกรม โดยยังถามยืนยันก่อนดาวน์โหลด/ติดตั้ง
 - **1.4 Save Roadmap Handoff to Project Docs**:
-  - บันทึกไฟล์นี้ไว้ที่ `docs/ROADMAP.md` ในโปรเจกต์
+  - บันทึกไฟล์นี้ไว้ที่ `docs/ROADMAP.md` ในโปรเจกต์ (เสร็จแล้ว)
 
 ---
 
@@ -136,3 +148,20 @@ When minimizing, restoring, maximizing, or Alt-Tabbing back to `FPS Patcher Stud
   - **ยังไม่เปิดใช้**: ยังไม่มี MSVC ในเครื่องนี้ จึงไม่มีตัวเลขขนาด/เวลาเปิดโปรแกรม/VirusTotal ที่วัดจริง และไม่มีการอ้าง 0/70 — การแก้ปัญหา false positive ที่แท้จริงคือ Authenticode signing
 - **4.2 Full CLI Interface**:
   - `FPSPatcherStudio.exe --cli patch|probe|score` พร้อม `--json`, exit codes 0/1/2/130, ไม่ import Qt, และต่อ console ของ parent ได้ใน frozen windowed build
+
+---
+
+### Phase 5: Post-`v1.2.0` — Release Hardening & Signing
+**สถานะ**: 🔄 บางส่วนเสร็จแล้ว · รอ manual QA และ SignPath
+
+- **5.1 SBOM automation — ✅ เสร็จแล้ว**:
+  - `build/release.ps1` มี step `sbom` เรียก `tools/generate_sbom.py` และเขียน `release/FPSPatcherStudio-v<version>.cdx.json` ก่อนสร้าง checksum manifest เพื่อให้ JSON manifest บันทึก `sbom_path`
+  - `.github/workflows/release.yml` ก็รัน `tools/generate_sbom.py` ก่อน `build/release.ps1` และอัปโหลด `release/*.cdx.json` เป็น artifact
+  - SBOM ของ `v1.2.0` ถูกแนบย้อนหลังเข้า GitHub Release แล้ว (2026-11-03, `FPSPatcherStudio-v1.2.0.cdx.json`) และ checksum ตรงกับไฟล์ที่อัปโหลด
+- **5.2 Manual QA sign-off สำหรับ `v1.2.0` — ⏳ ยังไม่ได้ตรวจ**:
+  - ใช้ `docs/handoff/manual-test-v1.0.1.md` รวม section 9 “v1.2.0 additions (not executed)” ซึ่งครอบคลุม bitrate pill, Inspector Bitrate, ช่วง 1-24 Mbps, พฤติกรรม auto-cap และ startup update prompt
+  - ห้ามลง PASS จาก code inspection; ต้องมีคนรันจริงและบันทึกผล/artifact/SHA-256 ใน sign-off table
+- **5.3 SignPath code signing — ⛔ ยังไม่เปิดใช้ (blocked)**:
+  - `v1.2.0` ที่เผยแพร่ยังเป็น **unsigned**; Windows SmartScreen อาจขึ้น “Unknown publisher”
+  - ต้องรอ owner สมัคร/ได้รับอนุมัติ SignPath, สร้าง project และตั้งค่า `SIGNPATH_ENABLED=true`, `SIGNPATH_ORG_ID` และ secret `SIGNPATH_API_TOKEN` ตาม `docs/CODE_SIGNING_SIGNPATH.md`
+  - ห้ามเขียนเอกสารหรือประกาศว่า signed จนกว่า workflow จะสร้าง artifact ที่มีลายเซ็นจริงและตรวจด้วย `Get-AuthenticodeSignature` แล้ว

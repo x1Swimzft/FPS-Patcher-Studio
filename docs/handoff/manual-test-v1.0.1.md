@@ -5,14 +5,18 @@ A human tester must run the steps and record PASS, FAIL or N/A plus notes.
 Do not mark an item PASS from code inspection alone.
 
 - **Branch:** `fix/v1.0.1`
-- **Version under test:** metadata is still `1.0.0` until release approval; record the
-  actual artifact name and SHA-256 below.
+- **Version under test:** the earlier sections were written for v1.0.1; the
+  published `1.2.0` build adds the items in section 9. Record the actual artifact
+  name and SHA-256 below for the build you test; do not assume older metadata.
 - **Scope:** the seven runtime settings wired in v1.0.1, two-stage Ctrl+C, updater
-  response cleanup, readiness-label localization, and the v1.0.1 documentation fixes.
+  response cleanup, readiness-label localization, the v1.0.1 documentation fixes,
+  and the v1.2.0 bitrate-plan/target and startup-update items in section 9.
 - **Reference tests:** `tests/test_settings_wired.py`,
   `tests/test_preflight_and_updater.py`, `tests/test_platform_profiles.py`,
-  `tests/test_cli.py` and `tests/test_ffmpeg_lifecycle.py` (automated coverage; not a
-  substitute for these steps).
+  `tests/test_cli.py`, `tests/test_ffmpeg_lifecycle.py`,
+  `tests/test_ui_qt_dnd.py`, `tests/test_ui_qt_settings.py`,
+  `tests/test_ui_qt_main_window.py` and `tests/test_settings_v2.py` (automated
+  coverage; not a substitute for these steps).
 
 ## 1. Environment and build provenance
 
@@ -177,3 +181,29 @@ with known metadata.
 
 **Rules:** one result per row; use N/A only when the step cannot run in the test
 environment, and explain why. A row without a result is still **not verified**.
+
+## 9. v1.2.0 additions (not executed)
+
+**Status: ยังไม่ได้ตรวจ (not executed).** These rows were added for v1.2.0 and
+have not been run. Leave every Result cell blank until a human tester records the
+observed outcome. Code inspection is not a result.
+
+Use a clip with a known video bitrate. For the lossless case, either use a source
+whose audio is already AAC-LC 48 kHz stereo or turn `auto_normalize_audio` off so
+the audio pass cannot be mistaken for the video path.
+
+| # | Step | Expected | Result | Notes |
+|---|---|---|---|---|
+| V1 | With `auto_cap_bitrate` off, add/probe a clip and read its queue row. | The bitrate pill shows the source bitrate only; no `→` target. | | |
+| V2 | Enable `auto_cap_bitrate`, set the target below the clip's source bitrate, re-probe or refresh the row. | The bitrate pill shows `source → target` in Mbps, and the target matches the configured value. | | |
+| V3 | Keep auto-cap on, use a clip at or below the target, and read its queue row. | The bitrate pill shows the source bitrate only; the arrow is absent because no cap applies. | | |
+| V4 | Select each clip and inspect the Inspector **Bitrate** field. | The field is read-only and matches the row: source only, or `source → target` when the cap applies. A clip without bitrate data shows `—`. | | |
+| V5 | Open Settings → Patching → Smart Pre-Flight and inspect the target control. | Range is 1–24 Mbps with step 1 and default 16. The control is disabled when auto-cap is off and enabled when it is on. | | |
+| V6 | With auto-cap on and the target below the source, patch the clip; check the console and output metadata. | Preflight reports a bitrate cap at the selected target; the output video is H.264 at approximately that rate; the original source file is unchanged. | | |
+| V7 | With auto-cap on and a clip at or below the target, patch it; check the console and output. | No bitrate-cap preflight runs for that clip; video is copied losslessly. Audio normalization may still run if the audio needs it. | | |
+| V8 | With `check_updates_on_start` on and a newer release published, launch the app. | The update dialog appears automatically and names the newer version and release notes. It asks before downloading or installing; declining leaves the toolbar update button available. | | |
+| V9 | Disable the network (or block GitHub), keep `check_updates_on_start` on, and launch the app. | No crash, traceback dialog, or blocked UI. The app remains usable; record exactly what, if anything, the update check shows. | | |
+
+**Rules for section 9:** one result per row; do not copy the expected text into
+Result; record the artifact name, SHA-256, Windows build, and scaling in section 8
+when this pass is executed.

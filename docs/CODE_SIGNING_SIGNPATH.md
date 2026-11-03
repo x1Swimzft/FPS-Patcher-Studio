@@ -1,21 +1,21 @@
 # Code signing with SignPath (setup and application guide)
 
-Canonical guide for signing FPS Patcher Studio v1.0.0 Windows release artifacts
+Canonical guide for signing FPS Patcher Studio v1.2.0 Windows release artifacts
 with SignPath Foundation through the GitHub trusted build system.
 
 - Workflow: [`.github/workflows/release.yml`](../.github/workflows/release.yml)
 - Artifact configuration: [`build/signpath-artifact-configuration.xml`](../build/signpath-artifact-configuration.xml)
 - Policy: [`docs/CODE_SIGNING_POLICY.md`](CODE_SIGNING_POLICY.md)
 
-**Status:** v1.0.0 is unsigned. Signing turns on only after the SignPath project
-exists and the repository variables/secret below are set.
+**Status:** v1.2.0 is published and **unsigned**. Signing turns on only after the
+SignPath project exists and the repository variables/secret below are set.
 
 ## 1. What gets signed
 
 | Artifact | Path inside the uploaded artifact ZIP | Signed |
 | --- | --- | --- |
-| Inno Setup installer | `FPSPatcherStudio-v1.0.0-Setup.exe` | yes |
-| Portable app | `FPSPatcherStudio-v1.0.0-win64.zip` → `FPSPatcherStudio/FPSPatcherStudio.exe` | yes |
+| Inno Setup installer | `FPSPatcherStudio-v1.2.0-Setup.exe` | yes |
+| Portable app | `FPSPatcherStudio-v1.2.0-win64.zip` → `FPSPatcherStudio/FPSPatcherStudio.exe` | yes |
 | Checksums, SBOM, manifest | `*.sha256`, `*.cdx.json`, `*.manifest.json` | no (not binaries) |
 
 `actions/upload-artifact@v4` stores the uploaded files in a ZIP, so the root
@@ -48,7 +48,7 @@ Notes:
   `VersionInfoProductName` in `build/installer.iss`).
 - Path separators inside a ZIP may be `/` or `\`; matching is case-insensitive.
 
-## 2. SignPath application answers (v1.0.0)
+## 2. SignPath application answers (v1.2.0)
 
 Submit at <https://signpath.org/apply>. Copy-paste values:
 
@@ -86,9 +86,9 @@ user-chosen folder, and never uploads media. It does not bypass DRM,
 authentication, or platform access controls, and it does not modify the encoded
 H.264/HEVC/AAC bitstream during container-only operations.
 
-Artifacts distributed from GitHub Releases (v1.0.0):
-- FPSPatcherStudio-v1.0.0-Setup.exe (Inno Setup installer)
-- FPSPatcherStudio/FPSPatcherStudio.exe inside FPSPatcherStudio-v1.0.0-win64.zip
+Artifacts distributed from GitHub Releases (v1.2.0):
+- FPSPatcherStudio-v1.2.0-Setup.exe (Inno Setup installer)
+- FPSPatcherStudio/FPSPatcherStudio.exe inside FPSPatcherStudio-v1.2.0-win64.zip
   (portable build)
 
 Builds are produced from the public repository by GitHub Actions
@@ -105,8 +105,8 @@ and heuristic antivirus warnings for PyInstaller-packaged open-source releases.
 **Artifacts to sign**
 
 ```
-FPSPatcherStudio-v1.0.0-Setup.exe
-FPSPatcherStudio/FPSPatcherStudio.exe (inside FPSPatcherStudio-v1.0.0-win64.zip)
+FPSPatcherStudio-v1.2.0-Setup.exe
+FPSPatcherStudio/FPSPatcherStudio.exe (inside FPSPatcherStudio-v1.2.0-win64.zip)
 ```
 
 **Code signing policy URL**
@@ -158,14 +158,15 @@ Unsigned (`SIGNPATH_ENABLED` unset or not `true`):
    fails if it is not found).
 3. Bundles `ffmpeg.exe` + `ffprobe.exe` from the BtbN GPL build into `bin/`
    (unless `BUNDLE_FFMPEG=false`).
-4. Generates `release/FPSPatcherStudio-v1.0.0.cdx.json` *before* the build, so
-   `release.ps1` records `sbom_path` in the JSON manifest.
+4. Generates `release/FPSPatcherStudio-v1.2.0.cdx.json` *before* the build;
+   `release.ps1` also regenerates it, hashes it in the `.sha256` manifest, and
+   records `sbom_path` in the JSON manifest.
 5. Runs `build/release.ps1 -SkipChecks` (pytest already ran; ruff/mypy run in
    `security-audit.yml`).
 6. Uploads `fps-patcher-studio-unsigned-release` with the Setup EXE, portable
    ZIP, `.sha256` sidecars, `.cdx.json` and manifest JSON.
 
-Signed (same as above, plus):
+Signed path (`SIGNPATH_ENABLED=true`, once the project is configured):
 
 7. Submits the uploaded artifact to SignPath and waits for the manual approval.
 8. Removes the pre-signing `.sha256` files and `*.manifest.json` from the signed
@@ -181,7 +182,8 @@ workflow.
 An agent cannot do these:
 
 1. Enable MFA on the GitHub account and on SignPath.
-2. Publish the v1.0.0 GitHub Release (the workflow only uploads artifacts).
+2. Confirm the v1.2.0 GitHub Release is published (the workflow only uploads
+   artifacts).
 3. Trigger the release workflow once and confirm the unsigned artifacts are
    produced.
 4. Submit the application at <https://signpath.org/apply> with the answers above.
@@ -228,8 +230,8 @@ An agent cannot do these:
 After downloading the signed artifact:
 
 ```powershell
-Get-AuthenticodeSignature .\FPSPatcherStudio-v1.0.0-Setup.exe | Format-List *
-Expand-Archive .\FPSPatcherStudio-v1.0.0-win64.zip .\verify
+Get-AuthenticodeSignature .\FPSPatcherStudio-v1.2.0-Setup.exe | Format-List *
+Expand-Archive .\FPSPatcherStudio-v1.2.0-win64.zip .\verify
 Get-AuthenticodeSignature .\verify\FPSPatcherStudio\FPSPatcherStudio.exe | Format-List *
 ```
 
