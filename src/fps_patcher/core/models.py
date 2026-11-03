@@ -73,6 +73,9 @@ class PatchRequest:
     bxd_max_tail_ms: int = 50
     auto_normalize_audio: bool = False
     auto_cap_bitrate: bool = False
+    auto_fix_vfr: bool = False
+    auto_fix_codec: bool = False
+    auto_cap_resolution: bool = False
     bitrate_target_mbps: int = 16
     fix_color_tag: bool = False
     scrub_metadata: bool = False

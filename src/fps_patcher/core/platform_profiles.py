@@ -236,6 +236,22 @@ class ReadinessReport:
         return tuple(c for c in self.checks if c.status == "unknown")
 
 
+# Checks the pre-flight ffmpeg pass can repair by re-encoding the video/audio.
+# Duration, file size, container and HDR need a trim, split, remux or tone-map.
+REMEDIABLE_CHECK_IDS = frozenset(
+    {"audio", "bitrate", "frame_rate", "video_codec", "frame_geometry"}
+)
+
+
+def remediable_checks(report: ReadinessReport) -> tuple[str, ...]:
+    """Failed check IDs that the pre-flight auto-fixes can repair."""
+    return tuple(
+        check.check_id
+        for check in report.failed_checks
+        if check.check_id in REMEDIABLE_CHECK_IDS
+    )
+
+
 def _check(
     check_id: str,
     label: str,

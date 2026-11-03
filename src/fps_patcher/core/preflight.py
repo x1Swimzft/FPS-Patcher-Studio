@@ -21,6 +21,7 @@ from .errors import PatchError
 from .ffmpeg_locator import CREATE_NO_WINDOW, FFmpegPaths
 from .ffmpeg_runner import run_streaming
 from .models import LogEvent, VideoInfo
+from .platform_profiles import PlatformProfile
 
 _OWNER_TOOL = "fps-patcher-studio"
 _OWNER_SUFFIX = ".preflight-owner.json"
@@ -51,10 +52,24 @@ Emit = Callable[[LogEvent], None]
 class PreflightPlan:
     normalize_audio: bool
     cap_bitrate: bool
+    fix_vfr: bool = False
+    transcode_codec: bool = False
+    scale_width: int | None = None
+    scale_height: int | None = None
+
+    @property
+    def needs_video_encode(self) -> bool:
+        return (
+            self.cap_bitrate
+            or self.fix_vfr
+            or self.transcode_codec
+            or self.scale_width is not None
+            or self.scale_height is not None
+        )
 
     @property
     def needed(self) -> bool:
-        return self.normalize_audio or self.cap_bitrate
+        return self.normalize_audio or self.needs_video_encode
 
 
 def needs_audio_normalize(info: VideoInfo) -> bool:
@@ -100,17 +115,54 @@ def planned_output_bitrate(
     return info.bit_rate
 
 
+def _resolution_target(
+    info: VideoInfo, profile: PlatformProfile | None
+) -> tuple[int | None, int | None]:
+    """Target fit box that only shrinks a source exceeding the profile caps."""
+    if profile is None or info.width <= 0 or info.height <= 0:
+        return None, None
+    width, height = info.width, info.height
+    target_w, target_h = width, height
+    capped = False
+    if profile.max_dimension is not None and max(width, height) > profile.max_dimension:
+        target_w = min(target_w, profile.max_dimension)
+        target_h = min(target_h, profile.max_dimension)
+        capped = True
+    if profile.max_short_side is not None and min(width, height) > profile.max_short_side:
+        if width >= height:
+            target_h = min(target_h, profile.max_short_side)
+        else:
+            target_w = min(target_w, profile.max_short_side)
+        capped = True
+    return (target_w, target_h) if capped else (None, None)
+
+
 def make_plan(
     info: VideoInfo,
     *,
     normalize_audio: bool,
     cap_bitrate: bool,
     target_mbps: int = BITRATE_TARGET_MBPS,
+    fix_vfr: bool = False,
+    fix_codec: bool = False,
+    cap_resolution: bool = False,
+    profile: PlatformProfile | None = None,
 ) -> PreflightPlan:
+    scale_width, scale_height = (
+        _resolution_target(info, profile) if cap_resolution else (None, None)
+    )
     return PreflightPlan(
         normalize_audio=normalize_audio and needs_audio_normalize(info),
         cap_bitrate=cap_bitrate
         and needs_bitrate_cap(info, target_bitrate_bps(target_mbps)),
+        fix_vfr=fix_vfr and info.is_vfr,
+        transcode_codec=(
+            fix_codec
+            and profile is not None
+            and (info.codec or "").lower() not in profile.video_codecs
+        ),
+        scale_width=scale_width,
+        scale_height=scale_height,
     )
 
 
@@ -140,6 +192,18 @@ def _video_args(encoder: str | None, target_mbps: int) -> list[str]:
     return args
 
 
+def _scale_filter(plan: PreflightPlan) -> str | None:
+    """Fit inside the plan box without upscaling; aspect ratio is preserved."""
+    if plan.scale_width is None and plan.scale_height is None:
+        return None
+    width = plan.scale_width if plan.scale_width is not None else "iw"
+    height = plan.scale_height if plan.scale_height is not None else "ih"
+    return (
+        f"scale=w='min(iw,{width})':h='min(ih,{height})':"
+        "force_original_aspect_ratio=decrease:force_divisible_by=2"
+    )
+
+
 def build_preflight_args(
     src: Path,
     dst: Path,
@@ -150,8 +214,16 @@ def build_preflight_args(
     bitrate_target_mbps: int = BITRATE_TARGET_MBPS,
 ) -> list[str]:
     """ffmpeg arguments for one pre-flight pass (audio-only or audio+video)."""
-    video_encoder = (encoder or SOFTWARE_ENCODER) if plan.cap_bitrate else None
-    input_args = ["-hwaccel", hwaccel] if hwaccel and plan.cap_bitrate else []
+    # Every video re-encode (bitrate cap, VFR, codec or resolution fix) targets
+    # the configured bitrate: one pass is cheaper than a second quality pass.
+    video_encoder = (encoder or SOFTWARE_ENCODER) if plan.needs_video_encode else None
+    input_args = ["-hwaccel", hwaccel] if hwaccel and plan.needs_video_encode else []
+    video_filter: list[str] = []
+    if plan.fix_vfr:
+        video_filter += ["-fps_mode", "cfr"]
+    scale = _scale_filter(plan)
+    if scale is not None:
+        video_filter += ["-vf", scale]
     return [
         "-hide_banner", "-nostdin", "-y",
         *input_args,
@@ -159,6 +231,7 @@ def build_preflight_args(
         "-map", "0:v:0", "-map", "0:a:0?",
         "-map_metadata", "0",
         *_video_args(video_encoder, bitrate_target_mbps),
+        *video_filter,
         *_audio_args(plan.normalize_audio),
         *extra_args,
         "-progress", "pipe:1",
@@ -382,7 +455,7 @@ def run_preflight(
     released = False
     try:
         attempts: list[tuple[str | None, str | None]]
-        if plan.cap_bitrate:
+        if plan.needs_video_encode:
             encoders = list(encoder_candidates(list_h264_encoders(paths.ffmpeg)))
             attempts = [(HW_DECODER, e) for e in encoders] + [(None, e) for e in encoders]
         else:

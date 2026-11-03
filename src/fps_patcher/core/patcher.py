@@ -33,6 +33,7 @@ from .models import (
     PatchResult,
     ProgressEvent,
 )
+from .platform_profiles import get_profile
 from .preflight import (
     BITRATE_TRIGGER_BPS,
     make_plan,
@@ -303,7 +304,27 @@ def patch(
         normalize_audio=req.auto_normalize_audio,
         cap_bitrate=req.auto_cap_bitrate,
         target_mbps=req.bitrate_target_mbps,
+        fix_vfr=req.auto_fix_vfr,
+        fix_codec=req.auto_fix_codec,
+        cap_resolution=req.auto_cap_resolution,
+        profile=get_profile(req.platform_profile),
     )
+
+    # Re-encoding HDR to 8-bit yuv420p without tone-mapping silently destroys the
+    # HDR signal. Only the new remediation fixes are blocked; a bitrate-only cap
+    # keeps its existing behaviour.
+    hdr_transfer = (before.color_transfer or "").strip().lower()
+    if (
+        plan.needs_video_encode
+        and not plan.cap_bitrate
+        and hdr_transfer in ("smpte2084", "arib-std-b67")
+    ):
+        raise PatchError(
+            "Auto-fix would re-encode an HDR source "
+            f"({hdr_transfer}) to 8-bit SDR. HDR needs tone-mapping, which is not "
+            "auto-fixed; disable the VFR/codec/resolution auto-fixes or tone-map "
+            "the file before patching."
+        )
 
     def on_stdout(line: str) -> None:
         frac = _parse_progress(line, before.duration_s)
@@ -332,10 +353,25 @@ def patch(
                     for n, on in (
                         ("audio -> AAC 48kHz stereo", plan.normalize_audio),
                         (f"bitrate cap ~{req.bitrate_target_mbps} Mbps", plan.cap_bitrate),
+                        ("VFR -> CFR", plan.fix_vfr),
+                        ("codec -> H.264", plan.transcode_codec),
+                        (
+                            f"scale -> {plan.scale_width}x{plan.scale_height}",
+                            plan.scale_width is not None or plan.scale_height is not None,
+                        ),
                     )
                     if on
                 )
                 emit(LogEvent(f"[PREFLIGHT] Auto-fix: {what}", "INFO"))
+                if plan.needs_video_encode:
+                    emit(
+                        LogEvent(
+                            "[PREFLIGHT] WARNING: Lossy video re-encode active "
+                            "(VFR/codec/resolution/bitrate fix). The video stream will "
+                            "be re-encoded to H.264.",
+                            "WARN",
+                        )
+                    )
                 work_src = run_preflight(
                     src,
                     plan,
