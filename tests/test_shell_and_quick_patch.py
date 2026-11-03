@@ -130,11 +130,24 @@ def test_quick_patch_success_runs_headless(
     request = calls["request"]
     assert request.src == clip
     assert request.out_dir == tmp_path
-    assert request.timescale == quick_patch.QUICK_PATCH_TIMESCALE
+    assert request.timescale == 60000
+    assert request.timescale == settings.target_timescale()
     assert request.strategy == settings.strategy
     assert request.fix_color_tag is True
     assert request.scrub_metadata is True
     assert toasts and "complete" in toasts[0]
+
+
+@pytest.mark.parametrize(
+    ("preset", "custom", "expected"),
+    [("120 FPS", 90000, 120000), ("custom", 75000, 75000)],
+)
+def test_quick_patch_uses_saved_target_fps(
+    tmp_path: Path, preset: str, custom: int, expected: int
+) -> None:
+    settings = Settings(last_preset=preset, custom_timescale=custom)
+    request = quick_patch._request(tmp_path / "clip.mp4", settings)
+    assert request.timescale == expected
 
 
 def test_quick_patch_failure_returns_one(

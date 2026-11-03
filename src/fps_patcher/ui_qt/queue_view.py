@@ -68,7 +68,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..app.queue_model import QueueItem
-from ..core.models import FPS_PRESETS, SUPPORTED_EXTENSIONS
+from ..core.models import SUPPORTED_EXTENSIONS
 from ..core.platform_profiles import ReadinessReport, evaluate_readiness
 from ..core.preflight import planned_output_bitrate
 from ..core.strategies import UI_PRESETS, migrate_strategy_name
@@ -1207,13 +1207,7 @@ class QueueView(QWidget):
         return report
 
     def target_timescale(self) -> int:
-        preset = str(getattr(self.settings, "last_preset", "60 FPS"))
-        if preset in FPS_PRESETS:
-            return FPS_PRESETS[preset]
-        try:
-            return int(getattr(self.settings, "custom_timescale", 60000))
-        except (TypeError, ValueError):
-            return 60000
+        return self.settings.target_timescale()
 
     def global_strategy(self) -> str:
         return migrate_strategy_name(str(getattr(self.settings, "strategy", "bxd-mobile")))[0]

@@ -247,6 +247,7 @@ def _cmd_patch(args: argparse.Namespace, settings: Settings) -> int:
                     verify_after=settings.verify_after,
                     backup_original=settings.backup_original,
                     preserve_mtime=settings.preserve_mtime,
+                    mask_diagnostic_paths=settings.mask_diagnostic_paths,
                     extra_ffmpeg_args=settings.extra_ffmpeg_args,
                 )
                 result = patch(

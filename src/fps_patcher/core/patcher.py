@@ -488,6 +488,7 @@ def patch(
                 file_path=src,
                 console_lines=[f"PATCH FAILED ({strategy.label}): {exc}", *list(stderr_tail)],
                 orig_path=src,
+                mask_paths=req.mask_diagnostic_paths,
             )
         except Exception:
             pass
@@ -502,6 +503,7 @@ def patch(
                 file_path=src,
                 console_lines=[f"UNEXPECTED ERROR ({strategy.label}): {exc}", *list(stderr_tail)],
                 orig_path=src,
+                mask_paths=req.mask_diagnostic_paths,
             )
         except Exception:
             pass
@@ -531,6 +533,7 @@ def patch(
             file_path=final,
             console_lines=[f"Preset: {strategy.label}", done_msg],
             orig_path=src,
+            mask_paths=req.mask_diagnostic_paths,
         )
     except Exception:
         pass

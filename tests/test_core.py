@@ -384,3 +384,56 @@ def test_failed_patch_preserves_existing_output(
 
     assert final.read_bytes() == b"PREVIOUS-OUTPUT"
     assert not list(tmp_path.glob("*.part"))
+
+
+@pytest.mark.parametrize(("mask", "expected"), [(False, False), (True, True)])
+def test_patch_diagnostic_log_honors_mask_setting(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mask: bool,
+    expected: bool,
+) -> None:
+    src = tmp_path / "clip.mp4"
+    src.write_bytes(b"x")
+    calls: list[dict[str, object]] = []
+
+    def fake_auto_save(**kwargs: object) -> Path:
+        calls.append(kwargs)
+        return tmp_path / "auto_patch.log"
+
+    monkeypatch.setattr(
+        "fps_patcher.core.diagnostic_logger.auto_save_diagnostic_log", fake_auto_save
+    )
+    monkeypatch.setattr(
+        "fps_patcher.core.patcher.probe",
+        lambda *_a, **_k: VideoInfo(
+            src,
+            "h264",
+            1920,
+            1080,
+            Fraction(60),
+            Fraction(60),
+            1.0,
+            60000,
+            60,
+            False,
+            1,
+        ),
+    )
+    monkeypatch.setattr("fps_patcher.core.patcher.output_path_for", lambda *_a, **_k: src)
+
+    with pytest.raises(PatchError):
+        patch(
+            PatchRequest(
+                src=src,
+                out_dir=tmp_path,
+                timescale=120000,
+                strategy="direct-atom",
+                overwrite=True,
+                mask_diagnostic_paths=mask,
+            ),
+            None,
+            lambda _event: None,
+        )
+
+    assert calls and calls[0]["mask_paths"] is expected

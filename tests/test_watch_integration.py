@@ -11,7 +11,6 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from fps_patcher.app.quick_patch import QUICK_PATCH_TIMESCALE
 from fps_patcher.config import Settings
 from fps_patcher.ui_qt.main_window import MainWindow
 
@@ -48,12 +47,14 @@ class FakeConsole:
         self.lines.append((message, level))
 
 
-def _stub(controller: FakeController, paths: list[Path]) -> Any:
+def _stub(
+    controller: FakeController, paths: list[Path], settings: Settings | None = None
+) -> Any:
     inbox: queue.Queue[Path] = queue.Queue()
     for path in paths:
         inbox.put(path)
     return SimpleNamespace(
-        settings=Settings(),
+        settings=settings or Settings(),
         controller=controller,
         _watch_inbox=inbox,
         _watch_batch_active=False,
@@ -72,10 +73,20 @@ def test_drain_queues_only_watched_paths(tmp_path: Path) -> None:
     assert controller.added == [(watched, False)]
     assert fake.queue_view.refreshes == 1
     (args, kwargs) = controller.started[0]
-    assert args == (QUICK_PATCH_TIMESCALE, fake.settings.strategy)
+    assert args == (fake.settings.target_timescale(), fake.settings.strategy)
     assert kwargs == {"only_selected": False, "only_paths": watched}
     assert fake._watch_batch_active is True
     assert fake._watch_inbox.empty()
+
+
+def test_drain_uses_saved_target_fps(tmp_path: Path) -> None:
+    watched = [tmp_path / "a.mp4"]
+    fake = _stub(FakeController(), watched, Settings(last_preset="120 FPS"))
+
+    MainWindow._drain_watch_inbox(fake)
+
+    args, _kwargs = fake.controller.started[0]
+    assert args == (120000, fake.settings.strategy)
 
 
 def test_drain_is_skipped_while_busy(tmp_path: Path) -> None:

@@ -1,7 +1,7 @@
 """Bridges UI (main thread) and core (worker threads) through a queue.
 
-Tk is not thread-safe: workers only ever ``put`` events; the main thread
-drains the queue via ``drain()`` scheduled with ``after``.
+Qt widgets are not thread-safe: workers only ever ``put`` events; the main
+thread drains the queue via ``drain()`` driven by a ``QTimer`` in ``ui_qt``.
 """
 
 from __future__ import annotations
@@ -429,6 +429,7 @@ class AppController:
                         verify_after=self.settings.verify_after,
                         backup_original=self.settings.backup_original,
                         preserve_mtime=self.settings.preserve_mtime,
+                        mask_diagnostic_paths=self.settings.mask_diagnostic_paths,
                         extra_ffmpeg_args=self.settings.extra_ffmpeg_args,
                     )
 

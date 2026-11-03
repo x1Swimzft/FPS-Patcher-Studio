@@ -27,6 +27,16 @@ def test_filename_template_rendering() -> None:
     assert fallback == "test_60fps"
 
 
+def test_target_timescale_follows_preset_and_custom_value() -> None:
+    assert Settings(last_preset="60 FPS").target_timescale() == 60000
+    assert Settings(last_preset="120 FPS").target_timescale() == 120000
+    assert Settings(last_preset="custom", custom_timescale=75000).target_timescale() == 75000
+    assert Settings(last_preset="custom", custom_timescale=0).target_timescale() == 1
+    broken = Settings(last_preset="custom")
+    broken.custom_timescale = "not-a-number"  # type: ignore[assignment]
+    assert broken.target_timescale() == 60000
+
+
 def test_settings_v2_defaults_and_roundtrip(tmp_path: Path) -> None:
     s = Settings()
     assert s.theme_preset == "Crimson Gamer"

@@ -79,6 +79,7 @@ class PatchRequest:
     verify_after: bool = True
     backup_original: bool = True
     preserve_mtime: bool = True
+    mask_diagnostic_paths: bool = True
     extra_ffmpeg_args: str = ""
 
 

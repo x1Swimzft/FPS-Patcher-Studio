@@ -12,6 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from .core.models import FPS_PRESETS
 from .core.platform_profiles import DEFAULT_PROFILE_ID, PLATFORM_PROFILES
 from .core.preflight import (
     BITRATE_TARGET_MBPS,
@@ -170,6 +171,16 @@ class Settings:
 
     # Transient runtime notice (not persisted)
     migrated_strategy_from: str | None = field(default=None, init=False, repr=False, compare=False)
+
+    def target_timescale(self) -> int:
+        """Timescale for the saved Target FPS preset or custom value."""
+        preset = str(self.last_preset)
+        if preset in FPS_PRESETS:
+            return FPS_PRESETS[preset]
+        try:
+            return max(1, int(self.custom_timescale))
+        except (TypeError, ValueError):
+            return 60000
 
     @classmethod
     def load(cls, path: Path | None = None) -> Settings:

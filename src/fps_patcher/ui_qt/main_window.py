@@ -32,7 +32,6 @@ from .. import APP_NAME, __version__
 from ..app import shell_integration
 from ..app.controller import AppController
 from ..app.queue_model import InputQueue, QueueItem
-from ..app.quick_patch import QUICK_PATCH_TIMESCALE
 from ..app.watcher import FolderWatcher
 from ..config import Settings, app_data_dir
 from ..core.models import (
@@ -574,7 +573,7 @@ class MainWindow(QMainWindow):
         self.console.append(f"Watch folder: patching {len(paths)} file(s)", "INFO")
         self._watch_batch_active = True
         self.controller.start_patch(
-            QUICK_PATCH_TIMESCALE,
+            self.settings.target_timescale(),
             self.settings.strategy,
             only_selected=False,
             only_paths=paths,

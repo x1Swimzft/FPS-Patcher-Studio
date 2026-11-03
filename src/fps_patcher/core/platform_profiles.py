@@ -1,6 +1,6 @@
 """Platform presets and deterministic pre-flight readiness scoring.
 
-This module is deliberately pure: no Tk, no FFmpeg, no network. The profile data
+This module is deliberately pure: no Qt, no FFmpeg, no network. The profile data
 is deterministic offline information; the cited sources are documentation URLs,
 not runtime dependencies. All checks are read-only and never mutate media.
 

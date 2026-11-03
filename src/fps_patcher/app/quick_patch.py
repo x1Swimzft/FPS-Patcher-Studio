@@ -15,8 +15,6 @@ from ..core.models import PatchRequest, PatchResult
 from ..core.notify import toast
 from ..core.patcher import patch
 
-QUICK_PATCH_TIMESCALE = 60000
-
 
 def _ignore(_event: object) -> None:
     return None
@@ -34,7 +32,7 @@ def _request(path: Path, settings: Settings) -> PatchRequest:
     return PatchRequest(
         src=path,
         out_dir=Path(settings.output_dir) if settings.output_dir else path.parent,
-        timescale=QUICK_PATCH_TIMESCALE,
+        timescale=settings.target_timescale(),
         strategy=settings.strategy,
         overwrite=overwrite,
         auto_rename=settings.auto_rename or settings.confirm_overwrite,
@@ -54,6 +52,7 @@ def _request(path: Path, settings: Settings) -> PatchRequest:
         verify_after=settings.verify_after,
         backup_original=settings.backup_original,
         preserve_mtime=settings.preserve_mtime,
+        mask_diagnostic_paths=settings.mask_diagnostic_paths,
         extra_ffmpeg_args=settings.extra_ffmpeg_args,
     )
 
