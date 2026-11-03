@@ -203,6 +203,9 @@ def generate_markdown_report(
     timestamp = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
 
     metadata_known = {
+        "pyside6": ("LGPL-3.0", "Qt for Python desktop UI runtime (Qt widgets, QtCore, QtGui)"),
+        "shiboken6": ("LGPL-3.0", "Python/C++ binding generator runtime required by PySide6"),
+        "pytest-qt": ("MIT", "Pytest plugin for Qt widget and event-loop testing"),
         "pillow": ("HPND / Historical", "Imaging library for icons, thumbs, preview decoding"),
         "cairosvg": ("LGPL-3.0", "SVG icon rasterizer to PNG / high-DPI icons"),
         "mypy": ("MIT", "Static type checker for Python"),

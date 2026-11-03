@@ -10,7 +10,8 @@
      - -Sign: Production Authenticode signing (requires CERT_PFX_PATH and CERT_PASSWORD).
   4. Launch smoke test (exe must stay alive for a few seconds)
   5. release/FPSPatcherStudio-v<version>-win64.zip + .sha256 (+ Setup.exe and manifests)
-  6. Structured JSON release manifest (release/FPSPatcherStudio-v<version>.manifest.json)
+  6. CycloneDX SBOM (release/FPSPatcherStudio-v<version>.cdx.json), hashed in the .sha256 manifest
+  7. Structured JSON release manifest (release/FPSPatcherStudio-v<version>.manifest.json)
   Run from project root:  powershell -ExecutionPolicy Bypass -File build\release.ps1
 .PARAMETER SkipChecks
   Skip ruff, mypy, and pytest gates.
@@ -175,9 +176,16 @@ if ($iscc) {
     Write-Host "Inno Setup not found: skipping installer (zip only)." -ForegroundColor Yellow
 }
 
+# CycloneDX SBOM: generated before the checksum manifest so it is hashed too.
+# The audit report goes to release/ (gitignored) to keep docs/ clean during builds.
+$sbomPath = Join-Path $releaseDir "FPSPatcherStudio-v$version.cdx.json"
+$reportPath = Join-Path $releaseDir "DEPENDENCY_AUDIT_REPORT-v$version.md"
+Step "sbom" { uv run python tools/generate_sbom.py --sbom-out $sbomPath --report-out $reportPath }
+
 # Backward-compatible combined SHA-256 manifest (sha256sum format)
 $manifestSha = Join-Path $releaseDir "FPSPatcherStudio-v$version.sha256"
-Get-ChildItem $releaseDir -File | Where-Object { $_.Name -like "FPSPatcherStudio-v$version-*" -and $_.Extension -ne ".sha256" -and $_.Extension -ne ".json" } |
+# `-*` would miss `FPSPatcherStudio-v<ver>.cdx.json`; exclude only the JSON manifest.
+Get-ChildItem $releaseDir -File | Where-Object { $_.Name -like "FPSPatcherStudio-v$version*" -and $_.Extension -ne ".sha256" -and $_.Name -notlike "*.manifest.json" } |
     ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)" } |
     Set-Content -Path $manifestSha -Encoding ASCII
 Write-Host "sha256 manifest: $manifestSha"
