@@ -77,3 +77,35 @@ def test_legacy_settings_open_with_no_platforms_checked(qtbot: Any, appdata: Pat
 
     assert dialog._draft.export_platforms == []
     assert _checked(dialog) == []
+
+
+def test_overwrite_precheck_covers_every_fanned_out_output(
+    qtbot: Any, monkeypatch: Any, tmp_path: Path
+) -> None:
+    from unittest.mock import MagicMock
+
+    from PySide6.QtWidgets import QMessageBox
+    from qt_support import make_main_window
+
+    window = make_main_window(qtbot, monkeypatch, tmp_path)
+    window.settings.overwrite = True
+    window.settings.confirm_overwrite = True
+    window.settings.export_platforms = ["tiktok", "youtube"]
+    video = tmp_path / "clip.mp4"
+    video.write_bytes(b"x")
+    window.controller.items.add([video])
+    window.controller.items.select_all(True)
+    # Only the second platform's legacy-name output exists.
+    (tmp_path / "clip_ts60000_youtube.mp4").write_bytes(b"old output")
+    start = MagicMock()
+    window.controller.start_patch = start  # type: ignore[method-assign]
+    monkeypatch.setattr(
+        QMessageBox,
+        "question",
+        lambda *_args, **_kwargs: QMessageBox.StandardButton.No,
+    )
+
+    window._start_patch(timescale=60000, strategy="direct-atom")
+
+    assert not start.called
+    window.close()

@@ -33,7 +33,7 @@ from ..app import shell_integration
 from ..app.controller import AppController
 from ..app.queue_model import InputQueue, QueueItem
 from ..app.watcher import FolderWatcher
-from ..config import Settings, app_data_dir
+from ..config import Settings, app_data_dir, platform_export_template
 from ..core.models import (
     SUPPORTED_EXTENSIONS,
     FFmpegDownloadEvent,
@@ -878,19 +878,31 @@ class MainWindow(QMainWindow):
                     if self.settings.output_dir
                     else item.path.parent
                 )
-                base = output_base_for(
-                    PatchRequest(
-                        src=item.path,
-                        out_dir=out_dir,
-                        timescale=item.timescale or effective_timescale,
-                        strategy=item.strategy or effective_strategy,
-                        filename_template=filename_template,
-                        platform_profile=item.platform_profile
-                        or self.settings.platform_profile,
-                    )
+                item_profile = item.platform_profile
+                if item_profile:
+                    targets = [item_profile]
+                elif len(self.settings.export_platforms) > 1:
+                    targets = list(self.settings.export_platforms)
+                else:
+                    targets = [self.settings.platform_profile]
+                template = (
+                    platform_export_template(filename_template)
+                    if len(targets) > 1
+                    else filename_template
                 )
-                if base.exists():
-                    existing += 1
+                for target in targets:
+                    base = output_base_for(
+                        PatchRequest(
+                            src=item.path,
+                            out_dir=out_dir,
+                            timescale=item.timescale or effective_timescale,
+                            strategy=item.strategy or effective_strategy,
+                            filename_template=template,
+                            platform_profile=target,
+                        )
+                    )
+                    if base.exists():
+                        existing += 1
             if existing:
                 answer = QMessageBox.question(
                     self,
