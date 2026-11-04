@@ -31,10 +31,10 @@ DEFAULT_THEME_PRESET = "Crimson Gamer"
 
 THEME_PRESETS = [
     "Crimson Gamer",
-    "Obsidian",
+    "Graphite",
     "Midnight Violet",
     "Emerald Terminal",
-    "Graphite",
+    "Obsidian",
     "Amber Warm",
     "Light",
 ]
@@ -171,6 +171,8 @@ class Settings:
     remember_geometry: bool = True
     geometry: str = ""
     always_on_top: bool = False
+    tray_enabled: bool = True
+    start_with_windows: bool = False
     confirm_cancel: bool = True
     confirm_overwrite: bool = True
     notify_done: str = "none"
@@ -210,7 +212,7 @@ class Settings:
             if not isinstance(raw, dict):
                 return cls()
         except FileNotFoundError:
-            # A genuinely new install gets the Crimson Gamer identity and an
+            # A genuinely new install keeps the Crimson Gamer identity and an
             # opaque window; no settings file is created until the app saves.
             return cls(
                 theme_preset=DEFAULT_THEME_PRESET,
@@ -223,9 +225,10 @@ class Settings:
         known = {f.name for f in fields(cls) if f.init}
         filtered: dict[str, Any] = {k: v for k, v in raw.items() if k in known}
 
-        # v0.9.0 cutover: any pre-cutover file is migrated once. Obsidian was the
-        # old implicit default, and the old 98% window alpha made the whole app
-        # translucent. Keep an explicitly chosen non-Obsidian preset.
+        # v0.9.0 cutover: any pre-cutover file is migrated once. The old
+        # implicit default was Obsidian and the old 98% window alpha made the
+        # whole app translucent; both are replaced by the current default and
+        # an opaque window, while post-cutover files keep their preset.
         raw_migrated = raw.get("qt_v090_migrated", False)
         needs_migration = raw_migrated is not True and str(raw_migrated).lower() not in (
             "1",

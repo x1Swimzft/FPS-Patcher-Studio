@@ -35,11 +35,11 @@ def test_make_theme_font_scale_contract() -> None:
     assert medium.fonts.thai_line_height_extra > 0
 
     small = make_theme(Settings(font_size="S"))
-    assert (small.fonts.body, small.fonts.caption, small.fonts.badge) == (12, 11, 10)
+    assert (small.fonts.body, small.fonts.caption, small.fonts.badge) == (12, 12, 11)
     assert small.fonts.mono == 11
 
     large = make_theme(Settings(font_size="L"))
-    assert (large.fonts.body, large.fonts.caption, large.fonts.badge) == (15, 14, 13)
+    assert (large.fonts.body, large.fonts.caption, large.fonts.badge) == (15, 13, 12)
     assert large.fonts.mono == 13
 
     assert all(scale.thai_line_height_extra > 0 for scale in FONT_SIZE_SCALES.values())

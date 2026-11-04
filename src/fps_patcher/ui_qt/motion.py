@@ -278,7 +278,7 @@ class MotionProgressBar(QProgressBar):
         width = max(10.0, rect.height() * 3.0)
         x = fill.left() + (fill.width() + width) * self._offset - width
         gradient = QLinearGradient(x, 0, x + width, 0)
-        glow = QColor(self._theme.color("accent_light"))
+        glow = QColor(self._theme.color("text"))
         glow.setAlpha(110)
         clear = QColor(glow)
         clear.setAlpha(0)
@@ -372,13 +372,18 @@ class MotionController(QObject):
             }[state]
             return QColor(background), QColor(background), QColor(color("on_accent"))
         if variant == "secondary":
-            background = {
-                "normal": color("surface"),
-                "hover": color("surface_hover"),
-                "pressed": color("surface_raised"),
+            transparent = QColor(_TRANSPARENT)
+            secondary_bg = {
+                "normal": transparent,
+                "hover": QColor(color("surface_hover")),
+                "pressed": QColor(color("surface_raised")),
             }[state]
-            border = color("border_hover") if state == "hover" else color("border")
-            return QColor(background), QColor(border), QColor(color("text"))
+            secondary_border = {
+                "normal": QColor(color("border_control")),
+                "hover": QColor(color("border_focus")),
+                "pressed": QColor(color("border_control")),
+            }[state]
+            return secondary_bg, secondary_border, QColor(color("text"))
         if variant == "ghost":
             ghost_bg = {
                 "normal": QColor(_TRANSPARENT),
@@ -393,10 +398,7 @@ class MotionController(QObject):
                 "hover": QColor(color("surface_hover")),
                 "pressed": QColor(color("surface_raised")),
             }[state]
-            icon_border = (
-                QColor(_TRANSPARENT) if state == "normal" else QColor(color("border"))
-            )
-            return icon_bg, icon_border, QColor(color("text"))
+            return icon_bg, QColor(_TRANSPARENT), QColor(color("text"))
         return None
 
     def _stylesheet(self, background: QColor, border: QColor, text: QColor) -> str:

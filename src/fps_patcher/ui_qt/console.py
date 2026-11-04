@@ -41,7 +41,7 @@ _DIM_PREFIXES = (
     "  lib",
 )
 
-# Console surfaces stay dark in every preset, so use the dark half of each token.
+# Console levels follow the active light/dark half of each token.
 _LEVEL_TOKENS = {
     "INFO": "text",
     "OK": "success",
@@ -128,7 +128,7 @@ class ConsolePanel(QWidget):
             accessible_name=title,
             parent=self._header,
         )
-        self._chevron.setIcon(get_icon("chevron_right", True))
+        self._chevron.setIcon(get_icon("chevron_right", theme.is_dark))
         self._header_layout.addWidget(self._chevron, 0, Qt.AlignmentFlag.AlignVCenter)
 
         self._title = QLabel(title, self._header)
@@ -153,7 +153,7 @@ class ConsolePanel(QWidget):
             accessible_name=t("more_actions", lang),
             parent=self._header,
         )
-        self._more.setIcon(get_icon("more", True))
+        self._more.setIcon(get_icon("more", theme.is_dark))
         self._header_layout.addWidget(self._more, 0, Qt.AlignmentFlag.AlignVCenter)
 
         self.detail = QWidget(self)
@@ -194,8 +194,7 @@ class ConsolePanel(QWidget):
         )
 
     def _console_color(self, token: str) -> str:
-        pair: tuple[str, str] = getattr(self._theme.tokens, token)
-        return pair[1]
+        return self._theme.color(token)
 
     def _mono_font(self, pixel_size: int) -> QFont:
         font = QFont()
@@ -290,7 +289,7 @@ class ConsolePanel(QWidget):
         self._render_all()
 
         chevron = "chevron_down" if self._expanded else "chevron_right"
-        self._chevron.setIcon(get_icon(chevron, True))
+        self._chevron.setIcon(get_icon(chevron, self._theme.is_dark))
         title = t("activity_console", lang)
         self._title.setText(title)
         self._chevron.setToolTip(title)
@@ -429,7 +428,7 @@ class ConsolePanel(QWidget):
             return
         self._expanded = expanded
         self._chevron.setIcon(
-            get_icon("chevron_down" if expanded else "chevron_right", True)
+            get_icon("chevron_down" if expanded else "chevron_right", self._theme.is_dark)
         )
         if expanded:
             self.detail.setVisible(True)
@@ -475,7 +474,7 @@ class ConsolePanel(QWidget):
         self._expanded = expanded
         self.detail.setVisible(expanded)
         self._chevron.setIcon(
-            get_icon("chevron_down" if expanded else "chevron_right", True)
+            get_icon("chevron_down" if expanded else "chevron_right", self._theme.is_dark)
         )
         self.setFixedHeight(self._drawer_height(expanded))
 

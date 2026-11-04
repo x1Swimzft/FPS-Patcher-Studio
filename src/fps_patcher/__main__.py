@@ -43,6 +43,9 @@ def _select_ui(argv: list[str]) -> tuple[bool, list[str]]:
 
 def main(argv: list[str] | None = None) -> None:
     args = list(sys.argv[1:] if argv is None else argv)
+    startup = "--startup" in args
+    if startup:
+        args = [item for item in args if item != "--startup"]
     settings = Settings.load()
     log_to_file = bool(getattr(settings, "log_to_file", True))
     if "--cli" in args:
@@ -82,7 +85,7 @@ def main(argv: list[str] | None = None) -> None:
         )
     from fps_patcher.ui_qt.app import run as run_qt
 
-    raise SystemExit(run_qt(settings))
+    raise SystemExit(run_qt(settings, startup=startup))
 
 
 if __name__ == "__main__":

@@ -77,6 +77,19 @@ def test_dialog_size_and_footer_alignment(qtbot: Any, appdata: Path) -> None:
     assert dialog._ok_btn.geometry().top() == dialog._reset_btn.geometry().top()
 
 
+def test_closing_with_x_restores_previewed_theme(qtbot: Any, appdata: Path) -> None:
+    dialog = _dialog(qtbot, Settings(reduce_motion=True))
+    _show(dialog)
+    original = dialog._theme_manager.theme.tokens.name
+
+    dialog._preset.setCurrentText("Graphite")
+    assert dialog._theme_manager.theme.tokens.name == "Graphite"
+
+    dialog.close()
+
+    assert dialog._theme_manager.theme.tokens.name == original
+
+
 def test_sidebar_search_filters_and_shows_empty_state(qtbot: Any, appdata: Path) -> None:
     dialog = _dialog(qtbot, Settings(reduce_motion=True))
     _show(dialog)
@@ -107,6 +120,7 @@ def test_sidebar_search_filters_and_shows_empty_state(qtbot: Any, appdata: Path)
 def test_seven_preset_swatches_select_and_preview(qtbot: Any, appdata: Path) -> None:
     dialog = _dialog(qtbot, Settings(reduce_motion=True))
     _show(dialog)
+    dialog._select_tab("appearance")
 
     cards = dialog.findChildren(QFrame, "PresetSwatchCard")
     assert len(cards) == 7
@@ -149,12 +163,49 @@ def test_reset_defaults_is_crimson_and_fully_opaque(
     assert settings.window_alpha == 1.0
 
 
-def test_dialog_has_seven_tabs_and_density_control(qtbot: Any, appdata: Path) -> None:
+def test_advanced_sections_start_collapsed_and_search_opens_them(
+    qtbot: Any, appdata: Path
+) -> None:
+    dialog = _dialog(qtbot, Settings(reduce_motion=True))
+    _show(dialog)
+
+    assert dialog._advanced_sections
+    assert all(not section.is_expanded for section in dialog._advanced_sections)
+    assert any(section.isAncestorOf(dialog._fix_vfr) for section in dialog._advanced_sections)
+
+    dialog._open_search_result("output")
+
+    assert all(section.is_expanded for section in dialog._advanced_sections)
+
+
+def test_tray_toggle_roundtrips(qtbot: Any, appdata: Path) -> None:
+    settings = Settings(reduce_motion=True, tray_enabled=True)
+    dialog = _dialog(qtbot, settings)
+
+    dialog._tray_enabled.setChecked(False)
+    dialog._apply()
+
+    assert settings.tray_enabled is False
+    assert Settings.load(appdata / "settings.json").tray_enabled is False
+
+
+def test_windows_startup_toggle_roundtrips(qtbot: Any, appdata: Path) -> None:
+    settings = Settings(reduce_motion=True, start_with_windows=False)
+    dialog = _dialog(qtbot, settings)
+
+    dialog._start_with_windows.setChecked(True)
+    dialog._apply()
+
+    assert settings.start_with_windows is True
+    assert Settings.load(appdata / "settings.json").start_with_windows is True
+
+
+def test_dialog_has_four_tabs_and_density_control(qtbot: Any, appdata: Path) -> None:
     dialog = _dialog(qtbot, Settings(reduce_motion=True))
 
     assert [page[0] for page in dialog._pages] == [key for key, _label in SettingsDialog._TABS]
-    assert len(dialog._pages) == 7
-    assert len(dialog._nav_buttons) == 7
+    assert len(dialog._pages) == 4
+    assert len(dialog._nav_buttons) == 4
     assert dialog._density_labels == ["Compact", "Comfortable"]
     assert dialog._density.value in dialog._density_labels
 

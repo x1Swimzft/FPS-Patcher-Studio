@@ -23,24 +23,24 @@ from fps_patcher.ui_qt.theme import (
 
 HEX_PAIR = re.compile(r"^#[0-9A-Fa-f]{6}$")
 CRIMSON_DARK = {
-    "bg": "#0a0a0f",
-    "surface": "#111118",
-    "surface_raised": "#191923",
-    "surface_hover": "#232334",
-    "border": "#242432",
-    "text": "#ecebf2",
-    "text2": "#c9c8d6",
-    "muted": "#9a99ab",
-    "accent": "#c8283f",
-    "accent_hover": "#d93049",
-    "accent_light": "#ff5a70",
-    "accent_glow": "#ff5a70",
-    "accent_pressed": "#a91f33",
-    "accent_dim": "#2a1119",
-    "accent_dim_border": "#6b1f30",
-    "toolbar_bg": "#0d0d13",
-    "inspector_bg": "#0d0d13",
-    "console_bg": "#07070b",
+    "bg": "#0E0F11",
+    "surface": "#15171A",
+    "surface_raised": "#1C1F23",
+    "surface_hover": "#23262B",
+    "border": "#26292E",
+    "text": "#ECEAE6",
+    "text2": "#B3AFA7",
+    "muted": "#8C8981",
+    "accent": "#D9646B",
+    "accent_hover": "#E27D83",
+    "accent_light": "#331E21",
+    "accent_glow": "#552D30",
+    "accent_pressed": "#B94A52",
+    "accent_dim": "#22181A",
+    "accent_dim_border": "#633337",
+    "toolbar_bg": "#0E0F11",
+    "inspector_bg": "#121417",
+    "console_bg": "#0A0B0C",
 }
 
 
@@ -79,7 +79,7 @@ def test_crimson_dark_profile_is_exact() -> None:
     tokens = PRESETS["Crimson Gamer"]
     for token_name, expected in CRIMSON_DARK.items():
         assert getattr(tokens, token_name)[1] == expected, token_name
-    assert tokens.accent[0] == "#c8283f"
+    assert tokens.accent[0] == "#9B2F3A"
 
 
 def test_density_corner_and_font_scale_values() -> None:
@@ -91,13 +91,13 @@ def test_density_corner_and_font_scale_values() -> None:
     assert (comfortable.outer, comfortable.inner, comfortable.spacing) == (6, 10, 12)
 
     assert (CORNER_RADII["Sharp"].card, CORNER_RADII["Sharp"].control) == (4, 4)
-    assert (CORNER_RADII["Normal"].card, CORNER_RADII["Normal"].control) == (12, 8)
-    assert (CORNER_RADII["Round"].card, CORNER_RADII["Round"].control) == (18, 12)
+    assert (CORNER_RADII["Normal"].card, CORNER_RADII["Normal"].control) == (8, 6)
+    assert (CORNER_RADII["Round"].card, CORNER_RADII["Round"].control) == (12, 8)
 
     for scale, expected in {
-        "S": (12, 11, 10, 11),
+        "S": (12, 12, 11, 11),
         "M": (13, 12, 11, 12),
-        "L": (15, 14, 13, 13),
+        "L": (15, 13, 12, 13),
     }.items():
         fonts = FONT_SIZE_SCALES[scale]
         assert (fonts.body, fonts.caption, fonts.badge, fonts.mono) == expected
@@ -113,13 +113,13 @@ def test_make_theme_resolves_mode_density_metrics_and_preset() -> None:
     assert dark.metrics.window_height == 700
     assert dark.metrics.min_width == 880
     assert dark.metrics.min_height == 600
-    assert dark.metrics.toolbar_height == 44
+    assert dark.metrics.toolbar_height == 48
     assert dark.metrics.inspector_width == 300
-    assert dark.metrics.console_collapsed_height == 36
+    assert dark.metrics.console_collapsed_height == 32
     assert dark.metrics.console_expanded_height == 180
-    assert dark.metrics.icon_button_size == 26
-    assert dark.metrics.primary_height == 36
-    assert (dark.radii.card, dark.radii.control) == (12, 8)
+    assert dark.metrics.icon_button_size == 28
+    assert dark.metrics.primary_height == 44
+    assert (dark.radii.card, dark.radii.control) == (8, 6)
 
     light = make_theme(Settings(appearance="light"))
     assert light.mode == "light"
@@ -208,11 +208,17 @@ def test_build_palette_has_core_and_disabled_roles() -> None:
     theme = make_theme(Settings(theme_preset="Crimson Gamer"))
     palette = build_palette(theme)
 
-    assert palette.color(QPalette.ColorRole.Window).name().lower() == theme.color("bg")
-    assert palette.color(QPalette.ColorRole.Base).name().lower() == theme.color("surface")
-    assert palette.color(QPalette.ColorRole.Highlight).name().lower() == theme.color("accent")
+    assert palette.color(QPalette.ColorRole.Window).name().lower() == theme.color("bg").lower()
+    assert palette.color(QPalette.ColorRole.Base).name().lower() == theme.color("surface").lower()
+    assert (
+        palette.color(QPalette.ColorRole.Highlight).name().lower()
+        == theme.color("accent").lower()
+    )
     disabled = QPalette.ColorGroup.Disabled
-    assert palette.color(disabled, QPalette.ColorRole.Text).name().lower() == theme.color("muted")
+    assert (
+        palette.color(disabled, QPalette.ColorRole.Text).name().lower()
+        == theme.color("muted").lower()
+    )
 
 
 def test_theme_manager_rebuilds_and_notifies() -> None:

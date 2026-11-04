@@ -40,6 +40,8 @@ def test_target_timescale_follows_preset_and_custom_value() -> None:
 def test_settings_v2_defaults_and_roundtrip(tmp_path: Path) -> None:
     s = Settings()
     assert s.theme_preset == "Crimson Gamer"
+    assert s.tray_enabled is True
+    assert s.start_with_windows is False
     assert s.tint_strength == 80
     assert s.window_alpha == 1.0
     assert s.qt_v090_migrated is True
@@ -76,7 +78,7 @@ def test_settings_v2_backward_compatibility_migration(tmp_path: Path) -> None:
     assert loaded.ffmpeg_dir == "C:/ffmpeg"
     assert loaded.output_dir == "D:/out"
     assert loaded.last_preset == "120 FPS"
-    # v0.9.0 cutover migration: legacy Obsidian + 98% alpha become Crimson + opaque.
+    # v0.9.0 cutover migration: legacy translucent settings become Crimson + opaque.
     assert loaded.theme_preset == "Crimson Gamer"
     assert loaded.window_alpha == 1.0
     assert loaded.qt_v090_migrated is True
@@ -143,7 +145,7 @@ def test_localization_strings() -> None:
     assert t("app_title", "en") == "FPS Patcher Studio"
     assert t("app_title", "th") == "FPS Patcher Studio"
     assert t("drop_title", "th") == "ลากไฟล์ MP4 / MOV มาวางที่นี่"
-    assert t("settings_btn", "th") == "⚙ ตั้งค่า"
+    assert t("settings_btn", "th") == "ตั้งค่า"
     # Fallback to English if key missing in Thai
     assert t("only_in_en_fallback", "th") == "only_in_en_fallback"
 

@@ -4,8 +4,27 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from PySide6.QtCore import Property, QPoint, QPropertyAnimation, QRectF, QSize, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QPainter, QPaintEvent, QPen
+from PySide6.QtCore import (
+    Property,
+    QEvent,
+    QObject,
+    QPoint,
+    QPointF,
+    QPropertyAnimation,
+    QRectF,
+    QSize,
+    Qt,
+    Signal,
+)
+from PySide6.QtGui import (
+    QColor,
+    QFont,
+    QPainter,
+    QPaintEvent,
+    QPen,
+    QTextLayout,
+    QTextOption,
+)
 from PySide6.QtWidgets import (
     QAbstractButton,
     QFrame,
@@ -18,7 +37,7 @@ from PySide6.QtWidgets import (
 )
 
 from .icons import get_icon
-from .motion import animate
+from .motion import animate, fade_in
 from .theme import Theme
 
 
@@ -120,7 +139,7 @@ class Card(QFrame):
 
 
 class InsetRow(QWidget):
-    """A 32px inset-grouped row: label on the left, value/popup on the right."""
+    """An inset-grouped row: label on the left, value/popup on the right."""
 
     def __init__(
         self,
@@ -141,7 +160,8 @@ class InsetRow(QWidget):
         self.right = right
         if right is not None:
             layout.addWidget(right, 0, Qt.AlignmentFlag.AlignVCenter)
-        self.setFixedHeight(32)
+        # Tall enough for Thai line boxes at the L scale without wasting space.
+        self.setFixedHeight(max(34, theme.fonts.body + 21))
         self._line = hairline(theme)
         self._line.setParent(self)
         self._line.setGeometry(0, 31, self.width(), 1)
@@ -199,6 +219,202 @@ class CardGroup(QWidget):
             row.set_theme(theme)
 
 
+class CollapsibleSection(QFrame):
+    """Card with a clickable header and a body that fades in on expand."""
+
+    toggled = Signal(bool)
+
+    def __init__(
+        self,
+        title: str,
+        theme: Theme,
+        *,
+        expanded: bool = False,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.setObjectName("Card")
+        self._theme = theme
+        self._expanded = bool(expanded)
+        self.reduce_motion = False
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        self.header = QPushButton(title, self)
+        self.header.setObjectName("SectionHeader")
+        self.header.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.header.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.header.setIconSize(QSize(12, 12))
+        self.header.clicked.connect(self.toggle)
+        layout.addWidget(self.header)
+
+        self.body = QWidget(self)
+        self.body_layout = QVBoxLayout(self.body)
+        self.body_layout.setContentsMargins(
+            theme.inner, theme.outer, theme.inner, theme.outer
+        )
+        self.body_layout.setSpacing(theme.outer)
+        layout.addWidget(self.body)
+        self.set_theme(theme)
+
+    @property
+    def is_expanded(self) -> bool:
+        return self._expanded
+
+    def toggle(self) -> None:
+        self.set_expanded(not self._expanded)
+
+    def set_expanded(self, expanded: bool, *, emit: bool = True) -> None:
+        expanded = bool(expanded)
+        changed = expanded != self._expanded
+        self._expanded = expanded
+        self._sync(animate=changed)
+        if changed and emit:
+            self.toggled.emit(expanded)
+
+    def set_reduce_motion(self, enabled: bool) -> None:
+        self.reduce_motion = bool(enabled)
+
+    def _sync(self, *, animate: bool = False) -> None:
+        self.body.setVisible(self._expanded)
+        if self._expanded and animate:
+            fade_in(self.body, 160, self.reduce_motion)
+        self.header.setProperty("expanded", "true" if self._expanded else "false")
+        self.header.setIcon(
+            get_icon(
+                "chevron_down" if self._expanded else "chevron_right",
+                self._theme.is_dark,
+            )
+        )
+        repolish(self.header)
+
+    def set_theme(self, theme: Theme) -> None:
+        self._theme = theme
+        self.setStyleSheet(
+            "QFrame#Card {"
+            f"background: {theme.color('surface')};"
+            f"border: 1px solid {theme.color('border')};"
+            f"border-radius: {theme.card_radius}px;"
+            "}"
+        )
+        self._sync()
+
+
+class SettingRow(QWidget):
+    """Label and optional hint on the left, one control on the right."""
+
+    def __init__(
+        self,
+        label: str,
+        theme: Theme,
+        control: QWidget | None = None,
+        *,
+        hint: str = "",
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self._theme = theme
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(theme.inner, theme.outer, theme.inner, theme.outer)
+        layout.setSpacing(theme.spacing)
+
+        text = QVBoxLayout()
+        text.setContentsMargins(0, 0, 0, 0)
+        text.setSpacing(2)
+        self.label = QLabel(label, self)
+        self.label.setWordWrap(True)
+        self.hint = QLabel(hint, self)
+        self.hint.setProperty("role", "muted")
+        self.hint.setWordWrap(True)
+        self.hint.setVisible(bool(hint))
+        text.addWidget(self.label)
+        text.addWidget(self.hint)
+        layout.addLayout(text, 1)
+
+        self.control = control
+        if control is not None:
+            layout.addWidget(control, 0, Qt.AlignmentFlag.AlignVCenter)
+            self.label.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.label.installEventFilter(self)
+
+        self.setMinimumHeight(max(40, theme.fonts.body + 26))
+        self._line = hairline(theme)
+        self._line.setParent(self)
+        self._line.setGeometry(0, self.height() - 1, self.width(), 1)
+        self._line.show()
+        self.set_theme(theme)
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        if (
+            watched is self.label
+            and event.type() == QEvent.Type.MouseButtonRelease
+            and isinstance(self.control, QAbstractButton)
+        ):
+            self.control.click()
+        return super().eventFilter(watched, event)
+
+    def set_last(self, last: bool = True) -> None:
+        self._line.setVisible(not last)
+
+    def resizeEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        super().resizeEvent(event)
+        self._line.setGeometry(0, self.height() - 1, self.width(), 1)
+
+    def set_theme(self, theme: Theme) -> None:
+        self._theme = theme
+        self._line.setStyleSheet(f"background: {theme.color('border')}; border: none;")
+
+
+class ConsequenceBadge(QFrame):
+    """One-line semantic callout for a safety consequence."""
+
+    _TOKENS = {
+        "lossless": "success",
+        "warning": "warn",
+        "danger": "danger",
+        "neutral": "text2",
+    }
+
+    def __init__(
+        self,
+        text: str,
+        kind: str,
+        theme: Theme,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        if kind not in self._TOKENS:
+            raise ValueError(f"unknown consequence kind: {kind!r}")
+        self.kind = kind
+        self.setObjectName("ConsequenceBadge")
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(theme.inner, theme.outer, theme.inner, theme.outer)
+        self.label = WrapLabel(text, self)
+        self.label.setWordWrap(True)
+        layout.addWidget(self.label)
+        self.setAccessibleName(text)
+        self.set_theme(theme)
+
+    def set_theme(self, theme: Theme) -> None:
+        color = theme.color(self._TOKENS[self.kind])
+        tint = QColor(color)
+        tint.setAlphaF(0.10)
+        fill = f"rgba({tint.red()}, {tint.green()}, {tint.blue()}, 0.10)"
+        self.setStyleSheet(
+            "QFrame#ConsequenceBadge {"
+            f"background: {fill};"
+            f"border: 1px solid {color};"
+            f"border-radius: {theme.control_radius}px;"
+            "}"
+            "QLabel {"
+            f"color: {color};"
+            "background: transparent;"
+            "border: none;"
+            "}"
+        )
+
+
 class ElidedLabel(QLabel):
     """Single-line label that elides instead of forcing a wide layout."""
 
@@ -224,6 +440,63 @@ class ElidedLabel(QLabel):
             self._full, Qt.TextElideMode.ElideRight, max(0, self.width())
         )
         painter.drawText(self.rect(), int(self.alignment()), text)
+        painter.end()
+
+
+class WrapLabel(QLabel):
+    """Word-wrapped label that can break long unspaced Thai text."""
+
+    def __init__(self, text: str = "", parent: QWidget | None = None) -> None:
+        super().__init__(text, parent)
+        self.setWordWrap(True)
+        self.setMinimumWidth(1)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+
+    def hasHeightForWidth(self) -> bool:  # noqa: N802 - Qt naming
+        return True
+
+    def _layout(self, width: int) -> QTextLayout:
+        layout = QTextLayout(self.text(), self.font())
+        option = QTextOption()
+        option.setWrapMode(QTextOption.WrapMode.WrapAtWordBoundaryOrAnywhere)
+        layout.setTextOption(option)
+        layout.beginLayout()
+        y = 0.0
+        while True:
+            line = layout.createLine()
+            if not line.isValid():
+                break
+            line.setLineWidth(max(1, width))
+            natural = line.naturalTextWidth()
+            alignment = self.alignment()
+            if alignment & Qt.AlignmentFlag.AlignHCenter:
+                x = (width - natural) / 2
+            elif alignment & Qt.AlignmentFlag.AlignRight:
+                x = width - natural
+            else:
+                x = 0.0
+            line.setPosition(QPointF(x, y))
+            y += line.height()
+        layout.endLayout()
+        return layout
+
+    def heightForWidth(self, width: int) -> int:  # noqa: N802 - Qt naming
+        height = self._layout(width).boundingRect().height()
+        return max(self.fontMetrics().height(), int(round(height)))
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802 - Qt naming
+        return QSize(1, self.fontMetrics().height())
+
+    def sizeHint(self) -> QSize:  # noqa: N802 - Qt naming
+        natural = self.fontMetrics().horizontalAdvance(self.text()) + 2
+        width = min(max(1, natural), 600)
+        return QSize(width, self.heightForWidth(width))
+
+    def paintEvent(self, event: QPaintEvent) -> None:
+        painter = QPainter(self)
+        painter.setPen(self.palette().color(self.foregroundRole()))
+        painter.translate(self.contentsRect().topLeft())
+        self._layout(self.contentsRect().width()).draw(painter, QPointF(0, 0))
         painter.end()
 
 
@@ -330,8 +603,8 @@ class SegmentedControl(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         rect = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
         radius = theme.control_radius
-        painter.setPen(QPen(QColor(theme.color("border")), 1))
-        painter.setBrush(QColor(theme.color("surface_raised")))
+        painter.setPen(QPen(QColor(theme.color("border_control")), 1))
+        painter.setBrush(QColor(theme.color("console_bg")))
         painter.drawRoundedRect(rect, radius, radius)
 
         width = rect.width() / len(self._items)
@@ -341,8 +614,8 @@ class SegmentedControl(QWidget):
             width - 4,
             rect.height() - 4,
         )
-        painter.setPen(QPen(QColor(theme.color("accent_dim_border")), 1))
-        painter.setBrush(QColor(theme.color("accent_dim")))
+        painter.setPen(QPen(QColor(theme.color("border")), 1))
+        painter.setBrush(QColor(theme.color("surface_raised")))
         painter.drawRoundedRect(thumb, max(2, radius - 2), max(2, radius - 2))
 
         font = QFont(self.font())
@@ -351,10 +624,9 @@ class SegmentedControl(QWidget):
         painter.setFont(font)
         for index, item in enumerate(self._items):
             area = QRectF(rect.left() + width * index, rect.top(), width, rect.height())
-            if index == self._index:
-                selected = theme.color("accent") if not theme.is_dark else theme.color("text")
-            else:
-                selected = theme.color("text2")
+            selected = (
+                theme.color("accent") if index == self._index else theme.color("text2")
+            )
             painter.setPen(QColor(selected))
             painter.drawText(area, Qt.AlignmentFlag.AlignCenter, item)
 
@@ -367,15 +639,40 @@ class SegmentedControl(QWidget):
 
 
 class Switch(QAbstractButton):
-    """macOS-style 38x22 toggle switch."""
+    """40x22 toggle switch with a semantic accent track."""
 
     def __init__(self, theme: Theme, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._theme = theme
+        self._offset = 1.0 if self.isChecked() else 0.0
+        self._offset_anim: QPropertyAnimation | None = None
+        self.reduce_motion = False
         self.setCheckable(True)
-        self.setFixedSize(38, 22)
+        self.setFixedSize(40, 22)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.toggled.connect(self._animate_thumb)
+
+    @Property(float)
+    def thumbOffset(self) -> float:  # noqa: N802 - Qt property name
+        return self._offset
+
+    @thumbOffset.setter  # type: ignore[no-redef]
+    def thumbOffset(self, value: float) -> None:  # noqa: N802 - Qt property name
+        self._offset = float(value)
+        self.update()
+
+    def set_reduce_motion(self, enabled: bool) -> None:
+        self.reduce_motion = bool(enabled)
+
+    def _animate_thumb(self, checked: bool) -> None:
+        target = 1.0 if checked else 0.0
+        if self._offset == target:
+            return
+        if self._offset_anim is not None:
+            self._offset_anim.stop()
+            self._offset_anim.deleteLater()
+        self._offset_anim = animate(self, b"thumbOffset", self._offset, target, 140)
 
     def set_theme(self, theme: Theme) -> None:
         self._theme = theme
@@ -383,18 +680,23 @@ class Switch(QAbstractButton):
 
     def paintEvent(self, _event: QPaintEvent) -> None:
         theme = self._theme
+        checked = self.isChecked()
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         track = QRectF(0.5, 0.5, self.width() - 1, self.height() - 1)
-        painter.setPen(QPen(QColor(theme.color("border")), 1))
+        painter.setPen(
+            QPen(QColor(theme.color("accent" if checked else "border_control")), 1)
+        )
         painter.setBrush(
-            QColor(theme.color("accent") if self.isChecked() else theme.color("surface_hover"))
+            QColor(theme.color("accent" if checked else "surface_hover"))
         )
         painter.drawRoundedRect(track, track.height() / 2, track.height() / 2)
         diameter = track.height() - 4
-        x = track.right() - diameter - 2 if self.isChecked() else track.left() + 2
+        x = track.left() + 2 + (track.width() - diameter - 5) * self._offset
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor("#FFFFFF"))
+        painter.setBrush(
+            QColor(theme.color("on_accent" if checked else "text2"))
+        )
         painter.drawEllipse(QRectF(x, track.top() + 2, diameter, diameter))
         if self.hasFocus():
             painter.setPen(QPen(QColor(theme.color("border_focus")), 2))

@@ -74,14 +74,15 @@ class ThemeTokens:
     accent_dim: tuple[str, str] = ("", "")
     accent_dim_border: tuple[str, str] = ("", "")
     on_accent: tuple[str, str] = ("", "")
+    border_control: tuple[str, str] = ("#9A9385", "#6E6A62")
 
     def __post_init__(self) -> None:
         # Derived once at import so every preset has a muted accent fill and a
         # readable foreground for primary buttons.
         if not all(self.accent_dim):
             object.__setattr__(
-                self, "accent_dim", (_mix(self.accent[0], self.bg[0], 0.14),
-                                     _mix(self.accent[1], self.bg[1], 0.14))
+                self, "accent_dim", (_mix(self.accent[0], self.bg[0], 0.10),
+                                     _mix(self.accent[1], self.bg[1], 0.10))
             )
         if not all(self.accent_dim_border):
             object.__setattr__(
@@ -96,190 +97,99 @@ class ThemeTokens:
             )
 
 
+# Neutral surfaces are shared by every preset so a theme changes the accent,
+# not the structure. Every pair is (light, dark).
+_LIGHT_BG = "#F4F1EB"
+_DARK_BG = "#0E0F11"
+
+
+def _preset(
+    name: str,
+    *,
+    accent: tuple[str, str],
+    accent_hover: tuple[str, str],
+    accent_pressed: tuple[str, str],
+) -> ThemeTokens:
+    return ThemeTokens(
+        name=name,
+        bg=(_LIGHT_BG, _DARK_BG),
+        surface=("#FBFAF7", "#15171A"),
+        surface_raised=("#FFFFFF", "#1C1F23"),
+        surface_hover=("#EFEAE0", "#23262B"),
+        surface_drop_hover=(
+            _mix(accent[0], _LIGHT_BG, 0.12),
+            _mix(accent[1], _DARK_BG, 0.12),
+        ),
+        border=("#DCD6CA", "#26292E"),
+        border_hover=("#9A9385", "#6E6A62"),
+        border_focus=accent,
+        text=("#1A1A18", "#ECEAE6"),
+        text2=("#55524C", "#B3AFA7"),
+        muted=("#6E6A62", "#8C8981"),
+        accent=accent,
+        accent_hover=accent_hover,
+        accent_pressed=accent_pressed,
+        accent_light=(
+            _mix(accent[0], _LIGHT_BG, 0.18),
+            _mix(accent[1], _DARK_BG, 0.18),
+        ),
+        accent_glow=(
+            _mix(accent[0], _LIGHT_BG, 0.35),
+            _mix(accent[1], _DARK_BG, 0.35),
+        ),
+        success=("#2F6B49", "#86AE91"),
+        warn=("#8A5A14", "#D6A45F"),
+        danger=("#A33A34", "#D07A73"),
+        console_bg=("#F0ECE4", "#0A0B0C"),
+        console_border=("#DCD6CA", "#26292E"),
+        toolbar_bg=(_LIGHT_BG, _DARK_BG),
+        inspector_bg=("#F7F4EE", "#121417"),
+        border_control=("#9A9385", "#6E6A62"),
+    )
+
+
 PRESETS: dict[str, ThemeTokens] = {
-    "Obsidian": ThemeTokens(
-        name="Obsidian",
-        bg=("#F6F6F8", "#1C1C1F"),
-        surface=("#FFFFFF", "#252529"),
-        surface_raised=("#EAEAEF", "#2E2E33"),
-        surface_hover=("#DFDFE6", "#38383E"),
-        surface_drop_hover=("#EFF6FF", "#1E2638"),
-        border=("#D2D2D7", "#2C2C2E"),
-        border_hover=("#007AFF", "#0A84FF"),
-        border_focus=("#007AFF", "#0A84FF"),
-        text=("#1D1D1F", "#D9D9DC"),
-        text2=("#6E6E73", "#8E8E93"),
-        muted=("#5F5F66", "#9A99AB"),
-        accent=("#007AFF", "#0A84FF"),
-        accent_hover=("#0062CC", "#409CFF"),
-        accent_pressed=("#004FB0", "#0071E3"),
-        accent_light=("#E5F2FF", "#142D4D"),
-        accent_glow=("#B3D7FF", "#0A84FF"),
-        success=("#34C759", "#30D158"),
-        warn=("#FF9500", "#FF9F0A"),
-        danger=("#FF3B30", "#FF453A"),
-        console_bg=("#141417", "#141417"),
-        console_border=("#2C2C2E", "#2C2C2E"),
-        toolbar_bg=("#FAFAFC", "#222226"),
-        inspector_bg=("#EEF0F5", "#18181B"),
+    "Crimson Gamer": _preset(
+        "Crimson Gamer",
+        accent=("#9B2F3A", "#D9646B"),
+        accent_hover=("#84262F", "#E27D83"),
+        accent_pressed=("#6E1E26", "#B94A52"),
     ),
-    "Midnight Violet": ThemeTokens(
-        name="Midnight Violet",
-        bg=("#FAF8FF", "#1A1721"),
-        surface=("#FFFFFF", "#231F2C"),
-        surface_raised=("#F3E8FF", "#2D2738"),
-        surface_hover=("#EDE9FE", "#373045"),
-        surface_drop_hover=("#F3E8FF", "#261E38"),
-        border=("#D2D2D7", "#2C2C2E"),
-        border_hover=("#8B5CF6", "#A78BFA"),
-        border_focus=("#7C3AED", "#C4B5FD"),
-        text=("#1D1D1F", "#D9D9DC"),
-        text2=("#6E6E73", "#8E8E93"),
-        muted=("#5F5F66", "#9A99AB"),
-        accent=("#7C3AED", "#8B5CF6"),
-        accent_hover=("#6D28D9", "#A78BFA"),
-        accent_pressed=("#5B21B6", "#7C3AED"),
-        accent_light=("#F3E8FF", "#2E1065"),
-        accent_glow=("#DDD6FE", "#3B1E6D"),
-        success=("#34C759", "#30D158"),
-        warn=("#FF9500", "#FF9F0A"),
-        danger=("#FF3B30", "#FF453A"),
-        console_bg=("#141417", "#141417"),
-        console_border=("#2C2C2E", "#2C2C2E"),
-        toolbar_bg=("#FCFAFF", "#201C28"),
-        inspector_bg=("#F3EFFC", "#16131C"),
+    "Graphite": _preset(
+        "Graphite",
+        accent=("#3D637F", "#8FB0C9"),
+        accent_hover=("#35536A", "#A3C2D9"),
+        accent_pressed=("#2A4558", "#6F92AB"),
     ),
-    "Emerald Terminal": ThemeTokens(
-        name="Emerald Terminal",
-        bg=("#F0FDF4", "#161E1B"),
-        surface=("#FFFFFF", "#1F2925"),
-        surface_raised=("#DCFCE7", "#283530"),
-        surface_hover=("#BBF7D0", "#32423C"),
-        surface_drop_hover=("#ECFDF5", "#1C2D26"),
-        border=("#D2D2D7", "#2C2C2E"),
-        border_hover=("#10B981", "#34D399"),
-        border_focus=("#059669", "#6EE7B7"),
-        text=("#1D1D1F", "#D9D9DC"),
-        text2=("#6E6E73", "#8E8E93"),
-        muted=("#5F5F66", "#9A99AB"),
-        accent=("#059669", "#10B981"),
-        accent_hover=("#047857", "#34D399"),
-        accent_pressed=("#065F46", "#059669"),
-        accent_light=("#D1FAE5", "#064E3B"),
-        accent_glow=("#A7F3D0", "#0D3A2C"),
-        success=("#34C759", "#30D158"),
-        warn=("#FF9500", "#FF9F0A"),
-        danger=("#FF3B30", "#FF453A"),
-        console_bg=("#141417", "#141417"),
-        console_border=("#2C2C2E", "#2C2C2E"),
-        toolbar_bg=("#F7FEF9", "#1B2420"),
-        inspector_bg=("#E9F9EF", "#131A17"),
+    "Midnight Violet": _preset(
+        "Midnight Violet",
+        accent=("#5B3E9E", "#B7A0E8"),
+        accent_hover=("#4B3285", "#C9B6F2"),
+        accent_pressed=("#3C276C", "#9C82CF"),
     ),
-    "Crimson Gamer": ThemeTokens(
-        name="Crimson Gamer",
-        bg=("#fdf6f7", "#0a0a0f"),
-        surface=("#ffffff", "#111118"),
-        surface_raised=("#fbeaec", "#191923"),
-        surface_hover=("#f6dadd", "#232334"),
-        surface_drop_hover=("#fdf0f2", "#160f1a"),
-        border=("#e6c9cd", "#242432"),
-        border_hover=("#c8283f", "#ff5a70"),
-        border_focus=("#c8283f", "#ff5a70"),
-        text=("#1d1d1f", "#ecebf2"),
-        text2=("#6e6e73", "#c9c8d6"),
-        muted=("#6B555A", "#9a99ab"),
-        accent=("#c8283f", "#c8283f"),
-        accent_hover=("#a91f33", "#d93049"),
-        accent_pressed=("#8b1a2a", "#a91f33"),
-        accent_light=("#fbe4e8", "#ff5a70"),
-        accent_glow=("#e8a6b0", "#ff5a70"),
-        accent_dim=("#fbe4e8", "#2a1119"),
-        accent_dim_border=("#e8a6b0", "#6b1f30"),
-        success=("#34c759", "#30d158"),
-        warn=("#ff9500", "#ff9f0a"),
-        danger=("#ff3b30", "#ff453a"),
-        console_bg=("#141417", "#07070b"),
-        console_border=("#2c2c2e", "#2c2c2e"),
-        toolbar_bg=("#fbf3f4", "#0d0d13"),
-        inspector_bg=("#faecee", "#0d0d13"),
+    "Emerald Terminal": _preset(
+        "Emerald Terminal",
+        accent=("#1F6F63", "#6FB3A8"),
+        accent_hover=("#185A50", "#8BC9BF"),
+        accent_pressed=("#124A42", "#569A90"),
     ),
-    "Graphite": ThemeTokens(
-        name="Graphite",
-        bg=("#F6F6F8", "#1C1C1F"),
-        surface=("#FFFFFF", "#252529"),
-        surface_raised=("#E4E4E7", "#2E2E33"),
-        surface_hover=("#D4D4D8", "#38383E"),
-        surface_drop_hover=("#F4F4F5", "#252529"),
-        border=("#D2D2D7", "#2C2C2E"),
-        border_hover=("#6E6E73", "#8E8E93"),
-        border_focus=("#1D1D1F", "#D9D9DC"),
-        text=("#1D1D1F", "#D9D9DC"),
-        text2=("#6E6E73", "#8E8E93"),
-        muted=("#5F5F66", "#9A99AB"),
-        accent=("#007AFF", "#0A84FF"),
-        accent_hover=("#0062CC", "#409CFF"),
-        accent_pressed=("#004FB0", "#0071E3"),
-        accent_light=("#E5F2FF", "#142D4D"),
-        accent_glow=("#B3D7FF", "#0A84FF"),
-        success=("#34C759", "#30D158"),
-        warn=("#FF9500", "#FF9F0A"),
-        danger=("#FF3B30", "#FF453A"),
-        console_bg=("#141417", "#141417"),
-        console_border=("#2C2C2E", "#2C2C2E"),
-        toolbar_bg=("#FAFAFC", "#222226"),
-        inspector_bg=("#EEF0F5", "#18181B"),
+    "Obsidian": _preset(
+        "Obsidian",
+        accent=("#7A5A24", "#C2A36B"),
+        accent_hover=("#694D1D", "#D2B47C"),
+        accent_pressed=("#563E15", "#A98B55"),
     ),
-    "Amber Warm": ThemeTokens(
-        name="Amber Warm",
-        bg=("#FFFBEB", "#1E1B16"),
-        surface=("#FFFFFF", "#28241D"),
-        surface_raised=("#FEF3C7", "#332E25"),
-        surface_hover=("#FDE68A", "#3E382D"),
-        surface_drop_hover=("#FFFBEB", "#2B251B"),
-        border=("#D2D2D7", "#2C2C2E"),
-        border_hover=("#FF9500", "#FF9F0A"),
-        border_focus=("#FF9500", "#FF9F0A"),
-        text=("#1D1D1F", "#D9D9DC"),
-        text2=("#6E6E73", "#8E8E93"),
-        muted=("#5F5F66", "#9A99AB"),
-        accent=("#FF9500", "#FF9F0A"),
-        accent_hover=("#E08500", "#FFB340"),
-        accent_pressed=("#C67600", "#FF9500"),
-        accent_light=("#FEF3C7", "#451A03"),
-        accent_glow=("#FDE68A", "#422808"),
-        success=("#34C759", "#30D158"),
-        warn=("#FF9500", "#FF9F0A"),
-        danger=("#FF3B30", "#FF453A"),
-        console_bg=("#141417", "#141417"),
-        console_border=("#2C2C2E", "#2C2C2E"),
-        toolbar_bg=("#FFFDF5", "#24201A"),
-        inspector_bg=("#FAF3DC", "#191612"),
+    "Amber Warm": _preset(
+        "Amber Warm",
+        accent=("#8A5A14", "#D9A441"),
+        accent_hover=("#744A10", "#E8B85C"),
+        accent_pressed=("#5E3B0C", "#B9872E"),
     ),
-    "Light": ThemeTokens(
-        name="Light",
-        bg=("#F6F6F8", "#1C1C1F"),
-        surface=("#FFFFFF", "#252529"),
-        surface_raised=("#EAEAEF", "#2E2E33"),
-        surface_hover=("#DFDFE6", "#38383E"),
-        surface_drop_hover=("#EFF6FF", "#1E2638"),
-        border=("#D2D2D7", "#2C2C2E"),
-        border_hover=("#007AFF", "#0A84FF"),
-        border_focus=("#007AFF", "#0A84FF"),
-        text=("#1D1D1F", "#D9D9DC"),
-        text2=("#6E6E73", "#8E8E93"),
-        muted=("#5F5F66", "#9A99AB"),
-        accent=("#007AFF", "#0A84FF"),
-        accent_hover=("#0062CC", "#409CFF"),
-        accent_pressed=("#004FB0", "#0071E3"),
-        accent_light=("#E5F2FF", "#142D4D"),
-        accent_glow=("#B3D7FF", "#0A84FF"),
-        success=("#34C759", "#30D158"),
-        warn=("#FF9500", "#FF9F0A"),
-        danger=("#FF3B30", "#FF453A"),
-        console_bg=("#141417", "#141417"),
-        console_border=("#2C2C2E", "#2C2C2E"),
-        toolbar_bg=("#FAFAFC", "#222226"),
-        inspector_bg=("#EEF0F5", "#18181B"),
+    "Light": _preset(
+        "Light",
+        accent=("#4A4E54", "#B9BDC4"),
+        accent_hover=("#3D4147", "#CDD1D8"),
+        accent_pressed=("#303338", "#9FA4AC"),
     ),
 }
 
@@ -310,21 +220,20 @@ class Metrics:
     window_height: int = 700
     min_width: int = 880
     min_height: int = 600
-    toolbar_height: int = 44
+    toolbar_height: int = 48
     inspector_width: int = 300
-    console_collapsed_height: int = 36
+    console_collapsed_height: int = 32
     console_expanded_height: int = 180
-    button_height: int = 26
-    icon_button_size: int = 26
-    segmented_height: int = 30
-    entry_height: int = 28
-    combo_height: int = 28
-    primary_height: int = 36
-    secondary_height: int = 28
+    button_height: int = 30
+    icon_button_size: int = 28
+    segmented_height: int = 32
+    entry_height: int = 30
+    combo_height: int = 30
+    primary_height: int = 44
+    secondary_height: int = 30
     indicator_size: int = 16
-    scrollbar_thickness: int = 10
-    progress_height: int = 6
-
+    scrollbar_thickness: int = 8
+    progress_height: int = 4
 
 @dataclass(frozen=True)
 class Radii:
@@ -334,11 +243,12 @@ class Radii:
 
 CORNER_RADII: dict[str, Radii] = {
     "Sharp": Radii(card=4, control=4),
-    "Normal": Radii(card=12, control=8),
-    "Round": Radii(card=18, control=12),
+    "Normal": Radii(card=8, control=6),
+    "Round": Radii(card=12, control=8),
 }
 
-RADIUS_PILL = 999
+# Chips are technical tags now; no 999px pills anywhere in the shell.
+RADIUS_PILL = 4
 
 
 @dataclass(frozen=True)
@@ -351,9 +261,9 @@ class FontSizes:
 
 
 FONT_SIZE_SCALES: dict[str, FontSizes] = {
-    "S": FontSizes(body=12, caption=11, badge=10, mono=11),
+    "S": FontSizes(body=12, caption=12, badge=11, mono=11),
     "M": FontSizes(body=13, caption=12, badge=11, mono=12),
-    "L": FontSizes(body=15, caption=14, badge=13, mono=13),
+    "L": FontSizes(body=15, caption=13, badge=12, mono=13),
 }
 
 UI_FONT_FAMILIES = (
@@ -397,6 +307,9 @@ class Theme:
     radii: Radii
     fonts: FontSizes
     appearance: str = "dark"
+    language: str = "en"
+    reduce_motion: bool = False
+    window_alpha: float = 1.0
 
     def color(self, name: str) -> str:
         """Resolve a token name for the current light/dark mode."""
@@ -466,6 +379,9 @@ def make_theme(settings: Settings) -> Theme:
         radii=radii,
         fonts=fonts,
         appearance=settings.appearance,
+        language=settings.language,
+        reduce_motion=bool(settings.reduce_motion),
+        window_alpha=float(settings.window_alpha),
     )
 
 
@@ -485,9 +401,12 @@ class ThemeManager(QObject):
 
     def apply(self, settings: Settings) -> Theme:
         self._settings = settings
-        self._theme = make_theme(settings)
-        self.changed.emit(self._theme)
-        return self._theme
+        theme = make_theme(settings)
+        if theme == self._theme:
+            return theme
+        self._theme = theme
+        self.changed.emit(theme)
+        return theme
 
     def subscribe(self, callback: Callable[[Theme], None]) -> None:
         self.changed.connect(callback)

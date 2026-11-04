@@ -18,12 +18,14 @@ from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut, QShowEvent
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QMainWindow,
     QMenu,
     QMessageBox,
     QPushButton,
+    QSystemTrayIcon,
     QVBoxLayout,
     QWidget,
 )
@@ -32,6 +34,7 @@ from .. import APP_NAME, __version__
 from ..app import shell_integration
 from ..app.controller import AppController
 from ..app.queue_model import InputQueue, QueueItem
+from ..app.startup import set_startup_enabled
 from ..app.watcher import FolderWatcher
 from ..config import Settings, app_data_dir, platform_export_template
 from ..core.models import (
@@ -111,6 +114,9 @@ class MainWindow(QMainWindow):
         self._last_busy: bool | None = None
         self._last_can_patch: bool | None = None
         self._console_expanded = False
+        self._tray: QSystemTrayIcon | None = None
+        self._force_quit = False
+        self._tray_notice_shown = False
 
         self._qt_settings = QSettings("FPSPatcherStudio", "QtUI")
         self._load_queue()
@@ -129,6 +135,8 @@ class MainWindow(QMainWindow):
         self._build_shell()
         self._build_shortcuts()
         self._connect_signals()
+        self._build_tray_menu()
+        self._sync_tray()
 
         self.bridge = ControllerBridge(self.controller, self)
         self._connect_bridge()
@@ -151,6 +159,7 @@ class MainWindow(QMainWindow):
         self._init_ffmpeg()
         self._sync_watcher()
         self._sync_explorer_menu()
+        self._sync_startup()
         self.controller.check_for_updates_background(__version__)
 
         self._watch_timer = QTimer(self)
@@ -201,6 +210,14 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(theme.inner, 0, theme.inner, 0)
         layout.setSpacing(theme.spacing)
 
+        self.brand_bar = QFrame(toolbar)
+        self.brand_bar.setObjectName("BrandBar")
+        self.brand_bar.setFixedSize(3, 18)
+        self.brand_bar.setStyleSheet(
+            f"background: {theme.color('accent')}; border-radius: 1px;"
+        )
+        layout.addWidget(self.brand_bar, 0, Qt.AlignmentFlag.AlignVCenter)
+
         self.title_label = QLabel(t("app_title", lang))
         self.title_label.setProperty("role", "title")
         layout.addWidget(self.title_label, 0, Qt.AlignmentFlag.AlignVCenter)
@@ -222,6 +239,7 @@ class MainWindow(QMainWindow):
             t("forensic_btn", lang),
             theme,
             self._open_forensic,
+            variant="ghost",
             height=theme.button_height,
         )
         layout.addWidget(self.forensic_button, 0, Qt.AlignmentFlag.AlignVCenter)
@@ -230,6 +248,7 @@ class MainWindow(QMainWindow):
             t("history_btn", lang),
             theme,
             self._open_history,
+            variant="ghost",
             height=theme.button_height,
         )
         layout.addWidget(self.history_button, 0, Qt.AlignmentFlag.AlignVCenter)
@@ -238,6 +257,7 @@ class MainWindow(QMainWindow):
             t("open_output_btn", lang),
             theme,
             self._open_output,
+            variant="ghost",
             height=theme.button_height,
         )
         layout.addWidget(self.output_button, 0, Qt.AlignmentFlag.AlignVCenter)
@@ -361,6 +381,9 @@ class MainWindow(QMainWindow):
             get_icon("sun" if theme.is_dark else "moon", theme.is_dark)
         )
         self.settings_button.setIcon(get_icon("settings", theme.is_dark))
+        self.brand_bar.setStyleSheet(
+            f"background: {theme.color('accent')}; border-radius: 1px;"
+        )
         self._set_ffmpeg_state(self._ff_state, self._ff_detail)
         self._update_title_bar()
         self._apply_window_opacity()
@@ -976,6 +999,7 @@ class MainWindow(QMainWindow):
         dialog.applied.connect(self._on_settings_applied)
         dialog.download_requested.connect(self.controller.start_ffmpeg_download)
         dialog.exec()
+        dialog.deleteLater()
 
     def _on_settings_applied(self, applied: object) -> None:
         if isinstance(applied, Settings) and applied is not self.settings:
@@ -986,12 +1010,15 @@ class MainWindow(QMainWindow):
         self.theme_manager.apply(self.settings)
         self._apply_always_on_top()
         self._retranslate()
+        self._sync_tray()
+        self._sync_startup(notify=True)
         self._sync_watcher()
         self._sync_explorer_menu()
         self._init_ffmpeg()
         self.queue_view.refresh()
         self.queue_view.refresh_profile()
         self._sync_focused_item()
+        self.inspector.refresh_settings()
         self.inspector.refresh_readiness()
         self._refresh_readiness()
         if self.isVisible():
@@ -1077,6 +1104,11 @@ class MainWindow(QMainWindow):
         self.theme_button.setAccessibleName(t("toggle_theme_tip", lang))
         self.settings_button.setToolTip(t("settings_btn", lang))
         self.settings_button.setAccessibleName(t("settings_btn", lang))
+        if hasattr(self, "_tray_show_action"):
+            self._tray_show_action.setText(t("tray_show", lang))
+            self._tray_quit_action.setText(t("tray_quit", lang))
+        if self._tray is not None:
+            self._tray.setToolTip(t("app_title", lang))
         self._set_ffmpeg_state(self._ff_state, self._ff_detail)
         if self._update_info is not None:
             self._show_update_button()
@@ -1207,8 +1239,102 @@ class MainWindow(QMainWindow):
                 QMessageBox.critical(self, t("app_title", lang), display)
             self._show_update_button()
 
+    # -------------------------------------------------------------------- tray
+    def _sync_startup(self, notify: bool = False) -> None:
+        if set_startup_enabled(self.settings.start_with_windows):
+            return
+        lang = self.settings.language
+        self.console.append(t("startup_failed", lang), "WARN")
+        if notify:
+            QMessageBox.warning(self, t("app_title", lang), t("startup_failed", lang))
+
+    @property
+    def tray_available(self) -> bool:
+        """True when the tray icon is live, so the window may start hidden."""
+        return self._tray is not None
+
+    def _build_tray_menu(self) -> None:
+        lang = self.settings.language
+        self._tray_menu = QMenu(self)
+        self._tray_show_action = self._tray_menu.addAction(
+            t("tray_show", lang), self._show_from_tray
+        )
+        self._tray_quit_action = self._tray_menu.addAction(
+            t("tray_quit", lang), self._quit_from_tray
+        )
+
+    def _sync_tray(self) -> None:
+        app = QApplication.instance()
+        wanted = bool(self.settings.tray_enabled) and QSystemTrayIcon.isSystemTrayAvailable()
+        if wanted and self._tray is None:
+            icon = self.windowIcon()
+            if icon.isNull() and isinstance(app, QApplication):
+                icon = app.windowIcon()
+            if icon.isNull():
+                icon = get_icon("settings", self.theme.is_dark)
+            self._tray = QSystemTrayIcon(icon, self)
+            self._tray.setToolTip(t("app_title", self.settings.language))
+            self._tray.setContextMenu(self._tray_menu)
+            self._tray.activated.connect(self._on_tray_activated)
+            self._tray.show()
+        elif not wanted and self._tray is not None:
+            self._tray.hide()
+            self._tray.deleteLater()
+            self._tray = None
+        if isinstance(app, QApplication):
+            app.setQuitOnLastWindowClosed(not wanted)
+
+    def _on_tray_activated(self, reason: QSystemTrayIcon.ActivationReason) -> None:
+        if reason in (
+            QSystemTrayIcon.ActivationReason.Trigger,
+            QSystemTrayIcon.ActivationReason.DoubleClick,
+        ):
+            self._show_from_tray()
+
+    def _show_from_tray(self) -> None:
+        if self.isMinimized():
+            self.showNormal()
+        else:
+            self.show()
+        self.raise_()
+        self.activateWindow()
+
+    def _quit_from_tray(self) -> None:
+        self._force_quit = True
+        if self._tray is not None:
+            self._tray.hide()
+        self.close()
+        app = QApplication.instance()
+        if isinstance(app, QApplication):
+            app.quit()
+
     # -------------------------------------------------------------------- close
     def closeEvent(self, event: QCloseEvent) -> None:
+        if (
+            self._tray is not None
+            and self.settings.tray_enabled
+            and not self._force_quit
+        ):
+            self.hide()
+            with contextlib.suppress(OSError):
+                self._save_geometry()
+                self.settings.save()
+                self.controller.items.save(app_data_dir() / "queue.json")
+            if not self._tray_notice_shown:
+                self._tray_notice_shown = True
+                lang = self.settings.language
+                message = t(
+                    "tray_patching" if self._last_busy else "tray_background", lang
+                )
+                with contextlib.suppress(Exception):
+                    self._tray.showMessage(
+                        t("app_title", lang),
+                        message,
+                        QSystemTrayIcon.MessageIcon.Information,
+                        2500,
+                    )
+            event.ignore()
+            return
         self.motion.stop_all()
         self.bridge.stop()
         self._watch_timer.stop()
@@ -1223,4 +1349,9 @@ class MainWindow(QMainWindow):
         except OSError:
             log.exception("Could not persist Qt UI state")
         finally:
+            if self._tray is not None:
+                self._tray.hide()
+            app = QApplication.instance()
+            if isinstance(app, QApplication):
+                app.setQuitOnLastWindowClosed(True)
             event.accept()

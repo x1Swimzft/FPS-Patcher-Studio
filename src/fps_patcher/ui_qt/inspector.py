@@ -45,7 +45,15 @@ from ..ui.strings import readiness_check_label, t
 from .icons import get_icon
 from .motion import MotionProgressBar, animate_height, fade
 from .theme import UI_FONT_FAMILIES, Theme, ThemeManager
-from .widgets import Card, CardGroup, Popover, SegmentedControl, Switch, text_button
+from .widgets import (
+    Card,
+    CardGroup,
+    ConsequenceBadge,
+    Popover,
+    SegmentedControl,
+    Switch,
+    text_button,
+)
 
 CUSTOM_PRESET = "Custom"
 MAX_TIMESCALE = 2_147_483_647
@@ -191,23 +199,22 @@ class Inspector(QWidget):
         # -- Output --------------------------------------------------------
         self.output_group = CardGroup(t("output_lbl", lang), theme)
 
-        self.timescale_field = QLineEdit()
-        self.timescale_field.setReadOnly(True)
-        self.timescale_field.setFixedHeight(theme.entry_height)
-        self.timescale_field.setFixedWidth(112)
-        self.timescale_field.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.timescale_field = QLabel()
+        self.timescale_field.setProperty("role", "value")
+        self.timescale_field.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
         self.timescale_field.setAccessibleName(t("timescale_lbl", lang))
         self.timescale_row = self.output_group.add_row(
             t("timescale_lbl", lang), self.timescale_field
         )
 
-        self.bitrate_field = QLineEdit()
-        self.bitrate_field.setReadOnly(True)
-        self.bitrate_field.setFixedHeight(theme.entry_height)
-        self.bitrate_field.setFixedWidth(210)
-        self.bitrate_field.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.bitrate_field = QLabel("—")
+        self.bitrate_field.setProperty("role", "value")
+        self.bitrate_field.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
         self.bitrate_field.setAccessibleName(t("bitrate_lbl", lang))
-        self.bitrate_field.setText("—")
         self.bitrate_row = self.output_group.add_row(
             t("bitrate_lbl", lang), self.bitrate_field
         )
@@ -332,6 +339,7 @@ class Inspector(QWidget):
         self.override_enable_label.setProperty("role", "caption")
         switch_layout.addWidget(self.override_enable_label, 1)
         self.override_switch = Switch(theme)
+        self.override_switch.set_reduce_motion(bool(self.settings.reduce_motion))
         self.override_switch.setAccessibleName(t("inspector_override_enable", lang))
         self.override_switch.toggled.connect(self._override_toggled)
         switch_layout.addWidget(self.override_switch, 0, Qt.AlignmentFlag.AlignVCenter)
@@ -421,6 +429,20 @@ class Inspector(QWidget):
             height=theme.secondary_height,
         )
         self.cancel_btn.setEnabled(False)
+        self.vfr_badge = ConsequenceBadge(
+            t("inspector_vfr_banner", lang), "warning", theme
+        )
+        self.vfr_badge.setVisible(False)
+        self.lossless_btn = text_button(
+            t("inspector_use_lossless", lang),
+            theme,
+            self._disable_vfr,
+            variant="ghost",
+            height=28,
+        )
+        self.lossless_btn.setVisible(False)
+        footer_layout.addWidget(self.vfr_badge)
+        footer_layout.addWidget(self.lossless_btn)
         footer_layout.addWidget(self.start_btn)
         footer_layout.addWidget(self.cancel_btn)
         root.addWidget(footer)
@@ -544,18 +566,18 @@ QWidget#Inspector QLabel[role="cardCaption"] {{
     font-weight: 600;
 }}
 QWidget#Inspector QLineEdit, QWidget#Inspector QComboBox {{
-    background: {c("surface")};
-    border: 1px solid {c("border")};
+    background: {c("console_bg")};
+    border: 1px solid {c("border_control")};
     border-radius: {control}px;
     color: {c("text")};
     font-size: {body}px;
     padding: 0 {inner}px;
 }}
 QWidget#Inspector QLineEdit {{
-    min-height: {entry}px;
+    min-height: {entry - 2}px;
 }}
 QWidget#Inspector QComboBox {{
-    min-height: {combo}px;
+    min-height: {combo - 2}px;
     padding-right: {inner + spacing}px;
 }}
 QWidget#Inspector QLineEdit:read-only {{
@@ -563,10 +585,20 @@ QWidget#Inspector QLineEdit:read-only {{
     color: {c("text2")};
 }}
 QWidget#Inspector QLineEdit:hover, QWidget#Inspector QComboBox:hover {{
-    border-color: {c("border_hover")};
+    border-color: {c("border_focus")};
 }}
 QWidget#Inspector QLineEdit:focus, QWidget#Inspector QComboBox:focus {{
     border: 2px solid {c("border_focus")};
+    min-height: {entry - 4}px;
+}}
+QWidget#Inspector QPushButton:focus {{
+    min-height: {button - 4}px;
+}}
+QWidget#Inspector QPushButton[variant="primary"]:focus {{
+    min-height: {primary - 4}px;
+}}
+QWidget#Inspector QPushButton[variant="secondary"]:focus {{
+    min-height: {secondary - 4}px;
 }}
 QWidget#Inspector QComboBox::drop-down {{
     border: none;
@@ -583,20 +615,20 @@ QWidget#Inspector QComboBox QAbstractItemView {{
     padding: {outer}px;
 }}
 QWidget#Inspector QPushButton {{
-    background: {c("surface_raised")};
-    border: 1px solid {c("border")};
+    background: transparent;
+    border: 1px solid {c("border_control")};
     border-radius: {control}px;
     color: {c("text")};
     font-size: {body}px;
-    min-height: {button}px;
+    min-height: {button - 2}px;
     padding: 0 {inner}px;
 }}
 QWidget#Inspector QPushButton:hover {{
     background: {c("surface_hover")};
-    border-color: {c("border_hover")};
+    border-color: {c("border_focus")};
 }}
 QWidget#Inspector QPushButton:disabled {{
-    background: {c("surface_raised")};
+    background: transparent;
     border-color: {c("border")};
     color: {c("muted")};
 }}
@@ -605,7 +637,7 @@ QWidget#Inspector QPushButton[variant="primary"] {{
     border: 1px solid {c("accent")};
     color: {c("on_accent")};
     font-weight: 600;
-    min-height: {primary}px;
+    min-height: {primary - 2}px;
 }}
 QWidget#Inspector QPushButton[variant="primary"]:hover {{
     background: {c("accent_hover")};
@@ -617,8 +649,8 @@ QWidget#Inspector QPushButton[variant="primary"]:disabled {{
     color: {c("muted")};
 }}
 QWidget#Inspector QPushButton[variant="secondary"] {{
-    background: {c("surface")};
-    min-height: {secondary}px;
+    background: transparent;
+    min-height: {secondary - 2}px;
 }}
 QWidget#Inspector QPushButton[variant="secondary"]:hover {{
     background: {c("surface_hover")};
@@ -647,8 +679,8 @@ QFrame#WarnCallout QLabel {{
     font-size: {caption}px;
 }}
 QWidget#Inspector QProgressBar {{
-    background: {c("surface_raised")};
-    border: 1px solid {c("border")};
+    background: {c("border")};
+    border: none;
     border-radius: {bar_radius}px;
     max-height: {theme.progress_height}px;
     min-height: {theme.progress_height}px;
@@ -754,9 +786,27 @@ QWidget#Inspector QProgressBar::chunk {{
             self.start_btn.setText(t("start_patch", lang))
             self.cancel_btn.setEnabled(False)
         self.progress_bar.set_busy(self._busy)
+        self.progress_group.setVisible(self._busy)
+        self.cancel_btn.setVisible(self._busy)
+        self._sync_vfr_banner()
         self._sync_override_state()
         self._update_glow()
         self._progress_caption()
+
+    def _sync_vfr_banner(self) -> None:
+        active = bool(self.settings.auto_fix_vfr)
+        self.vfr_badge.setVisible(active)
+        self.lossless_btn.setVisible(active)
+
+    def _disable_vfr(self) -> None:
+        self.settings.auto_fix_vfr = False
+        save = getattr(self.settings, "save_async", None)
+        if callable(save):
+            save()
+        self.refresh_settings()
+
+    def refresh_settings(self) -> None:
+        self._sync_state()
 
     def _progress_caption(self) -> None:
         lang = self._lang()
@@ -897,7 +947,7 @@ QWidget#Inspector QProgressBar::chunk {{
         if self._glow is None:
             return
         phase = float(cast(float, value))
-        color = QColor(self._theme.color("accent_light"))
+        color = QColor(self._theme.color("accent"))
         color.setAlphaF(0.18 + 0.42 * phase)
         self._glow.setColor(color)
         self._glow.setBlurRadius(10.0 + 18.0 * phase)

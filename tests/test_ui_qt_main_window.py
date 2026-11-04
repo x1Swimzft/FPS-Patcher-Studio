@@ -10,7 +10,11 @@ import pytest
 
 pytest.importorskip("PySide6")
 
-from PySide6.QtWidgets import QWidget  # noqa: E402
+from PySide6.QtWidgets import (  # noqa: E402
+    QApplication,
+    QSystemTrayIcon,
+    QWidget,
+)
 
 from fps_patcher.config import THEME_PRESETS  # noqa: E402
 from fps_patcher.core.models import UpdateAvailableEvent  # noqa: E402
@@ -40,15 +44,15 @@ def test_default_window_metrics(qtbot: Any, monkeypatch: Any, tmp_path: Path) ->
 
     toolbar = window.findChild(QWidget, "Toolbar")
     assert toolbar is not None
-    assert toolbar.height() == 44
+    assert toolbar.height() == 48
 
     assert window.inspector.width() == 300
-    assert window.console.height() == 36
+    assert window.console.height() == 32
 
     window.console.set_expanded(True)
     assert window.console.height() == 180
     window.console.set_expanded(False)
-    assert window.console.height() == 36
+    assert window.console.height() == 32
 
     window.close()
 
@@ -178,6 +182,94 @@ def test_rich_empty_state_has_actions_badges_and_profile_strip(
     assert "60 FPS" in summary
     assert "X1T For Mobile" in summary
     assert t("drop_profile_output_same", "en") in summary
+    assert drop.reassure_label.text() == t("drop_reassure", "en")
+    window.close()
+
+
+def test_empty_state_hides_queue_chrome(
+    qtbot: Any, monkeypatch: Any, tmp_path: Path
+) -> None:
+    from qt_support import make_main_window
+
+    window = make_main_window(qtbot, monkeypatch, tmp_path)
+    queue = window.queue_view
+
+    assert not queue.drop_card.isHidden()
+    assert queue.toolbar.isHidden()
+    assert queue.footer.isHidden()
+    assert queue._divider.isHidden()
+
+    _queue_video(window, tmp_path)
+
+    assert queue.drop_card.isHidden()
+    assert not queue.toolbar.isHidden()
+    assert not queue.footer.isHidden()
+    assert not queue._divider.isHidden()
+    window.close()
+
+
+def test_vfr_banner_switches_to_lossless(
+    qtbot: Any, monkeypatch: Any, tmp_path: Path
+) -> None:
+    from qt_support import make_main_window
+
+    window = make_main_window(qtbot, monkeypatch, tmp_path, auto_fix_vfr=True)
+    inspector = window.inspector
+
+    assert not inspector.vfr_badge.isHidden()
+    assert not inspector.lossless_btn.isHidden()
+    assert window.settings.auto_fix_vfr is True
+
+    inspector.lossless_btn.click()
+
+    assert window.settings.auto_fix_vfr is False
+    assert inspector.vfr_badge.isHidden()
+    assert inspector.lossless_btn.isHidden()
+    window.close()
+
+
+def test_tray_enabled_hides_on_close_and_quits_from_tray(
+    qtbot: Any, monkeypatch: Any, tmp_path: Path
+) -> None:
+    from qt_support import make_main_window
+
+    monkeypatch.setattr(
+        QSystemTrayIcon, "isSystemTrayAvailable", staticmethod(lambda: True)
+    )
+    window = make_main_window(qtbot, monkeypatch, tmp_path, tray_enabled=True)
+    app = QApplication.instance()
+    assert app is not None
+    assert window._tray is not None
+    assert app.quitOnLastWindowClosed() is False
+
+    window.show()
+    qtbot.wait(20)
+    window.close()
+
+    assert window.isHidden()
+    assert window._tray is not None
+
+    window._show_from_tray()
+    qtbot.wait(20)
+    window._force_quit = True
+    window.close()
+
+    assert app.quitOnLastWindowClosed() is True
+    assert window._tray.isVisible() is False
+
+
+def test_tray_disabled_keeps_normal_close(
+    qtbot: Any, monkeypatch: Any, tmp_path: Path
+) -> None:
+    from qt_support import make_main_window
+
+    monkeypatch.setattr(
+        QSystemTrayIcon, "isSystemTrayAvailable", staticmethod(lambda: True)
+    )
+    window = make_main_window(qtbot, monkeypatch, tmp_path, tray_enabled=False)
+
+    assert window._tray is None
+    assert QApplication.instance().quitOnLastWindowClosed() is True
     window.close()
 
 

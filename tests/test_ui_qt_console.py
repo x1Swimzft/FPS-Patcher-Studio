@@ -77,6 +77,20 @@ def test_level_colours_are_present_and_distinct(qtbot: Any) -> None:
     assert classify_log_level("frame= 10 fps=0") == "DIM"
 
 
+def test_console_follows_light_mode_tokens(qtbot: Any) -> None:
+    settings = Settings(show_ffmpeg_output=True, appearance="light")
+    panel = ConsolePanel(settings, ThemeManager(settings))
+    qtbot.addWidget(panel)
+    theme = make_theme(settings)
+
+    panel.append_batch([("all good", "OK"), ("careful", "WARN"), ("broken", "ERROR")])
+    colours = {tag: fmt.foreground().color().name() for tag, fmt in panel._formats.items()}
+    assert colours["OK"] == theme.tokens.success[0].lower()
+    assert colours["WARN"] == theme.tokens.warn[0].lower()
+    assert colours["ERROR"] == theme.tokens.danger[0].lower()
+    assert panel._console_color("console_bg") == theme.color("console_bg")
+
+
 def test_clear_logs_resets_text_entries_and_counter(qtbot: Any) -> None:
     panel = _console(qtbot, log_timestamps=False)
     panel.append_batch([("first", "INFO"), ("second", "OK")])

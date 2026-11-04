@@ -21,7 +21,7 @@ def launches(monkeypatch: pytest.MonkeyPatch) -> tuple[list[tuple[str, Any]], ob
     calls: list[tuple[str, Any]] = []
     settings = object()
 
-    def fake_qt_run(received: Any) -> int:
+    def fake_qt_run(received: Any, startup: bool = False) -> int:
         calls.append(("qt", received))
         return 0
 

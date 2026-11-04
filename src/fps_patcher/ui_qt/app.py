@@ -16,7 +16,7 @@ from .main_window import MainWindow
 _ICON_PATH = Path(__file__).resolve().parent.parent / "ui" / "assets" / "app.ico"
 
 
-def run(settings: Settings) -> int:
+def run(settings: Settings, startup: bool = False) -> int:
     """Create the Qt application, show the main window and run the event loop."""
     app = QApplication.instance()
     if app is None:
@@ -30,7 +30,11 @@ def run(settings: Settings) -> int:
         app.setWindowIcon(QIcon(str(_ICON_PATH)))
 
     window = MainWindow(settings)
-    window.show()
+    if startup and window.tray_available:
+        # Started by Windows at sign-in: stay quiet in the tray until opened.
+        pass
+    else:
+        window.show()
     return app.exec()
 
 

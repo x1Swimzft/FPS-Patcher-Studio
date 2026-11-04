@@ -1,4 +1,4 @@
-"""Modal Qt settings dialog: seven tabs, draft/apply semantics, live theme preview."""
+"""Modal Qt settings dialog: four tabs, draft/apply semantics, live theme preview."""
 
 from __future__ import annotations
 
@@ -60,9 +60,26 @@ from .icons import get_icon
 from .motion import fade_in
 from .qss import build_qss
 from .theme import PRESETS, Theme, ThemeManager, ThemeTokens
-from .widgets import Card, SegmentedControl, Switch, set_prop, text_button
+from .widgets import (
+    Card,
+    CollapsibleSection,
+    ConsequenceBadge,
+    SegmentedControl,
+    Switch,
+    WrapLabel,
+    set_prop,
+    text_button,
+)
 
-SWATCHES = ["#3B82F6", "#8B5CF6", "#10B981", "#F43F5E", "#F59E0B", "#06B6D4", "#EC4899"]
+SWATCHES = [
+    "#A5803C",
+    "#4F7391",
+    "#6D55A8",
+    "#2F7A6C",
+    "#A8323E",
+    "#A86E1E",
+    "#5C636B",
+]
 CUSTOM_PRESET = "Custom"
 
 DIALOG_WIDTH = 920
@@ -75,13 +92,10 @@ GRID_GAP = 16
 PAGE_MARGIN = 20
 
 _NAV_ICONS = {
-    "appearance": "sun",
+    "general": "settings",
     "output": "folder",
-    "patching": "zap",
-    "ffmpeg": "play",
-    "console": "info",
-    "behavior": "settings",
-    "about": "forensic",
+    "appearance": "sun",
+    "system": "info",
 }
 
 # Local structural rules only; every colour and metric still comes from build_qss.
@@ -162,13 +176,10 @@ class SettingsDialog(QDialog):
     download_requested = Signal()
 
     _TABS = [
-        ("appearance", "tab_appearance"),
+        ("general", "tab_general"),
         ("output", "tab_output"),
-        ("patching", "tab_patching"),
-        ("ffmpeg", "tab_ffmpeg"),
-        ("console", "tab_console"),
-        ("behavior", "tab_behavior"),
-        ("about", "tab_about"),
+        ("appearance", "tab_appearance"),
+        ("system", "tab_system"),
     ]
 
     def __init__(
@@ -189,7 +200,12 @@ class SettingsDialog(QDialog):
         self._preset_cards: dict[str, _PresetCard] = {}
         self._export_checks: dict[str, QCheckBox] = {}
         self._search_rows: list[tuple[QPushButton, str]] = []
-        self._last_tab = "appearance"
+        self._advanced_sections: list[CollapsibleSection] = []
+        self._last_tab = "general"
+        self._previewed = False
+        self._detached = False
+        self._search_scroll: QScrollArea | None = None
+        self._search_empty: QLabel | None = None
         self._ff_status: QLabel | None = None
         self._ff_status_token = "muted"
         self._fade_anim: QPropertyAnimation | None = None
@@ -225,6 +241,9 @@ class SettingsDialog(QDialog):
         self._page_layouts = []
         self._pages = []
         self._nav_buttons = {}
+        self._advanced_sections = []
+        self._search_scroll = None
+        self._search_empty = None
         self._ff_status = None
 
         self._root.setContentsMargins(0, 0, 0, 0)
@@ -236,9 +255,8 @@ class SettingsDialog(QDialog):
         body_row.addWidget(self._build_rail(theme))
         body_row.addWidget(self._build_body(theme), 1)
         self._root.addLayout(body_row, 1)
-        self._build_search_page()
         self._root.addWidget(self._build_footer(theme), 0)
-        self._select_tab("appearance")
+        self._select_tab("general")
         self._sync_preset_cards()
 
     def _build_rail(self, theme: Theme) -> Card:
@@ -260,6 +278,7 @@ class SettingsDialog(QDialog):
         # QSS min-height is the content box; subtract the 1px border to land on 28px total.
         self._search.setStyleSheet(
             "QLineEdit#SettingsSearch { min-height: 26px; max-height: 26px; }"
+            "QLineEdit#SettingsSearch:focus { min-height: 24px; max-height: 24px; }"
         )
         self._search.textChanged.connect(self._filter_settings)
         layout.addWidget(self._search)
@@ -274,6 +293,7 @@ class SettingsDialog(QDialog):
             # QSS min/max-height is the content box; 32px + 1px border lands on 34px total.
             button.setStyleSheet(
                 "QPushButton#SettingsNavPill { min-height: 32px; max-height: 32px; }"
+                "QPushButton#SettingsNavPill:focus { min-height: 30px; max-height: 30px; }"
             )
             button.setIcon(get_icon(_NAV_ICONS[key], theme.is_dark))
             button.setIconSize(QSize(16, 16))
@@ -296,13 +316,10 @@ class SettingsDialog(QDialog):
         self._stack.setObjectName("SettingsStack")
         body_layout.addWidget(self._stack)
 
-        self._build_appearance()
+        self._build_general()
         self._build_output()
-        self._build_patching()
-        self._build_ffmpeg()
-        self._build_console()
-        self._build_behavior()
-        self._build_about()
+        self._build_appearance()
+        self._build_system()
         return body
 
     def _build_footer(self, theme: Theme) -> QWidget:
@@ -347,6 +364,7 @@ class SettingsDialog(QDialog):
         # QSS min/max-height is the content box; 30px + 1px border lands on 32px total.
         button.setStyleSheet(
             "QPushButton { min-height: 30px; max-height: 30px; }"
+            "QPushButton:focus { min-height: 28px; max-height: 28px; }"
         )
         button.setCursor(Qt.CursorShape.PointingHandCursor)
         button.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
@@ -388,6 +406,7 @@ class SettingsDialog(QDialog):
         row_span: int = 1,
         *,
         expand: bool = False,
+        column_span: int = 1,
     ) -> QVBoxLayout:
         theme = self._theme_manager.theme
         card = Card(theme)
@@ -398,18 +417,44 @@ class SettingsDialog(QDialog):
         layout.setSpacing(8)
         card.body.addLayout(layout)
         if expand:
-            grid.addWidget(card, row, column, row_span, 1)
+            grid.addWidget(card, row, column, row_span, column_span)
         else:
-            grid.addWidget(card, row, column, row_span, 1, Qt.AlignmentFlag.AlignTop)
+            grid.addWidget(
+                card,
+                row,
+                column,
+                row_span,
+                column_span,
+                Qt.AlignmentFlag.AlignTop,
+            )
         self._themed_widgets.append(card)
         return layout
+
+    def _advanced(
+        self,
+        grid: QGridLayout,
+        row: int,
+        column: int,
+        *,
+        column_span: int = 1,
+    ) -> QVBoxLayout:
+        theme = self._theme_manager.theme
+        section = CollapsibleSection(self._tr("settings_advanced"), theme)
+        section.set_reduce_motion(bool(self._draft.reduce_motion))
+        section.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
+        grid.addWidget(
+            section, row, column, 1, column_span, Qt.AlignmentFlag.AlignTop
+        )
+        self._themed_widgets.append(section)
+        self._advanced_sections.append(section)
+        return section.body_layout
 
     # ------------------------------------------------------- shared controls
     def _section(self, layout: QVBoxLayout, key: str) -> QLabel:
         theme = self._theme_manager.theme
         if layout.count():
             layout.addSpacing(theme.outer)
-        label = QLabel(self._tr(key))
+        label = WrapLabel(self._tr(key))
         label.setProperty("role", "title")
         label.setProperty("settingsSearch", True)
         label.setWordWrap(True)
@@ -417,19 +462,17 @@ class SettingsDialog(QDialog):
         return label
 
     def _hint(self, layout: QVBoxLayout, key: str) -> QLabel:
-        label = QLabel(self._tr(key))
+        label = WrapLabel(self._tr(key))
         label.setProperty("role", "caption")
         label.setProperty("settingsSearch", True)
         label.setWordWrap(True)
-        label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         layout.addWidget(label)
         return label
 
     def _field_label(self, layout: QVBoxLayout, key: str) -> QLabel:
-        label = QLabel(self._tr(key))
+        label = WrapLabel(self._tr(key))
         label.setProperty("settingsSearch", True)
         label.setWordWrap(True)
-        label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         layout.addWidget(label)
         return label
 
@@ -466,10 +509,11 @@ class SettingsDialog(QDialog):
             lambda: self._choose_dir(edit),
             variant="secondary",
         )
-        row.addWidget(edit, 1)
+        layout.addWidget(edit)
         row.addWidget(browse)
         if reset:
             row.addWidget(text_button(self._tr("reset"), theme, edit.clear, variant="ghost"))
+        row.addStretch(1)
         layout.addLayout(row)
         return edit
 
@@ -515,11 +559,11 @@ class SettingsDialog(QDialog):
         theme = self._theme_manager.theme
         row = QHBoxLayout()
         row.setSpacing(theme.spacing)
-        label = QLabel(self._tr(key))
+        label = WrapLabel(self._tr(key))
         label.setProperty("settingsSearch", True)
         label.setWordWrap(True)
-        label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         switch = Switch(theme)
+        switch.set_reduce_motion(bool(self._draft.reduce_motion))
         switch.setChecked(checked)
         switch.setAccessibleName(label.text())
         switch.setToolTip(label.text())
@@ -587,6 +631,7 @@ class SettingsDialog(QDialog):
     def _build_appearance(self) -> None:
         _page, grid = self._new_page("appearance")
         draft = self._draft
+        theme = self._theme_manager.theme
 
         preset = self._card(grid, 1, 0)
         self._field_label(preset, "theme_preset")
@@ -615,36 +660,7 @@ class SettingsDialog(QDialog):
             self._preset_cards[name] = card
         preset.addLayout(swatch_grid)
 
-        custom = self._card(grid, 1, 1, row_span=2, expand=True)
-        self._field_label(custom, "custom_accent")
-        self._accent = QLineEdit(draft.custom_accent)
-        self._accent.setPlaceholderText("#RRGGBB")
-        self._accent.setAccessibleName(self._tr("custom_accent"))
-        self._accent.textChanged.connect(self._on_accent)
-        custom.addWidget(self._accent)
-        self._hint(custom, "settings_helper_accent")
-
-        swatch_label = QLabel(self._tr("accent_swatches"))
-        swatch_label.setProperty("role", "caption")
-        swatch_label.setProperty("settingsSearch", True)
-        custom.addWidget(swatch_label)
-        swatch_row = QHBoxLayout()
-        swatch_row.setSpacing(self._theme_manager.theme.outer)
-        theme = self._theme_manager.theme
-        for color in SWATCHES:
-            button = QPushButton()
-            button.setProperty("variant", "icon")
-            button.setProperty("motionSkip", True)
-            button.setFixedSize(theme.icon_button_size, theme.icon_button_size)
-            button.setToolTip(color)
-            button.setAccessibleName(f"{self._tr('custom_accent')} {color}")
-            button.clicked.connect(lambda _checked=False, c=color: self._pick_accent(c))
-            self._style_swatch(button, color)
-            self._swatches.append((button, color))
-            swatch_row.addWidget(button)
-        swatch_row.addStretch(1)
-        custom.addLayout(swatch_row)
-
+        custom = self._card(grid, 1, 1, expand=True)
         self._appearance_labels = [self._tr("mode_dark"), self._tr("mode_light")]
         current_mode = self._appearance_labels[1 if draft.appearance == "light" else 0]
         self._appearance = self._segmented(
@@ -655,7 +671,10 @@ class SettingsDialog(QDialog):
             self._on_appearance,
         )
 
-        self._density_labels = [self._tr("density_compact"), self._tr("density_comfortable")]
+        self._density_labels = [
+            self._tr("density_compact"),
+            self._tr("density_comfortable"),
+        ]
         current_density = (
             self._density_labels[1]
             if draft.layout_density == "Comfortable"
@@ -670,36 +689,76 @@ class SettingsDialog(QDialog):
         )
         self._hint(custom, "settings_helper_density")
 
-        self._ui_scale = self._spin(custom, "ui_scale", draft.ui_scale, 50, 200, 5, "%")
-        self._hint(custom, "settings_helper_scale")
+        advanced = self._advanced(grid, 2, 0, column_span=2)
+        self._field_label(advanced, "custom_accent")
+        self._accent = QLineEdit(draft.custom_accent)
+        self._accent.setPlaceholderText("#RRGGBB")
+        self._accent.setAccessibleName(self._tr("custom_accent"))
+        self._accent.textChanged.connect(self._on_accent)
+        advanced.addWidget(self._accent)
+        self._hint(advanced, "settings_helper_accent")
 
-        self._reduce_motion = self._switch(custom, "reduce_motion", draft.reduce_motion)
-        self._hint(custom, "settings_helper_motion")
+        swatch_label = QLabel(self._tr("accent_swatches"))
+        swatch_label.setProperty("role", "caption")
+        swatch_label.setProperty("settingsSearch", True)
+        advanced.addWidget(swatch_label)
+        swatch_row = QHBoxLayout()
+        swatch_row.setSpacing(theme.outer)
+        for color in SWATCHES:
+            button = QPushButton()
+            button.setProperty("variant", "icon")
+            button.setProperty("motionSkip", True)
+            button.setFixedSize(theme.icon_button_size, theme.icon_button_size)
+            button.setToolTip(color)
+            button.setAccessibleName(f"{self._tr('custom_accent')} {color}")
+            button.clicked.connect(lambda _checked=False, c=color: self._pick_accent(c))
+            self._style_swatch(button, color)
+            self._swatches.append((button, color))
+            swatch_row.addWidget(button)
+        swatch_row.addStretch(1)
+        advanced.addLayout(swatch_row)
 
-        window = self._card(grid, 2, 0)
-        self._glass = self._switch(window, "glass_effect", draft.glass)
+        self._ui_scale = self._spin(
+            advanced, "ui_scale", draft.ui_scale, 50, 200, 5, "%"
+        )
+        self._hint(advanced, "settings_helper_scale")
+
+        columns = QHBoxLayout()
+        columns.setSpacing(theme.spacing)
+        left = QVBoxLayout()
+        right = QVBoxLayout()
+        self._glass = self._switch(left, "glass_effect", draft.glass)
         self._backdrop = self._combo(
-            window,
+            left,
             "glass_mode",
             BACKDROP_MODES,
             draft.glass_mode,
             lambda value: setattr(self._draft, "glass_mode", value),
         )
-        self._tint = self._slider(window, "tint_strength", draft.tint_strength, 0, 100)
-        self._alpha = self._slider(window, "window_alpha", round(draft.window_alpha * 100), 85, 100)
+        self._tint = self._slider(left, "tint_strength", draft.tint_strength, 0, 100)
+        self._alpha = self._slider(
+            left, "window_alpha", round(draft.window_alpha * 100), 85, 100
+        )
         self._alpha.valueChanged.connect(
             lambda value: self.setWindowOpacity(max(0.85, min(1.0, value / 100.0)))
         )
         self._font_size = self._combo(
-            window, "font_size", FONT_SIZES, draft.font_size, self._on_font_size
+            right, "font_size", FONT_SIZES, draft.font_size, self._on_font_size
         )
         self._radius = self._segmented(
-            window,
+            right,
             "radius_style",
             RADIUS_STYLES,
             draft.radius_style,
             lambda value: self._set_and_preview("radius_style", value),
         )
+        self._reduce_motion = self._switch(right, "reduce_motion", draft.reduce_motion)
+        self._hint(right, "settings_helper_motion")
+        left.addStretch(1)
+        right.addStretch(1)
+        columns.addLayout(left, 1)
+        columns.addLayout(right, 1)
+        advanced.addLayout(columns)
 
     def _choose_preset(self, name: str) -> None:
         if name != self._preset.currentText():
@@ -769,7 +828,9 @@ class SettingsDialog(QDialog):
     def _build_output(self) -> None:
         _page, grid = self._new_page("output")
         draft = self._draft
-        paths = self._card(grid, 1, 0)
+        theme = self._theme_manager.theme
+
+        paths = self._card(grid, 1, 0, row_span=2, expand=True)
         self._out_dir = self._path_row(
             paths,
             "default_output_dir",
@@ -777,22 +838,6 @@ class SettingsDialog(QDialog):
             hint_key="leave_empty_source",
             reset=True,
         )
-        self._template = self._entry(paths, "filename_template", draft.filename_template)
-        self._use_template = self._switch(
-            paths, "use_filename_template", draft.use_filename_template
-        )
-        self._hint(paths, "use_filename_template_help")
-        self._hint(paths, "template_help")
-        self._template_preview = QLabel()
-        self._template_preview.setProperty("role", "caption")
-        self._template_preview.setWordWrap(True)
-        paths.addWidget(self._template_preview)
-        self._template.textChanged.connect(self._update_template_preview)
-        self._use_template.toggled.connect(self._template.setEnabled)
-        self._use_template.toggled.connect(self._update_template_preview)
-        self._template.setEnabled(self._use_template.isChecked())
-        self._update_template_preview()
-
         self._section(paths, "export_platforms_lbl")
         self._export_checks = {}
         for profile in PLATFORM_PROFILES.values():
@@ -806,20 +851,75 @@ class SettingsDialog(QDialog):
 
         workflow = self._card(grid, 1, 1)
         self._open_done = self._switch(workflow, "open_when_done", draft.open_when_done)
-        self._preserve_mtime = self._switch(workflow, "preserve_mtime", draft.preserve_mtime)
-
-        watch = self._card(grid, 2, 0)
-        self._section(watch, "watch_folder_section")
-        self._hint(watch, "watch_folder_hint")
-        self._watch_enabled = self._switch(
-            watch, "watch_folder_enable", draft.watch_folder_enabled
+        self._preserve_mtime = self._switch(
+            workflow, "preserve_mtime", draft.preserve_mtime
         )
-        self._watch_dir = self._path_row(watch, "watch_folder_dir", draft.watch_folder)
 
-        explorer = self._card(grid, 2, 1)
-        self._explorer_menu = self._switch(
-            explorer, "explorer_menu_enable", draft.explorer_menu
+        safety = self._card(grid, 2, 1)
+        safety.addWidget(
+            ConsequenceBadge(self._tr("settings_badge_lossless"), "lossless", theme)
         )
+        self._hint(safety, "settings_lossless_note")
+
+        advanced = self._advanced(grid, 3, 0, column_span=2)
+        self._use_template = self._switch(
+            advanced, "use_filename_template", draft.use_filename_template
+        )
+        self._template = self._entry(
+            advanced, "filename_template", draft.filename_template
+        )
+        self._hint(advanced, "template_help")
+        self._template_preview = WrapLabel()
+        self._template_preview.setProperty("role", "caption")
+        self._template_preview.setWordWrap(True)
+        advanced.addWidget(self._template_preview)
+        self._template.textChanged.connect(self._update_template_preview)
+        self._use_template.toggled.connect(self._template.setEnabled)
+        self._use_template.toggled.connect(self._update_template_preview)
+        self._template.setEnabled(self._use_template.isChecked())
+        self._update_template_preview()
+
+        advanced.addWidget(
+            ConsequenceBadge(self._tr("settings_badge_lossy"), "warning", theme)
+        )
+        columns = QHBoxLayout()
+        columns.setSpacing(theme.spacing)
+        left = QVBoxLayout()
+        right = QVBoxLayout()
+        self._normalize_audio = self._switch(
+            left, "auto_normalize_audio", draft.auto_normalize_audio
+        )
+        self._cap_bitrate = self._switch(
+            left, "auto_cap_bitrate", draft.auto_cap_bitrate
+        )
+        self._bitrate_target = self._spin(
+            left,
+            "bitrate_target_lbl",
+            max(
+                BITRATE_TARGET_MBPS_MIN,
+                min(BITRATE_TARGET_MBPS_MAX, draft.bitrate_target_mbps),
+            ),
+            BITRATE_TARGET_MBPS_MIN,
+            BITRATE_TARGET_MBPS_MAX,
+            1,
+            " Mbps",
+        )
+        self._bitrate_target.setEnabled(draft.auto_cap_bitrate)
+        self._cap_bitrate.toggled.connect(self._bitrate_target.setEnabled)
+        self._hint(left, "bitrate_target_hint")
+        self._fix_vfr = self._switch(
+            right, "settings_auto_fix_vfr", draft.auto_fix_vfr
+        )
+        self._fix_codec = self._switch(
+            right, "settings_auto_fix_codec", draft.auto_fix_codec
+        )
+        self._cap_resolution = self._switch(
+            right, "settings_auto_cap_resolution", draft.auto_cap_resolution
+        )
+        self._hint(right, "settings_lossy_hint")
+        columns.addLayout(left, 1)
+        columns.addLayout(right, 1)
+        advanced.addLayout(columns)
 
     def _update_template_preview(self, _value: object = "") -> None:
         if not self._use_template.isChecked():
@@ -839,10 +939,68 @@ class SettingsDialog(QDialog):
         )
         self._template_preview.setText(self._tr("template_preview", preview=f"{rendered}.mp4"))
 
-    # -------------------------------------------------------------- patching
-    def _build_patching(self) -> None:
-        _page, grid = self._new_page("patching")
+    # --------------------------------------------------------------- general
+    def _build_general(self) -> None:
+        _page, grid = self._new_page("general")
         draft = self._draft
+        theme = self._theme_manager.theme
+
+        startup = self._card(grid, 1, 0)
+        self._language_labels = [
+            f"{self._tr('language_en')} (en)",
+            f"{self._tr('language_th')} (th)",
+        ]
+        self._language = self._combo(
+            startup,
+            "language_choice",
+            self._language_labels,
+            self._language_labels[1 if draft.language == "th" else 0],
+            self._on_language,
+        )
+        self._check_updates = self._switch(
+            startup, "check_updates_on_start", draft.check_updates_on_start
+        )
+        self._remember_geometry = self._switch(
+            startup, "remember_geometry", draft.remember_geometry
+        )
+        self._always_on_top = self._switch(
+            startup, "always_on_top", draft.always_on_top
+        )
+        self._tray_enabled = self._switch(
+            startup, "tray_enabled", draft.tray_enabled
+        )
+        self._hint(startup, "tray_hint")
+        self._start_with_windows = self._switch(
+            startup, "start_with_windows", draft.start_with_windows
+        )
+        self._hint(startup, "startup_hint")
+
+        notifications = self._card(grid, 1, 1)
+        self._notify_labels = [
+            self._tr("notify_none"),
+            self._tr("notify_sound"),
+            self._tr("notify_toast"),
+        ]
+        current_notify = (
+            self._notify_labels[NOTIFY_MODES.index(draft.notify_done)]
+            if draft.notify_done in NOTIFY_MODES
+            else self._notify_labels[0]
+        )
+        self._notify = self._combo(
+            notifications,
+            "notify_done",
+            self._notify_labels,
+            current_notify,
+            lambda _value: None,
+        )
+        self._confirm_cancel = self._switch(
+            notifications, "confirm_cancel", draft.confirm_cancel
+        )
+        self._confirm_overwrite = self._switch(
+            notifications, "confirm_overwrite", draft.confirm_overwrite
+        )
+
+        target = self._card(grid, 2, 0)
         self._custom_fps = self._tr("custom")
         fps_items = [*FPS_PRESETS, self._custom_fps]
         if draft.last_preset == CUSTOM_PRESET:
@@ -851,14 +1009,8 @@ class SettingsDialog(QDialog):
             current_fps = draft.last_preset
         else:
             current_fps = self._first_fps(fps_items)
-
-        target = self._card(grid, 1, 0)
         self._fps_preset = self._combo(
-            target,
-            "default_target_preset",
-            fps_items,
-            current_fps,
-            self._on_fps_preset,
+            target, "default_target_preset", fps_items, current_fps, self._on_fps_preset
         )
         self._timescale = self._spin(
             target, "default_timescale", draft.custom_timescale, 1, 2_000_000_000
@@ -866,7 +1018,9 @@ class SettingsDialog(QDialog):
         self._timescale.setEnabled(current_fps == self._custom_fps)
 
         strategy_labels = [preset.label for preset in UI_PRESETS.values()]
-        self._strategy_label_to_key = {preset.label: preset.name for preset in UI_PRESETS.values()}
+        self._strategy_label_to_key = {
+            preset.label: preset.name for preset in UI_PRESETS.values()
+        }
         resolved, _old = migrate_strategy_name(draft.strategy)
         current_strategy = UI_PRESETS.get(resolved)
         self._strategy = self._combo(
@@ -876,63 +1030,53 @@ class SettingsDialog(QDialog):
             current_strategy.label if current_strategy else strategy_labels[0],
             lambda _value: None,
         )
-        self._padding = self._spin(
-            target, "bxd_padding_lbl", draft.bxd_padding_bytes, 0, MAX_BXD_PADDING_BYTES, 1024
-        )
-        self._tail_ms = self._spin(
-            target, "bxd_tail_ms_lbl", draft.bxd_max_tail_ms, 0, 5000
-        )
 
-        safety = self._card(grid, 1, 1)
-        self._mask_paths = self._switch(safety, "mask_paths_lbl", draft.mask_diagnostic_paths)
+        safety = self._card(grid, 2, 1)
         self._verify = self._switch(safety, "verify_after", draft.verify_after)
         self._backup = self._switch(safety, "backup_original", draft.backup_original)
-        self._stop_on_error = self._switch(safety, "stop_on_error", draft.stop_on_error)
+        self._stop_on_error = self._switch(
+            safety, "stop_on_error", draft.stop_on_error
+        )
+        safety.addWidget(
+            ConsequenceBadge(
+                self._tr("settings_badge_lossless"), "lossless", theme
+            )
+        )
 
-        container = self._card(grid, 2, 0)
-        self._section(container, "v4_options")
-        self._v4_strict = self._switch(container, "v4_strict", draft.v4_strict_lossless)
-        self._v4_video = self._switch(container, "v4_preserve_video", draft.v4_preserve_video)
-        self._v4_audio = self._switch(container, "v4_preserve_audio", draft.v4_preserve_audio)
-        self._v4_sync = self._switch(container, "v4_sync_mvhd", draft.v4_sync_mvhd)
-        self._v4_report = self._switch(container, "v4_export_report", draft.v4_export_report)
-        self._v4_dry_run = self._switch(container, "v4_dry_run", draft.v4_dry_run)
-
-        preflight = self._card(grid, 2, 1)
-        self._section(preflight, "preflight_section")
-        self._normalize_audio = self._switch(
-            preflight, "auto_normalize_audio", draft.auto_normalize_audio
+        advanced = self._advanced(grid, 3, 0, column_span=2)
+        self._mask_paths = self._switch(
+            advanced, "mask_paths_lbl", draft.mask_diagnostic_paths
         )
-        self._cap_bitrate = self._switch(preflight, "auto_cap_bitrate", draft.auto_cap_bitrate)
-        self._fix_vfr = self._switch(
-            preflight, "settings_auto_fix_vfr", draft.auto_fix_vfr
+        self._section(advanced, "v4_options")
+        self._v4_strict = self._switch(
+            advanced, "v4_strict", draft.v4_strict_lossless
         )
-        self._fix_codec = self._switch(
-            preflight, "settings_auto_fix_codec", draft.auto_fix_codec
+        self._v4_video = self._switch(
+            advanced, "v4_preserve_video", draft.v4_preserve_video
         )
-        self._cap_resolution = self._switch(
-            preflight, "settings_auto_cap_resolution", draft.auto_cap_resolution
+        self._v4_audio = self._switch(
+            advanced, "v4_preserve_audio", draft.v4_preserve_audio
         )
-        self._hint(preflight, "settings_lossy_hint")
-        self._bitrate_target = self._spin(
-            preflight,
-            "bitrate_target_lbl",
-            max(
-                BITRATE_TARGET_MBPS_MIN,
-                min(BITRATE_TARGET_MBPS_MAX, draft.bitrate_target_mbps),
-            ),
-            BITRATE_TARGET_MBPS_MIN,
-            BITRATE_TARGET_MBPS_MAX,
-            1,
-            " Mbps",
+        self._v4_sync = self._switch(advanced, "v4_sync_mvhd", draft.v4_sync_mvhd)
+        self._v4_report = self._switch(
+            advanced, "v4_export_report", draft.v4_export_report
         )
-        self._bitrate_target.setEnabled(draft.auto_cap_bitrate)
-        self._cap_bitrate.toggled.connect(self._bitrate_target.setEnabled)
-        self._hint(preflight, "bitrate_target_hint")
-
-        self._section(preflight, "color_metadata_section")
-        self._fix_color = self._switch(preflight, "fix_color_tag", draft.fix_color_tag)
-        self._scrub_metadata = self._switch(preflight, "scrub_metadata", draft.scrub_metadata)
+        self._v4_dry_run = self._switch(advanced, "v4_dry_run", draft.v4_dry_run)
+        self._padding = self._spin(
+            advanced,
+            "bxd_padding_lbl",
+            draft.bxd_padding_bytes,
+            0,
+            MAX_BXD_PADDING_BYTES,
+            1024,
+        )
+        self._tail_ms = self._spin(
+            advanced, "bxd_tail_ms_lbl", draft.bxd_max_tail_ms, 0, 5000
+        )
+        self._fix_color = self._switch(advanced, "fix_color_tag", draft.fix_color_tag)
+        self._scrub_metadata = self._switch(
+            advanced, "scrub_metadata", draft.scrub_metadata
+        )
 
     @staticmethod
     def _first_fps(items: list[str]) -> str:
@@ -943,20 +1087,22 @@ class SettingsDialog(QDialog):
         self._draft.last_preset = CUSTOM_PRESET if custom else value
         self._timescale.setEnabled(custom)
 
-    # ---------------------------------------------------------------- ffmpeg
-    def _build_ffmpeg(self) -> None:
+    # ---------------------------------------------------------------- system
+    def _build_system(self) -> None:
         theme = self._theme_manager.theme
-        _page, grid = self._new_page("ffmpeg")
+        _page, grid = self._new_page("system")
         draft = self._draft
 
         location = self._card(grid, 1, 0)
         label = self._field_label(location, "ffmpeg_dir")
-        row = QHBoxLayout()
-        row.setSpacing(theme.spacing)
         self._ffmpeg_dir = QLineEdit(draft.ffmpeg_dir)
         self._ffmpeg_dir.setAccessibleName(label.text())
+        self._ffmpeg_dir.setCursorPosition(0)
         label.setBuddy(self._ffmpeg_dir)
-        row.addWidget(self._ffmpeg_dir, 1)
+        location.addWidget(self._ffmpeg_dir)
+
+        row = QHBoxLayout()
+        row.setSpacing(theme.spacing)
         row.addWidget(
             text_button(
                 self._tr("browse"),
@@ -967,7 +1113,10 @@ class SettingsDialog(QDialog):
         )
         row.addWidget(
             text_button(
-                self._tr("auto_detect"), theme, self._autodetect_ffmpeg, variant="secondary"
+                self._tr("auto_detect"),
+                theme,
+                self._autodetect_ffmpeg,
+                variant="secondary",
             )
         )
         location.addLayout(row)
@@ -975,30 +1124,90 @@ class SettingsDialog(QDialog):
         test_row = QHBoxLayout()
         test_row.setSpacing(theme.spacing)
         test_row.addWidget(
-            text_button(self._tr("test_ffmpeg"), theme, self._test_ffmpeg, variant="secondary")
+            text_button(
+                self._tr("test_ffmpeg"),
+                theme,
+                self._test_ffmpeg,
+                variant="secondary",
+            )
         )
-        self._ff_status = QLabel()
-        self._ff_status.setProperty("role", "caption")
-        self._ff_status.setWordWrap(True)
-        self._ff_status.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        test_row.addWidget(self._ff_status, 1)
+        test_row.addWidget(
+            text_button(
+                self._tr("ffmpeg_auto_download_btn"),
+                theme,
+                self.download_requested.emit,
+                variant="secondary",
+            )
+        )
         location.addLayout(test_row)
 
-        download = text_button(
-            self._tr("ffmpeg_auto_download_btn"),
-            theme,
-            self.download_requested.emit,
-            variant="secondary",
+        self._ff_status = WrapLabel()
+        self._ff_status.setProperty("role", "caption")
+        self._ff_status.setWordWrap(True)
+        self._ff_status.setSizePolicy(
+            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred
         )
-        location.addWidget(download)
+        location.addWidget(self._ff_status)
 
-        options = self._card(grid, 1, 1)
-        self._check_ffmpeg = self._switch(options, "check_on_start", draft.check_ffmpeg_on_start)
-        self._show_ffmpeg = self._switch(options, "show_output_console", draft.show_ffmpeg_output)
+        self._check_ffmpeg = self._switch(
+            location, "check_on_start", draft.check_ffmpeg_on_start
+        )
+        self._show_ffmpeg = self._switch(
+            location, "show_output_console", draft.show_ffmpeg_output
+        )
 
-        self._section(options, "extra_args")
-        self._hint(options, "extra_args_warn")
-        self._extra_args = self._entry(options, "extra_args", draft.extra_ffmpeg_args)
+        display = self._card(grid, 1, 1)
+        self._console_font = self._spin(
+            display, "console_font_size", draft.console_font_size, 8, 24
+        )
+        self._log_timestamps = self._switch(
+            display, "log_timestamps", draft.log_timestamps
+        )
+        self._log_autoscroll = self._switch(
+            display, "log_autoscroll", draft.log_autoscroll
+        )
+        self._max_log_lines = self._spin(
+            display, "max_log_lines", draft.max_log_lines, 100, 20000, 100
+        )
+        self._log_to_file = self._switch(display, "log_to_file", draft.log_to_file)
+
+        about = self._card(grid, 2, 0, column_span=2)
+        version = QLabel(self._tr("app_info", version=__version__))
+        version.setProperty("role", "title")
+        version.setProperty("settingsSearch", True)
+        version.setWordWrap(True)
+        about.addWidget(version)
+        self._hint(about, "about_desc")
+        actions = QHBoxLayout()
+        actions.setSpacing(theme.outer)
+        copy = text_button(self._tr("copy_diagnostics"), theme, self._copy_diagnostics)
+        export = text_button(self._tr("export_settings"), theme, self._export_settings)
+        import_btn = text_button(
+            self._tr("import_settings"), theme, self._import_settings
+        )
+        for button in (copy, export, import_btn):
+            button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            actions.addWidget(button)
+        about.addLayout(actions)
+        self._hint(about, "restart_hint")
+
+        advanced = self._advanced(grid, 3, 0, column_span=2)
+        self._section(advanced, "watch_folder_section")
+        self._hint(advanced, "watch_folder_hint")
+        self._watch_enabled = self._switch(
+            advanced, "watch_folder_enable", draft.watch_folder_enabled
+        )
+        self._watch_dir = self._path_row(
+            advanced, "watch_folder_dir", draft.watch_folder
+        )
+        self._explorer_menu = self._switch(
+            advanced, "explorer_menu_enable", draft.explorer_menu
+        )
+        self._section(advanced, "extra_args")
+        self._hint(advanced, "extra_args_warn")
+        self._extra_args = self._entry(
+            advanced, "extra_args", draft.extra_ffmpeg_args
+        )
 
     def _set_ff_status(self, text: str, token: str) -> None:
         if self._ff_status is None:
@@ -1030,101 +1239,10 @@ class SettingsDialog(QDialog):
         if self._ff_status is not None:
             self._ff_status.setToolTip(paths.version)
 
-    # --------------------------------------------------------------- console
-    def _build_console(self) -> None:
-        _page, grid = self._new_page("console")
-        draft = self._draft
-        display = self._card(grid, 1, 0)
-        self._console_font = self._spin(
-            display, "console_font_size", draft.console_font_size, 8, 24
-        )
-        self._log_timestamps = self._switch(display, "log_timestamps", draft.log_timestamps)
-        self._log_autoscroll = self._switch(display, "log_autoscroll", draft.log_autoscroll)
-
-        retention = self._card(grid, 1, 1)
-        self._max_log_lines = self._spin(
-            retention, "max_log_lines", draft.max_log_lines, 100, 20000, 100
-        )
-        self._log_to_file = self._switch(retention, "log_to_file", draft.log_to_file)
-
-    # -------------------------------------------------------------- behavior
-    def _build_behavior(self) -> None:
-        _page, grid = self._new_page("behavior")
-        draft = self._draft
-        window = self._card(grid, 1, 0)
-        self._remember_geometry = self._switch(
-            window, "remember_geometry", draft.remember_geometry
-        )
-        self._always_on_top = self._switch(window, "always_on_top", draft.always_on_top)
-
-        workflow = self._card(grid, 1, 1)
-        self._confirm_cancel = self._switch(workflow, "confirm_cancel", draft.confirm_cancel)
-        self._confirm_overwrite = self._switch(
-            workflow, "confirm_overwrite", draft.confirm_overwrite
-        )
-
-        language = self._card(grid, 2, 0)
-        self._language_labels = [
-            f"{self._tr('language_en')} (en)",
-            f"{self._tr('language_th')} (th)",
-        ]
-        self._language = self._combo(
-            language,
-            "language_choice",
-            self._language_labels,
-            self._language_labels[1 if draft.language == "th" else 0],
-            self._on_language,
-        )
-
-        notify_card = self._card(grid, 2, 1)
-        self._notify_labels = [
-            self._tr("notify_none"),
-            self._tr("notify_sound"),
-            self._tr("notify_toast"),
-        ]
-        current_notify = (
-            self._notify_labels[NOTIFY_MODES.index(draft.notify_done)]
-            if draft.notify_done in NOTIFY_MODES
-            else self._notify_labels[0]
-        )
-        self._notify = self._combo(
-            notify_card,
-            "notify_done",
-            self._notify_labels,
-            current_notify,
-            lambda _value: None,
-        )
-        self._check_updates = self._switch(
-            notify_card, "check_updates_on_start", draft.check_updates_on_start
-        )
-
     def _on_language(self, value: str) -> None:
         self._draft.language = "th" if "th" in value else "en"
         self._harvest()
         self._rebuild()
-
-    # ----------------------------------------------------------------- about
-    def _build_about(self) -> None:
-        theme = self._theme_manager.theme
-        _page, grid = self._new_page("about")
-
-        info = self._card(grid, 1, 0)
-        version = QLabel(self._tr("app_info", version=__version__))
-        version.setProperty("role", "title")
-        version.setProperty("settingsSearch", True)
-        version.setWordWrap(True)
-        info.addWidget(version)
-        self._hint(info, "about_desc")
-
-        actions = self._card(grid, 1, 1)
-        copy = text_button(self._tr("copy_diagnostics"), theme, self._copy_diagnostics)
-        export = text_button(self._tr("export_settings"), theme, self._export_settings)
-        import_btn = text_button(self._tr("import_settings"), theme, self._import_settings)
-        reset = text_button(self._tr("reset_defaults"), theme, self._reset_all, variant="secondary")
-        for button in (copy, export, import_btn, reset):
-            button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-            actions.addWidget(button)
-        self._hint(actions, "restart_hint")
 
     def _copy_diagnostics(self) -> None:
         payload = {
@@ -1221,9 +1339,12 @@ class SettingsDialog(QDialog):
     def _filter_settings(self, text: str) -> None:
         query = text.strip().casefold()
         if not query:
-            self._search_empty.hide()
+            if self._search_empty is not None:
+                self._search_empty.hide()
             self._select_tab(self._last_tab)
             return
+        if self._search_scroll is None:
+            self._build_search_page()
         active = self._current_tab_key()
         if active is not None:
             self._last_tab = active
@@ -1232,17 +1353,22 @@ class SettingsDialog(QDialog):
             visible = query in haystack
             row.setVisible(visible)
             matches += int(visible)
-        self._search_empty.setVisible(matches == 0)
-        self._stack.setCurrentWidget(self._search_scroll)
+        if self._search_empty is not None:
+            self._search_empty.setVisible(matches == 0)
+        if self._search_scroll is not None:
+            self._stack.setCurrentWidget(self._search_scroll)
 
     def _nav_clicked(self, key: str) -> None:
         if self._search.text():
             with QSignalBlocker(self._search):
                 self._search.clear()
-        self._search_empty.hide()
+        if self._search_empty is not None:
+            self._search_empty.hide()
         self._select_tab(key)
 
     def _open_search_result(self, key: str) -> None:
+        for section in self._advanced_sections:
+            section.set_expanded(True)
         self._nav_clicked(key)
 
     # ---------------------------------------------------------------- actions
@@ -1256,10 +1382,18 @@ class SettingsDialog(QDialog):
 
     def _select_tab(self, key: str) -> None:
         if not self._search.text().strip():
+            previous = self._stack.currentWidget()
             for index, (page_key, _button, _page) in enumerate(self._pages):
                 if page_key == key:
                     self._stack.setCurrentIndex(index)
                     break
+            current = self._stack.currentWidget()
+            if (
+                current is not None
+                and current is not previous
+                and not self._draft.reduce_motion
+            ):
+                fade_in(current, 150, False)
         self._last_tab = key
         for page_key, button, _page in self._pages:
             set_prop(button, "active", "true" if page_key == key else "false")
@@ -1375,6 +1509,8 @@ class SettingsDialog(QDialog):
 
         draft.remember_geometry = self._remember_geometry.isChecked()
         draft.always_on_top = self._always_on_top.isChecked()
+        draft.tray_enabled = self._tray_enabled.isChecked()
+        draft.start_with_windows = self._start_with_windows.isChecked()
         draft.confirm_cancel = self._confirm_cancel.isChecked()
         draft.confirm_overwrite = self._confirm_overwrite.isChecked()
         notify_index = self._notify_labels.index(self._notify.currentText())
@@ -1383,6 +1519,7 @@ class SettingsDialog(QDialog):
         draft.check_updates_on_start = self._check_updates.isChecked()
 
     def _preview_theme(self) -> None:
+        self._previewed = True
         self._harvest()
         self._theme_manager.apply(self._draft)
 
@@ -1400,8 +1537,16 @@ class SettingsDialog(QDialog):
         self.applied.emit(self._settings)
 
     def _ok(self) -> None:
+        self._detach_theme()
         self._apply()
         self.accept()
+
+    def _detach_theme(self) -> None:
+        if self._detached:
+            return
+        self._detached = True
+        with contextlib.suppress(Exception):
+            self._theme_manager.changed.disconnect(self._refresh_theme)
 
     def _reset_all(self) -> None:
         answer = QMessageBox.question(
@@ -1439,7 +1584,7 @@ class SettingsDialog(QDialog):
         super().showEvent(event)
         self._stop_fade()
         if not self._draft.reduce_motion:
-            self._fade_anim = fade_in(self, 140, False)
+            self._fade_anim = fade_in(self, 90, False)
             if self._fade_anim is not None:
                 self._fade_anim.finished.connect(
                     lambda: setattr(self, "_fade_anim", None)
@@ -1450,13 +1595,19 @@ class SettingsDialog(QDialog):
         super().hideEvent(event)
 
     def closeEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        self._detach_theme()
+        if self._previewed:
+            self._theme_manager.apply(self._settings)
         self._stop_fade()
         super().closeEvent(event)
 
     def done(self, result: int) -> None:
+        self._detach_theme()
         self._stop_fade()
         super().done(result)
 
     def reject(self) -> None:
-        self._theme_manager.apply(self._settings)
+        self._detach_theme()
+        if self._previewed:
+            self._theme_manager.apply(self._settings)
         super().reject()

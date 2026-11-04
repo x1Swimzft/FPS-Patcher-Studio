@@ -31,6 +31,7 @@ def stub_startup(monkeypatch: Any) -> None:
     monkeypatch.setattr(Settings, "save_async", lambda self, *args, **kwargs: None)
     monkeypatch.setattr(mw, "update_title_bar_theme", MagicMock(return_value=True))
     monkeypatch.setattr(mw, "apply_backdrop", MagicMock(return_value=False))
+    monkeypatch.setattr(mw, "set_startup_enabled", lambda enabled: True)
     for name in (
         "_cleanup_stale_preflight",
         "_init_ffmpeg",

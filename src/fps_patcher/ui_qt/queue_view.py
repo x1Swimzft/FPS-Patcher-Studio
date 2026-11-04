@@ -53,7 +53,6 @@ from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
     QFrame,
-    QGraphicsDropShadowEffect,
     QHBoxLayout,
     QInputDialog,
     QLabel,
@@ -80,7 +79,7 @@ from ..core.preflight import planned_output_bitrate
 from ..core.strategies import UI_PRESETS, migrate_strategy_name
 from ..ui.strings import readiness_check_label, t
 from .icons import get_icon
-from .motion import animate
+from .motion import animate, fade_in
 from .theme import UI_FONT_FAMILIES, Theme
 from .thumbnails import THUMBNAIL_SIZE, ThumbnailLoader
 from .widgets import ElidedLabel, Switch, hairline, text_button
@@ -131,15 +130,6 @@ def _format_duration(seconds: float) -> str:
     return f"{hrs:d}:{mins:02d}:{secs:02d}" if hrs else f"{mins:02d}:{secs:02d}"
 
 
-def _blend_color(start: QColor, end: QColor, phase: float) -> QColor:
-    phase = max(0.0, min(1.0, phase))
-    return QColor(
-        round(start.red() + (end.red() - start.red()) * phase),
-        round(start.green() + (end.green() - start.green()) * phase),
-        round(start.blue() + (end.blue() - start.blue()) * phase),
-    )
-
-
 def _format_meta(item: QueueItem) -> str:
     info = item.info
     if info is None:
@@ -187,23 +177,24 @@ class DropCard(QWidget):
 
         self.center_card = QFrame(self)
         self.center_card.setObjectName("DropCenterCard")
-        self.center_card.setFixedWidth(400)
+        self.center_card.setFixedWidth(540)
         self._card_layout = QVBoxLayout(self.center_card)
         self._card_layout.setContentsMargins(
-            theme.outer, theme.outer, theme.outer, theme.outer
+            theme.spacing + 16, theme.spacing + 12, theme.spacing + 16, theme.spacing + 10
         )
-        self._card_layout.setSpacing(theme.outer)
+        self._card_layout.setSpacing(theme.spacing + 2)
         layout.addWidget(self.center_card, 0, Qt.AlignmentFlag.AlignHCenter)
 
-        self.icon_holder = QWidget(self.center_card)
-        self.icon_holder.setFixedSize(40, 44)
+        self.icon_holder = QFrame(self.center_card)
+        self.icon_holder.setObjectName("DropIconHolder")
+        self.icon_holder.setFixedSize(64, 64)
         self.icon_label = QLabel(self.icon_holder)
         self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.icon_label.setFixedSize(40, 40)
+        self.icon_label.setFixedSize(64, 64)
         self._card_layout.addWidget(self.icon_holder, 0, Qt.AlignmentFlag.AlignHCenter)
 
         self.title_label = QLabel()
-        self.title_label.setProperty("role", "title")
+        self.title_label.setProperty("role", "hero")
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._card_layout.addWidget(self.title_label)
 
@@ -219,14 +210,16 @@ class DropCard(QWidget):
         self.browse_button = text_button(
             t("add_files_btn", language), theme, self.browse_requested.emit, variant="primary"
         )
-        self.browse_button.setMinimumWidth(128)
+        self.browse_button.setMinimumWidth(140)
+        self.browse_button.setFixedHeight(theme.primary_height)
         self.folder_button = text_button(
             t("add_folder_btn", language),
             theme,
             self.folder_requested.emit,
             variant="secondary",
         )
-        self.folder_button.setMinimumWidth(128)
+        self.folder_button.setMinimumWidth(140)
+        self.folder_button.setFixedHeight(theme.primary_height)
         button_row.addStretch(1)
         button_row.addWidget(self.browse_button)
         button_row.addWidget(self.folder_button)
@@ -242,7 +235,7 @@ class DropCard(QWidget):
         for key in ("mp4", "mov", "m4v"):
             label = QLabel()
             label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            label.setFixedHeight(20)
+            label.setFixedHeight(22)
             self.format_labels[key] = label
             format_row.addWidget(label)
         format_row.addStretch(1)
@@ -251,7 +244,7 @@ class DropCard(QWidget):
         self.profile_strip = QFrame(self.center_card)
         self.profile_strip.setObjectName("DropProfileStrip")
         profile_layout = QVBoxLayout(self.profile_strip)
-        profile_layout.setContentsMargins(theme.inner, theme.outer, theme.inner, theme.outer)
+        profile_layout.setContentsMargins(0, theme.spacing + 4, 0, 0)
         profile_layout.setSpacing(2)
         self._profile_layout = profile_layout
         self.profile_title = QLabel()
@@ -262,6 +255,12 @@ class DropCard(QWidget):
         self.profile_summary.setFixedHeight(16)
         profile_layout.addWidget(self.profile_summary)
         self._card_layout.addWidget(self.profile_strip)
+
+        self.reassure_label = QLabel()
+        self.reassure_label.setProperty("role", "muted")
+        self.reassure_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.reassure_label.setWordWrap(True)
+        self._card_layout.addWidget(self.reassure_label)
 
         layout.addStretch(1)
         self.setMinimumHeight(180)
@@ -368,6 +367,10 @@ class DropCard(QWidget):
         self.set_breathing(False)
         super().hideEvent(event)
 
+    def showEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        super().showEvent(event)
+        fade_in(self.center_card, 180, self.reduce_motion)
+
     def set_drag_active(self, active: bool) -> None:
         if active == self._drag_active:
             return
@@ -385,12 +388,10 @@ class DropCard(QWidget):
     def set_theme(self, theme: Theme) -> None:
         self._theme = theme
         self._card_layout.setContentsMargins(
-            theme.outer, theme.outer, theme.outer, theme.outer
+            theme.spacing + 16, theme.spacing + 12, theme.spacing + 16, theme.spacing + 10
         )
-        self._card_layout.setSpacing(theme.outer)
-        self._profile_layout.setContentsMargins(
-            theme.inner, theme.outer, theme.inner, theme.outer
-        )
+        self._card_layout.setSpacing(theme.spacing + 2)
+        self._profile_layout.setContentsMargins(0, theme.spacing + 4, 0, 0)
         self.folder_button.setIcon(get_icon("folder", theme.is_dark))
         self.folder_button.setIconSize(QSize(14, 14))
         self._refresh_text()
@@ -412,6 +413,7 @@ class DropCard(QWidget):
         self.subtitle_label.setText(t("drop_sub", self._language))
         self.browse_button.setText(t("add_files_btn", self._language))
         self.folder_button.setText(t("add_folder_btn", self._language))
+        self.reassure_label.setText(t("drop_reassure", self._language))
         for key, label in self.format_labels.items():
             label.setText(t(f"format_{key}", self._language))
         self.profile_title.setText(t("active_patch_profile", self._language))
@@ -425,42 +427,43 @@ class DropCard(QWidget):
         caption = theme.fonts.caption
         self.center_card.setStyleSheet(
             "QFrame#DropCenterCard {"
-            f"background: {theme.color('surface_raised')};"
+            f"background: {theme.color('surface')};"
             f"border: 1px solid {theme.color('border')};"
             f"border-radius: {theme.radii.card}px;"
             "}"
         )
-        if self.center_card.graphicsEffect() is None:
-            shadow = QGraphicsDropShadowEffect(self.center_card)
-            shadow.setBlurRadius(26)
-            shadow.setOffset(0, 4)
-            shadow.setColor(QColor(0, 0, 0, 64))
-            self.center_card.setGraphicsEffect(shadow)
+        self.icon_holder.setStyleSheet(
+            "QFrame#DropIconHolder {"
+            f"background: {theme.color('console_bg')};"
+            f"border: 1px solid {theme.color('border')};"
+            f"border-radius: {theme.radii.control}px;"
+            "}"
+        )
         badge_qss = (
             "QLabel {"
-            f"background: {theme.color('surface')};"
+            "background: transparent;"
             f"border: 1px solid {theme.color('border')};"
-            "border-radius: 9px;"
+            "border-radius: 4px;"
             f"color: {theme.color('text2')};"
             f"font-size: {caption}px;"
             "font-weight: 600;"
-            "padding: 0 9px;"
+            "padding: 0 8px;"
             "}"
         )
         for label in self.format_labels.values():
             label.setStyleSheet(badge_qss)
         self.profile_strip.setStyleSheet(
             "QFrame#DropProfileStrip {"
-            f"background: {theme.color('surface')};"
-            f"border: 1px solid {theme.color('border')};"
-            f"border-radius: {theme.radii.control}px;"
+            "background: transparent;"
+            f"border: none;"
+            f"border-top: 1px solid {theme.color('border')};"
             "}"
             f"QFrame#DropProfileStrip QLabel {{ color: {theme.color('text2')}; }}"
         )
 
     def _refresh_icon(self) -> None:
         icon = get_icon("zap" if self._drag_active else "folder", self._theme.is_dark)
-        pixmap = icon.pixmap(QSize(40, 40))
+        pixmap = icon.pixmap(QSize(32, 32))
         if pixmap.isNull():
             pixmap = QPixmap()
         self.icon_label.setPixmap(pixmap)
@@ -471,6 +474,8 @@ class DropCard(QWidget):
         super().mousePressEvent(event)
 
     def paintEvent(self, _event: QPaintEvent) -> None:
+        if not self._drag_active:
+            return
         theme = self._theme
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -481,21 +486,11 @@ class DropCard(QWidget):
         painter.translate(-rect.center())
 
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(
-            QColor(theme.color("surface_drop_hover" if self._drag_active else "surface"))
-        )
+        painter.setBrush(QColor(theme.color("surface_drop_hover")))
         painter.drawRoundedRect(rect, radius, radius)
 
-        if self._drag_active:
-            border = QColor(theme.color("accent"))
-        else:
-            border = _blend_color(
-                QColor(theme.color("border")),
-                QColor(theme.color("accent_dim_border")),
-                self._breath_phase,
-            )
-        pen = QPen(border)
-        pen.setWidthF(2.0 if self._drag_active else 1.4)
+        pen = QPen(QColor(theme.color("accent")))
+        pen.setWidthF(2.0)
         pen.setStyle(Qt.PenStyle.DashLine)
         pen.setDashPattern([4.0, 3.0])
         painter.setPen(pen)
@@ -1096,6 +1091,9 @@ class QueueView(QWidget):
             self._focused_path = None
         has_items = bool(items)
         self.drop_card.setVisible(not has_items)
+        self.toolbar.setVisible(has_items)
+        self._divider.setVisible(has_items)
+        self.footer.setVisible(has_items)
         self.summary_label.setVisible(has_items)
         self.list_view.setVisible(has_items)
         self.summary_label.setText(self.tr("queue_collapsed", count=len(items)))
@@ -1299,7 +1297,8 @@ class QueueView(QWidget):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(theme.outer)
 
-        toolbar = QWidget(self)
+        self.toolbar = QWidget(self)
+        toolbar = self.toolbar
         bar = QHBoxLayout(toolbar)
         bar.setContentsMargins(0, 0, 0, 0)
         bar.setSpacing(theme.outer)
@@ -1309,11 +1308,18 @@ class QueueView(QWidget):
         self.add_folder_button.setIconSize(QSize(14, 14))
         self.retry_button = text_button(self.tr("retry_failed"), theme, self._retry_failed)
         self.retry_button.setVisible(False)
-        self.select_all_button = text_button(self.tr("select_all"), theme, self._toggle_select_all)
-        self.clear_selection_button = text_button(
-            self.tr("clear_selection"), theme, self._clear_selection
+        self.select_all_button = text_button(
+            self.tr("select_all"), theme, self._toggle_select_all, variant="ghost"
         )
-        self.clear_all_button = text_button(self.tr("clear_all"), theme, self._clear_all)
+        self.clear_selection_button = text_button(
+            self.tr("clear_selection"),
+            theme,
+            self._clear_selection,
+            variant="ghost",
+        )
+        self.clear_all_button = text_button(
+            self.tr("clear_all"), theme, self._clear_all, variant="ghost"
+        )
         for widget in (
             self.add_files_button,
             self.add_folder_button,
@@ -1368,11 +1374,13 @@ class QueueView(QWidget):
         self._divider = hairline(theme)
         root.addWidget(self._divider)
 
-        footer = QWidget(self)
+        self.footer = QWidget(self)
+        footer = self.footer
         foot = QHBoxLayout(footer)
         foot.setContentsMargins(0, 0, 0, 0)
         foot.setSpacing(theme.inner)
         self.preview_switch = Switch(theme, footer)
+        self.preview_switch.set_reduce_motion(bool(self.settings.reduce_motion))
         self.preview_switch.setChecked(self._preview_on)
         self.preview_switch.toggled.connect(self._on_preview_toggled)
         foot.addWidget(self.preview_switch)

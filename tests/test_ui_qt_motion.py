@@ -56,7 +56,7 @@ def test_reduce_motion_console_reaches_full_height_without_animation(qtbot: Any)
     assert _running(console) == []
 
     console.set_expanded(False)
-    assert console.height() == 36
+    assert console.height() == 32
 
 
 def test_reduce_motion_start_glow_does_not_run(qtbot: Any) -> None:
