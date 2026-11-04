@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import tempfile
+import threading
 import uuid
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime
@@ -23,6 +24,10 @@ from .models import PatchRequest, PatchResult
 log = logging.getLogger("fps_patcher")
 
 MAX_HISTORY = 200
+
+# Parallel patch workers append to the same file; serialize read-modify-write
+# inside this process. Cross-process writes remain best-effort.
+_HISTORY_LOCK = threading.Lock()
 
 
 @dataclass(frozen=True)
@@ -109,9 +114,10 @@ def record_job(
         platform_profile=req.platform_profile,
     )
     try:
-        records = _read(path)
-        records.insert(0, record)
-        _write(path, records[:MAX_HISTORY])
+        with _HISTORY_LOCK:
+            records = _read(path)
+            records.insert(0, record)
+            _write(path, records[:MAX_HISTORY])
     except OSError as exc:
         # A successful patch must never be reported as failed because of logging.
         log.warning("Could not record job history in %s: %s", path, exc)

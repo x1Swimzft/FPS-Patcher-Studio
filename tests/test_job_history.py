@@ -109,6 +109,29 @@ def test_history_keeps_only_newest_200(tmp_path: Path) -> None:
     assert jobs[-1].output == str(tmp_path / "out1.mp4")
 
 
+def test_concurrent_record_jobs_are_not_lost(tmp_path: Path) -> None:
+    import threading
+
+    history = tmp_path / "job_history.json"
+    barrier = threading.Barrier(2)
+    jobs: list[JobRecord] = []
+
+    def worker(index: int) -> None:
+        barrier.wait(timeout=5)
+        jobs.append(_record(history, output=tmp_path / f"out{index}.mp4"))
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=10)
+
+    assert len(jobs) == 2
+    assert {job.job_id for job in jobs} == {
+        job.job_id for job in load_history(history_path=history)
+    }
+
+
 def test_malformed_or_missing_history_reads_empty_and_record_recovers(
     tmp_path: Path,
 ) -> None:
