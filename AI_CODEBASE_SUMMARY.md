@@ -1,4 +1,4 @@
-# AI Codebase Summary — FPS Patcher Studio (v1.4.0)
+# AI Codebase Summary — FPS Patcher Studio (v2.0.0)
 
 > **Purpose**: Master architecture, codebase map, state lifecycle, and operational guide for autonomous AI agents and engineers working on **FPS Patcher Studio**.
 
@@ -8,13 +8,13 @@
 
 - **Repository**: `fps-patcher-studio`
 - **Root Path**: `E:\Project\fps-patcher-studio`
-- **Current Version**: `1.4.0` (2026-11-04)
+- **Current Version**: `2.0.0` (2026-11-04)
 - **Python Target**: Python 3.11+
 - **Desktop Stack**: PySide6 `6.12.0`, Pillow, PyInstaller one-folder build
 - **Primary Domain**: High-precision ISO-BMFF (MP4/MOV/M4V) container timing patcher. It modifies video timescales, sample duration tables (`stts`), composition offsets (`ctts`), track/movie headers (`mvhd`, `tkhd`, `mdhd`), and edit lists (`edts`/`elst`) losslessly at the binary atom level **without re-encoding video frames** unless the optional bitrate cap is enabled.
 - **User Interface**: Qt is the only UI (`src/fps_patcher/ui_qt/`), with English and Thai localization, light/dark themes, seven theme presets, drag-and-drop, thumbnails, and a bottom activity console.
 - **Headless Surface**: `src/fps_patcher/cli.py` (`--cli patch|probe|score`), plus `--quick-patch` for the Explorer verb.
-- **Release Status**: v1.4.0 is source-only (not built or tagged). v1.2.0 is the last published release on GitHub Releases and is **unsigned**. SignPath is documented but not active.
+- **Release Status**: v2.0.0 is source-only (not built or tagged). v1.2.0 is the last published release on GitHub Releases and is **unsigned**. SignPath is documented but not active.
 
 ---
 
@@ -31,7 +31,7 @@ E:\Project\fps-patcher-studio\
 │   ├── version_info.txt            # Windows PE version metadata
 │   └── fps_patcher.manifest        # DPI/long-path aware application manifest
 ├── src\fps_patcher\
-│   ├── __init__.py                 # __version__ = "1.4.0", APP_NAME
+│   ├── __init__.py                 # __version__ = "2.0.0", APP_NAME
 │   ├── __main__.py                 # Entry dispatch: --cli, --quick-patch, Qt GUI
 │   ├── cli.py                      # Headless CLI: patch | probe | score
 │   ├── config.py                   # Settings persistence and clamping
@@ -82,7 +82,7 @@ E:\Project\fps-patcher-studio\
 │       ├── thumbnails.py           # Off-thread thumbnail generation/cache
 │       ├── widgets.py              # Card, Switch, SegmentedControl, Popover
 │       └── icons.py                # Dual-mode icon loading
-├── tests\                          # 40 test_*.py modules, 412 tests
+├── tests\                          # 52 test_*.py modules, 566 tests
 │   ├── conftest.py
 │   ├── qt_support.py               # pytest-qt helpers and startup stubs
 │   └── test_*.py
@@ -93,7 +93,7 @@ E:\Project\fps-patcher-studio\
 │   └── make_icon.py
 ├── docs\                           # Policies, roadmap, signing, handoff checklists
 ├── release\                        # Built installers, zips, checksums, SBOM
-├── pyproject.toml                  # Version 1.4.0, PySide6 pin, tool config
+├── pyproject.toml                  # Version 2.0.0, PySide6 pin, tool config
 ├── uv.lock                         # Locked dependency graph
 ├── README.md
 ├── CHANGELOG.md
@@ -363,6 +363,57 @@ v1.4.0 is source-only and has not been built or tagged; section 12 of
 `docs/handoff/manual-test-v1.0.1.md` lists the manual checks and they are not
 executed.
 
+### 7.8 v2.0.0 Changes (four pillars)
+
+v2.0.0 adds four opt-in pillars on top of the v1.4.0 base. Default settings keep
+legacy `_ts<timescale>` naming, single-platform runs, lossless atom patching and
+`.bak` handling unchanged.
+
+- **A — readiness auto-remediation** (`core/preflight.py`): `PreflightPlan`
+  gained `fix_vfr`, `transcode_codec`, `scale_width`, `scale_height` and
+  `needs_video_encode`; `build_preflight_args` emits `-fps_mode cfr` and
+  `-vf scale=...`. `make_plan` handles VFR -> CFR, codec fallback (e.g. AV1 to
+  H.264 for TikTok) and profile resolution caps without upscaling. Controlled by
+  `auto_fix_vfr`, `auto_fix_codec`, `auto_cap_resolution` (all default `False`),
+  the readiness popover Auto-Fix button, and CLI `--fix-vfr` / `--fix-codec` /
+  `--cap-resolution`. A WARN is logged for every lossy video re-encode; HDR
+  PQ/HLG sources are refused instead of tone-mapped.
+- **B1 — filename template routing**: `render_filename_template` supports
+  `{platform}` and `{strategy}`; `output_base_for` renders a template only when
+  `PatchRequest.filename_template` is non-empty and otherwise keeps the legacy
+  name. `use_filename_template` defaults to `False`. `QueueItem.platform_profile`
+  stores a per-item override via sentinel-based `set_override` (omitted =
+  unchanged, explicit `None` = clear), exposed in the inspector and queue menu;
+  item readiness and captions use the item profile.
+- **B2 — multi-platform export**: `Settings.export_platforms` (valid,
+  non-generic, deduped IDs) fans one run out to one output per platform. An empty
+  template becomes `{name}_ts{timescale}_{platform}`; a template without
+  `{platform}` gets the platform as a suffix. A per-item profile override
+  disables fan-out, and the first target failure skips the remaining targets.
+  CLI: `--platforms a,b` (mutually exclusive with `--profile`). The overwrite
+  pre-check mirrors the fan-out, so every variant is confirmed.
+- **C — two-stage parallel batch** (`app/controller.py`): one source per future
+  in a `ThreadPoolExecutor(max_workers=2)`; `run_preflight` serializes FFmpeg
+  work on a process-local `threading.Semaphore(1)` with a cancel-aware acquire
+  released in `finally`. `active_patching_paths` and a read-only
+  `current_patching_path` expose state; progress is monotonic under a lock;
+  cancellation stops new scheduling; `stop_on_error` keeps a one-source in-flight
+  limit; shutdown timeout drops queued futures.
+- **D — job history and rollback** (`core/job_history.py`): JSON ledger at
+  `app_data_dir()/job_history.json`, newest-first, last 200, atomic replace.
+  `record_job`, `load_history` and `undo_job` restore the `.bak` through the
+  destination lock and mark the row `rolled_back`; `PatchResult.backup_path`
+  carries the path. Controller `undo_job`/`undo_last_job` refuse while busy; CLI
+  `history`/`undo` and the toolbar History dialog expose it.
+
+**Compatibility and limits**: all new behavior is opt-in and the re-encoding
+fixes are lossy. Parallel batches may reorder files when `stop_on_error` is off.
+The preflight semaphore and the job-history writes are process-local, so two app
+instances can still encode or write history simultaneously. v2.0.0 is source-only
+and has not been built or tagged; section 13 of
+`docs/handoff/manual-test-v1.0.1.md` lists the manual checks and they are not
+executed.
+
 ---
 
 ## 8. Development, Quality Gates & Release Workflow
@@ -395,7 +446,7 @@ Current baseline:
 
 - `ruff`: clean.
 - `mypy`: clean across **95 source files**.
-- `pytest`: **412 tests** collected from **40 `test_*.py` modules** (plus `conftest.py` and `qt_support.py` helpers).
+- `pytest`: **566 tests** collected from **52 `test_*.py` modules** (plus `conftest.py` and `qt_support.py` helpers).
 
 ### 8.3 Build and release
 

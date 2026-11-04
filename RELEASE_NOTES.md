@@ -1,5 +1,55 @@
 # Release Notes
 
+## v2.0.0 - 2026-11-04 (Autonomous Multi-Platform Studio)
+
+Version 2.0.0 turns readiness into opt-in remediation, exports several platform
+variants in one run, keeps a job ledger with one-click rollback, and patches two
+sources in parallel. **This version is source-only; it has not been built or
+tagged, manual QA is pending, and builds remain unsigned.**
+
+### Highlights
+
+- **Pillar A — readiness auto-remediation** — the readiness popover can fix VFR
+  sources (`-fps_mode cfr`), swap an unsupported codec for H.264 on the active
+  platform, and cap resolution to the profile without upscaling. Every fix is
+  opt-in, warns that the re-encode is lossy, and refuses HDR PQ/HLG rather than
+  silently tone-mapping it. CLI: `--fix-vfr`, `--fix-codec`, `--cap-resolution`.
+- **Pillar B — multi-platform export and filename routing** — `export_platforms`
+  writes one output per selected platform with collision-safe `{platform}`
+  naming, and `filename_template` accepts `{platform}`/`{strategy}`. The same
+  release adds per-item platform overrides in the inspector and queue. CLI:
+  `--platforms a,b` (not combined with `--profile`).
+- **Pillar C — two-stage parallel batch** — up to two sources are patched at
+  once while FFmpeg preflight work is serialized to a single pass. Progress stays
+  monotonic, cancellation stops new scheduling, and `stop_on_error` keeps a
+  one-source in-flight limit.
+- **Pillar D — job history and rollback** — `job_history.json` records the last
+  200 jobs newest-first, `PatchResult.backup_path` points at the `.bak`, and the
+  History dialog or `--cli history|undo` restores the previous bytes and marks
+  the row rolled back.
+
+### Upgrade notes
+
+- Defaults keep the old behavior: legacy `_ts<timescale>` naming, single-platform
+  runs, lossless atom patching, and `.bak` handling are unchanged.
+- Every new fix and export option is opt-in. The re-encoding fixes are lossy;
+  HDR PQ/HLG sources are refused.
+- With `stop_on_error` off, parallel batches may process files in a different
+  order. With it on, processing stays sequential.
+
+### Known limitations
+
+- The preflight GPU semaphore is process-local; two app instances can still
+  encode simultaneously.
+- Job history writes are not cross-process locked.
+- Aspect-ratio cropping/padding and HDR tone-mapping are not auto-fixed.
+- No manual QA has been executed and no v2.0.0 build, signature or tag exists.
+  SignPath and the Nuitka benchmark (no MSVC v143) remain blocked.
+
+### Verification
+
+- Automated gates only: 566 tests, ruff and mypy clean.
+
 ## v1.4.0 - 2026-11-04 (zero-copy prober)
 
 Version 1.4.0 makes direct probing memory-safe: it reads box headers and the

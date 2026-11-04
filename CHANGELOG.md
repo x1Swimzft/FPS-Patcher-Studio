@@ -2,6 +2,33 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
+## [2.0.0] - 2026-11-04
+
+### Added
+- Opt-in readiness auto-remediation: VFR -> CFR, codec fallback to H.264 for the active platform, and profile resolution caps, with an explicit lossy warning and an HDR (PQ/HLG) guard.
+- Multi-platform export: one run can produce TikTok/Instagram/YouTube variants with collision-safe `{platform}` naming (`--platforms` on the CLI, checkboxes in Settings).
+- Job history and one-click rollback: `job_history.json`, `PatchResult.backup_path`, `--cli history|undo`, and a History dialog that restores `.bak` files.
+- Filename template routing: `{platform}`/`{strategy}` tokens, opt-in `use_filename_template`, and per-item platform profile overrides in the inspector and queue.
+- Two-stage parallel batch: up to two sources patched concurrently while FFmpeg preflight passes are serialized to one at a time.
+
+### Changed
+- Batch progress is monotonic across concurrent workers; cancellation stops scheduling new sources.
+- The overwrite pre-check now checks every platform variant that a multi-export run would write.
+
+### Compatibility
+- No breaking changes with default settings: legacy `_ts<timescale>` naming, single-platform runs, lossless atom patching, and `.bak` handling are unchanged.
+- Parallel batches may reorder work when `stop_on_error` is off; with it on, processing remains sequential.
+- All remediation options are opt-in and lossy; HDR PQ/HLG sources are refused rather than silently tone-mapped.
+
+### Known limitations
+- The preflight GPU semaphore is process-local; two app instances can still encode simultaneously.
+- Job history writes are not cross-process locked.
+- Aspect-ratio cropping/padding and HDR tone-mapping are not auto-fixed.
+- No manual QA and no v2.0.0 build, signature or tag; SignPath and the Nuitka benchmark (no MSVC v143) remain blocked.
+
+### Verification
+- Automated gates only: 566 tests, ruff and mypy clean.
+
 ## [1.4.0] - 2026-11-04
 
 ### Changed

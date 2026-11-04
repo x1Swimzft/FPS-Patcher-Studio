@@ -261,3 +261,25 @@ code inspection are not results.
 | Y6 | Run the Nuitka benchmark. | Not run on this machine; record the blocked state. Do not invent numbers. | | |
 
 **Status:** not executed. A human on Windows must record results.
+
+## 13. v2.0.0 additions (not executed)
+
+**Status: not executed.** These rows cover the v2.0.0 pillars (filename
+templates, per-item platform overrides, job history/undo, auto-remediation,
+multi-platform export and two-stage parallel batches) and have not been run. A
+human on Windows must record every result; automated tests and code inspection
+are not results.
+
+| # | Step | Expected | Result | Notes |
+|---|---|---|---|---|
+| Z1 | Enable `use_filename_template` with `{name}_{platform}_{fps}fps` and patch a clip via the GUI. | The output name follows the template, and the watch folder does not re-ingest its own output. | | |
+| Z2 | Set a per-item platform profile override in the Inspector and via the queue context menu, then change FPS/preset. | The readiness badge/caption follow the item profile independently of the global profile, and FPS/preset overrides do not clear it. | | |
+| Z3 | Overwrite an existing output with `backup_original` on; open History and click Rollback. | The previous bytes return and the row is marked rolled back. | | |
+| Z4 | Run `--cli history --json` and `--cli undo --last --json` from PowerShell. | Both commands return the documented JSON without errors. | | |
+| Z5 | Load an AV1 or VFR clip under TikTok, use the readiness Auto-Fix button, confirm the lossy warning, then patch. | A WARN is logged for the lossy re-encode and output readiness reflects the fix. | | |
+| Z6 | Load an HDR (BT.2020/PQ) clip and use the new auto-fixes. | The fixes refuse with a clear message rather than silently tone-mapping. | | |
+| Z7 | Enable TikTok + Instagram + YouTube multi-export and patch one clip; repeat with an existing output. | Three distinct outputs are written; the overwrite confirmation covers every variant. | | |
+| Z8 | Queue 4 clips, start a batch, watch encoder load, then Cancel mid-run and close the app. | At most one preflight encode runs at a time while two atom patches overlap; cancel and close shut down cleanly. | | |
+| Z9 | Run history/undo while a batch is running. | Both refuse with a clear message. | | |
+
+**Status:** not executed. A human on Windows must record results.
