@@ -8,7 +8,7 @@ A Windows desktop app and CLI that change the timing metadata of MP4, MOV, and M
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 <p align="center">
-  <img src="images/after-qt/crimson-gamer-dark-en-100-main-queue.png" width="840" alt="FPS Patcher Studio with three clips in the batch queue">
+  <img src="images/ui-redesign/dark-queue.png" width="840" alt="FPS Patcher Studio with three clips in the batch queue">
 </p>
 
 ## How it works
