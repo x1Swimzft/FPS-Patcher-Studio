@@ -17,11 +17,15 @@ from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from .errors import PatchError
+from .errors import PatchCancelledError, PatchError
 from .ffmpeg_locator import CREATE_NO_WINDOW, FFmpegPaths
 from .ffmpeg_runner import run_streaming
 from .models import LogEvent, VideoInfo
 from .platform_profiles import PlatformProfile
+
+# FFmpeg preflight encodes compete for the same GPU; keep one pass at a time
+# across all controller workers.
+_PREFLIGHT_GPU_SEM = threading.Semaphore(1)
 
 _OWNER_TOOL = "fps-patcher-studio"
 _OWNER_SUFFIX = ".preflight-owner.json"
@@ -451,9 +455,15 @@ def run_preflight(
         f"{src.stem}.preflight-{os.getpid()}-{secrets.token_hex(6)}{src.suffix}"
     )
     cleanup_stale_preflight([src.parent])
-    marker = _claim_preflight_owner(src, dst)
+    while True:
+        if cancel_event is not None and cancel_event.is_set():
+            raise PatchCancelledError("Pre-flight cancelled.")
+        if _PREFLIGHT_GPU_SEM.acquire(timeout=0.1):
+            break
+    marker: Path | None = None
     released = False
     try:
+        marker = _claim_preflight_owner(src, dst)
         attempts: list[tuple[str | None, str | None]]
         if plan.needs_video_encode:
             encoders = list(encoder_candidates(list_h264_encoders(paths.ffmpeg)))
@@ -505,6 +515,10 @@ def run_preflight(
 
         raise PatchError("Pre-flight conversion failed.", last_tail)
     finally:
+        # Release before returning the temp so waiting workers can start their
+        # own pass while the caller patches the previous result.
+        _PREFLIGHT_GPU_SEM.release()
         if not released:
             dst.unlink(missing_ok=True)
-            marker.unlink(missing_ok=True)
+            if marker is not None:
+                marker.unlink(missing_ok=True)

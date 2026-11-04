@@ -6,6 +6,7 @@ thread drains the queue via ``drain()`` driven by a ``QTimer`` in ``ui_qt``.
 
 from __future__ import annotations
 
+import concurrent.futures
 import logging
 import queue
 import threading
@@ -50,6 +51,8 @@ log = logging.getLogger("fps_patcher")
 
 EventHandler = Callable[[Event], None]
 
+_PATCH_WORKERS = 2
+
 
 class AppController:
     def __init__(self, settings: Settings) -> None:
@@ -59,9 +62,12 @@ class AppController:
         self.current: VideoInfo | None = None
         self.queue: list[Path] = []
         self.items = InputQueue()
-        self.current_patching_path: Path | None = None
+        self.active_patching_paths: set[Path] = set()
+        self._active_paths_lock = threading.Lock()
         self._cancel = threading.Event()
         self._worker: threading.Thread | None = None
+        self._executor: concurrent.futures.ThreadPoolExecutor | None = None
+        self._executor_lock = threading.Lock()
         self._ff_download: threading.Thread | None = None
         self._update_cancel = threading.Event()
         self._update_worker: threading.Thread | None = None
@@ -86,6 +92,12 @@ class AppController:
     @property
     def busy(self) -> bool:
         return self._worker is not None and self._worker.is_alive()
+
+    @property
+    def current_patching_path(self) -> Path | None:
+        """One active source (legacy single-value view of active_patching_paths)."""
+        with self._active_paths_lock:
+            return next(iter(self.active_patching_paths), None)
 
     def emit(self, event: Event) -> None:
         self.events.put(event)
@@ -382,28 +394,29 @@ class AppController:
         ff = self.ffmpeg
         total_files = len(items)
         self._cancel.clear()
+        executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=_PATCH_WORKERS, thread_name_prefix="fps-patch"
+        )
+        with self._executor_lock:
+            self._executor = executor
 
         def patch_job() -> None:
+            state_lock = threading.Lock()
+            progress_lock = threading.Lock()
+            stop_after_error = threading.Event()
             batch_results: list[PatchResult] = []
             failed: list[tuple[Path, str]] = []
             cancelled = False
             last_error: str | None = None
             last_stderr: list[str] = []
+            last_progress = 0.0
 
-            try:
-                for idx, src in enumerate(items, start=1):
-                    if self._cancel.is_set():
-                        cancelled = True
-                        self.emit(
-                            LogEvent(
-                                f"Batch cancelled by user before file {idx}/{total_files} "
-                                f"({src.name})",
-                                "WARN",
-                            )
-                        )
-                        break
+            def run_source(idx: int, src: Path) -> None:
+                nonlocal cancelled, last_error, last_stderr
 
-                    self.current_patching_path = src
+                with self._active_paths_lock:
+                    self.active_patching_paths.add(src)
+                try:
                     out_dir = (
                         Path(self.settings.output_dir)
                         if self.settings.output_dir
@@ -433,13 +446,16 @@ class AppController:
                     self.emit(LogEvent(f"[{idx}/{total_files}] Starting patch for {src.name}"))
 
                     file_failed = False
+                    source_cancelled = False
                     last_output: Path | None = None
                     try:
                         self.items.set_status(src, "patching")
                         self.emit(QueueChangedEvent("patching"))
                         for target_index, target in enumerate(targets):
                             if target_index and self._cancel.is_set():
-                                cancelled = True
+                                source_cancelled = True
+                                with state_lock:
+                                    cancelled = True
                                 self.emit(
                                     LogEvent(
                                         f"[{idx}/{total_files}] Cancelled {src.name} "
@@ -456,18 +472,23 @@ class AppController:
                                 target_idx: int = target_index,
                                 target_count: int = len(targets),
                             ) -> None:
+                                nonlocal last_progress
                                 if isinstance(evt, ProgressEvent):
                                     within = (target_idx + evt.fraction) / target_count
                                     overall = ((cur_idx - 1) + within) / total_files
-                                    self.emit(
-                                        ProgressEvent(
-                                            fraction=overall,
-                                            file_fraction=within,
-                                            current_file=cur_src,
-                                            file_index=cur_idx,
-                                            total_files=total_files,
+                                    with progress_lock:
+                                        last_progress = max(last_progress, overall)
+                                        # Emit under the lock so two workers can
+                                        # never publish out of order.
+                                        self.emit(
+                                            ProgressEvent(
+                                                fraction=last_progress,
+                                                file_fraction=within,
+                                                current_file=cur_src,
+                                                file_index=cur_idx,
+                                                total_files=total_files,
+                                            )
                                         )
-                                    )
                                 else:
                                     self.emit(evt)
 
@@ -505,7 +526,8 @@ class AppController:
 
                             try:
                                 res = patch(req, ff, file_emit, self._cancel)
-                                batch_results.append(res)
+                                with state_lock:
+                                    batch_results.append(res)
                                 last_output = res.output
                                 if qi is not None:
                                     qi.output = res.output
@@ -514,8 +536,10 @@ class AppController:
                                         LogEvent(f"Output ({target}): {res.output}")
                                     )
                             except PatchCancelledError as exc:
-                                cancelled = True
-                                last_error = str(exc)
+                                source_cancelled = True
+                                with state_lock:
+                                    cancelled = True
+                                    last_error = str(exc)
                                 self.emit(
                                     LogEvent(
                                         f"[{idx}/{total_files}] Cancelled {src.name}",
@@ -525,8 +549,9 @@ class AppController:
                                 break
                             except OutputFileExistsError as exc:
                                 file_failed = True
-                                last_error = str(exc)
-                                failed.append((src, str(exc)))
+                                with state_lock:
+                                    last_error = str(exc)
+                                    failed.append((src, str(exc)))
                                 self.items.set_status(src, "failed", error=str(exc))
                                 self.emit(
                                     LogEvent(
@@ -538,9 +563,10 @@ class AppController:
                                 break
                             except PatchError as exc:
                                 file_failed = True
-                                last_error = str(exc)
-                                last_stderr = exc.stderr_tail
-                                failed.append((src, str(exc)))
+                                with state_lock:
+                                    last_error = str(exc)
+                                    last_stderr = exc.stderr_tail
+                                    failed.append((src, str(exc)))
                                 self.items.set_status(src, "failed", error=str(exc))
                                 self.emit(
                                     LogEvent(
@@ -551,8 +577,9 @@ class AppController:
                                 break
                             except FPSPatcherError as exc:
                                 file_failed = True
-                                last_error = str(exc)
-                                failed.append((src, str(exc)))
+                                with state_lock:
+                                    last_error = str(exc)
+                                    failed.append((src, str(exc)))
                                 self.items.set_status(src, "failed", error=str(exc))
                                 self.emit(
                                     LogEvent(
@@ -565,9 +592,11 @@ class AppController:
                             except Exception as exc:
                                 log.exception("Unexpected patch failure in batch")
                                 file_failed = True
-                                last_error = f"Unexpected error: {exc}"
-                                failed.append((src, last_error))
-                                self.items.set_status(src, "failed", error=last_error)
+                                message = f"Unexpected error: {exc}"
+                                with state_lock:
+                                    last_error = message
+                                    failed.append((src, message))
+                                self.items.set_status(src, "failed", error=message)
                                 self.emit(
                                     LogEvent(
                                         f"[{idx}/{total_files}] Unexpected error "
@@ -577,23 +606,71 @@ class AppController:
                                 )
                                 break
                     finally:
-                        self.current_patching_path = None
-                    if cancelled:
-                        break
-                    if last_output is not None and not file_failed:
-                        self.items.set_status(src, "done", output=last_output)
-                        self.emit(QueueChangedEvent("done"))
-                    if file_failed and self.settings.stop_on_error:
-                        self.emit(
-                            LogEvent(
-                                f"[{idx}/{total_files}] Stopping batch after first error "
-                                "(stop_on_error).",
-                                "WARN",
+                        if last_output is not None and not file_failed and not source_cancelled:
+                            self.items.set_status(src, "done", output=last_output)
+                            self.emit(QueueChangedEvent("done"))
+                        if file_failed and self.settings.stop_on_error:
+                            self.emit(
+                                LogEvent(
+                                    f"[{idx}/{total_files}] Stopping batch after first error "
+                                    "(stop_on_error).",
+                                    "WARN",
+                                )
                             )
-                        )
+                            stop_after_error.set()
+                finally:
+                    with self._active_paths_lock:
+                        self.active_patching_paths.discard(src)
+
+            try:
+                # stop_on_error must never start more than one source past a
+                # failure, so it keeps the old sequential in-flight limit.
+                max_in_flight = 1 if self.settings.stop_on_error else _PATCH_WORKERS
+                pending = 0
+                in_flight: dict[concurrent.futures.Future[None], Path] = {}
+                while pending < total_files or in_flight:
+                    while (
+                        pending < total_files
+                        and len(in_flight) < max_in_flight
+                        and not self._cancel.is_set()
+                        and not stop_after_error.is_set()
+                    ):
+                        src = items[pending]
+                        in_flight[executor.submit(run_source, pending + 1, src)] = src
+                        pending += 1
+                    if pending < total_files and not in_flight:
+                        if self._cancel.is_set():
+                            with state_lock:
+                                cancelled = True
+                            self.emit(
+                                LogEvent(
+                                    f"Batch cancelled by user before file {pending + 1}/"
+                                    f"{total_files} ({items[pending].name})",
+                                    "WARN",
+                                )
+                            )
                         break
+                    if not in_flight:
+                        break
+                    finished, _ = concurrent.futures.wait(
+                        in_flight, return_when=concurrent.futures.FIRST_COMPLETED
+                    )
+                    for future in finished:
+                        src = in_flight.pop(future)
+                        try:
+                            future.result()
+                        except Exception as exc:
+                            log.exception("Unexpected failure in parallel patch worker")
+                            message = f"Unexpected error: {exc}"
+                            with state_lock:
+                                failed.append((src, message))
+                                last_error = message
+                            stop_after_error.set()
             finally:
-                self.current_patching_path = None
+                executor.shutdown(wait=True)
+                with self._executor_lock:
+                    if self._executor is executor:
+                        self._executor = None
 
             n_exp = sum(1 for r in batch_results if r.experimental)
             n_ok = len(batch_results) - n_exp
@@ -771,6 +848,12 @@ class AppController:
         worker = self._worker
         if worker is not None and worker.is_alive():
             worker.join(timeout=timeout)
+        if worker is not None and worker.is_alive():
+            # Timed out: drop queued futures and never block process exit on them.
+            with self._executor_lock:
+                executor = self._executor
+            if executor is not None:
+                executor.shutdown(wait=False, cancel_futures=True)
 
     def _start(self, job: Callable[[], None]) -> None:
         self._worker = threading.Thread(target=job, daemon=True)

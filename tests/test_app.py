@@ -9,6 +9,7 @@ import pytest
 
 from fps_patcher.app.controller import AppController
 from fps_patcher.config import Settings
+from fps_patcher.core.errors import PatchCancelledError
 from fps_patcher.core.ffmpeg_locator import FFmpegPaths
 from fps_patcher.core.models import (
     Event,
@@ -74,29 +75,41 @@ def test_controller_batch_queue(clip30: Path, clip5994: Path, tmp_path: Path) ->
     assert any(p.file_index == 2 for p in progresses)
 
 
-def test_controller_batch_cancel(clip30: Path, clip5994: Path, tmp_path: Path) -> None:
+def test_controller_batch_cancel(
+    clip30: Path, clip5994: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     ctrl = AppController(Settings(output_dir=str(tmp_path)))
     assert ctrl.init_ffmpeg() is not None
 
     ctrl.load_files([clip30, clip5994])
     _wait_for(ctrl, ProbeDoneEvent)
 
-    orig_emit = ctrl.emit
+    both_running = threading.Event()
+    guard = threading.Lock()
+    running = 0
 
-    # Set cancel flag as soon as file 1 completes its run
-    def wrapped_emit(evt: Event) -> None:
-        orig_emit(evt)
-        if isinstance(evt, LogEvent) and "Done in" in evt.message:
-            ctrl._cancel.set()
+    def fake_patch(
+        _req: PatchRequest, _ff: object, _emit: object, cancel: threading.Event
+    ) -> None:
+        nonlocal running
+        with guard:
+            running += 1
+            if running == 2:
+                both_running.set()
+        assert cancel.wait(10)
+        raise PatchCancelledError("cancelled")
 
-    ctrl.emit = wrapped_emit  # type: ignore[assignment,method-assign]
+    monkeypatch.setattr("fps_patcher.app.controller.patch", fake_patch)
 
     ctrl.start_patch(60000, "timescale")
+    assert both_running.wait(5)
+    ctrl.cancel()
+
     patch_events = _wait_for(ctrl, PatchDoneEvent)
     done = next(e for e in patch_events if isinstance(e, PatchDoneEvent))
 
     assert done.cancelled is True
-    assert len(done.batch_results) == 1
+    assert done.batch_results == []
     assert len(list(tmp_path.glob("*.part"))) == 0
 
 
