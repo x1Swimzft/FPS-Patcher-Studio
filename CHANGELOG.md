@@ -5,6 +5,11 @@ All notable changes to FPS Patcher Studio are documented in this file.
 ## [2.0.0] - 2026-11-04
 
 ### Added
+- Crimson Graphite UI: shared warm neutral surfaces across all seven presets, Crimson Gamer as the default, a light-mode-first console, Thai-safe wrapping at 125%, and a 44 px primary action.
+- Four-tab Settings (General, Output, Appearance, System) with collapsed Advanced sections, a lazy search index, and a simpler first-run path.
+- System tray background mode: closing the window keeps patching and watch-folder work running; the tray menu can show the window or quit, with a first-close notice.
+- Launch at Windows startup through the per-user Run key, with `--startup` starting silently in the tray when the tray is enabled.
+- One-click VFR safety banner in the inspector: when compatibility VFR fixing is on, the app shows the consequence and offers "Use lossless" without changing the setting silently.
 - Opt-in readiness auto-remediation: VFR -> CFR, codec fallback to H.264 for the active platform, and profile resolution caps, with an explicit lossy warning and an HDR (PQ/HLG) guard.
 - Multi-platform export: one run can produce TikTok/Instagram/YouTube variants with collision-safe `{platform}` naming (`--platforms` on the CLI, checkboxes in Settings).
 - Job history and one-click rollback: `job_history.json`, `PatchResult.backup_path`, `--cli history|undo`, and a History dialog that restores `.bak` files.
@@ -12,6 +17,10 @@ All notable changes to FPS Patcher Studio are documented in this file.
 - Two-stage parallel batch: up to two sources patched concurrently while FFmpeg preflight passes are serialized to one at a time.
 
 ### Changed
+- Settings now opens on General; theme, accent, scale, glass, and lossy preflight controls live behind Advanced.
+- Settings open/close no longer restyles stale dialogs or re-applies an unchanged theme: close drops from 600 ms+ to about 5 ms and construction is about 130 ms.
+- Input and button borders render fully in the normal and 2 px focus states; the box-model clipping that hid bottom borders is fixed.
+- Header utility actions are now ghost buttons; the empty queue hides duplicate toolbar/footer chrome and shows one hero drop card.
 - Batch progress is monotonic across concurrent workers; cancellation stops scheduling new sources.
 - The overwrite pre-check now checks every platform variant that a multi-export run would write.
 
@@ -24,10 +33,11 @@ All notable changes to FPS Patcher Studio are documented in this file.
 - The preflight GPU semaphore is process-local; two app instances can still encode simultaneously.
 - Job history writes are not cross-process locked.
 - Aspect-ratio cropping/padding and HDR tone-mapping are not auto-fixed.
-- No manual QA and no v2.0.0 build, signature or tag; SignPath and the Nuitka benchmark (no MSVC v143) remain blocked.
+- Builds remain unsigned; the manual Windows QA checklist is still pending for this build.
+- System tray and Windows startup are Windows-only.
 
 ### Verification
-- Automated gates only: 566 tests, ruff and mypy clean.
+- 591 tests, ruff and mypy clean; Windows PyInstaller build plus a 6-second launch smoke test.
 
 ## [1.4.0] - 2026-11-04
 

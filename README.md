@@ -26,10 +26,12 @@ The video payload comes out unchanged. The audio payload is copied as well, exce
 - Repair a PC-only X1T clip from the Forensic window.
 - Queue batches with thumbnails, per-item overrides, selection checkboxes, and live probe data.
 - Watch a folder and pick up clips when renders finish.
+- Run in the system tray after closing the window, and optionally start with Windows.
+- Configure the essentials in four Settings tabs, with technical options under Advanced.
 - Patch straight from Explorer with **Quick Patch with X1T**.
 - Score clips against TikTok, Instagram Reels, YouTube Shorts, or generic upload rules.
 - Inspect atoms, color parameters, sample counts, A/V drift, and payload hashes in the Forensic window.
-- Choose from seven theme presets, with an English or Thai interface.
+- Choose from seven theme presets in the Crimson Graphite design, with an English or Thai interface.
 
 ## Install
 

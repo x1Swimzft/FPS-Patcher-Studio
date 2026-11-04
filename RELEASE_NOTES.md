@@ -4,8 +4,10 @@
 
 Version 2.0.0 turns readiness into opt-in remediation, exports several platform
 variants in one run, keeps a job ledger with one-click rollback, and patches two
-sources in parallel. **This version is source-only; it has not been built or
-tagged, manual QA is pending, and builds remain unsigned.**
+sources in parallel. It also ships the Crimson Graphite redesign, four-tab
+Settings, system-tray background mode, and optional Windows startup. **The
+Windows build is produced and shipped unsigned; the manual QA checklist remains
+pending.**
 
 ### Highlights
 
@@ -28,6 +30,27 @@ tagged, manual QA is pending, and builds remain unsigned.**
   History dialog or `--cli history|undo` restores the previous bytes and marks
   the row rolled back.
 
+### UI and background
+
+- **Crimson Graphite redesign** — warm graphite/paper surfaces, one muted accent
+  per preset, hairline borders, a 44 px primary action, and a first-class light
+  mode. Crimson Gamer remains the default preset.
+- **Four-tab Settings** — General, Output, Appearance, and System, with Advanced
+  accordions for technical patching, naming, visual, and FFmpeg options.
+- **System tray** — closing the window keeps patching and watch-folder work
+  running. The tray menu can reopen the window or quit, and the first close
+  explains where the app went.
+- **Windows startup** — optional per-user Run entry; `--startup` starts silently
+  in the tray when the tray is enabled.
+- **VFR safety banner** — the inspector states when compatibility VFR fixing may
+  re-encode and offers a one-click "Use lossless" switch.
+- **Faster Settings** — closed dialogs are detached and deleted, an unchanged
+  theme is not re-applied, and the search index is built lazily. Close time drops
+  from 600 ms+ to about 5 ms; open is about 130 ms.
+- **Thai 125% and focus polish** — Thai text wraps at word boundaries, and input
+  and button borders render fully in normal and 2 px focus states.
+
+
 ### Upgrade notes
 
 - Defaults keep the old behavior: legacy `_ts<timescale>` naming, single-platform
@@ -43,12 +66,13 @@ tagged, manual QA is pending, and builds remain unsigned.**
   encode simultaneously.
 - Job history writes are not cross-process locked.
 - Aspect-ratio cropping/padding and HDR tone-mapping are not auto-fixed.
-- No manual QA has been executed and no v2.0.0 build, signature or tag exists.
-  SignPath and the Nuitka benchmark (no MSVC v143) remain blocked.
+- Builds remain unsigned; the manual Windows QA checklist is still pending.
+- System tray and Windows startup are Windows-only.
 
 ### Verification
 
-- Automated gates only: 566 tests, ruff and mypy clean.
+- 591 tests, ruff and mypy clean, plus a Windows PyInstaller build and a
+  6-second launch smoke test.
 
 ## v1.4.0 - 2026-11-04 (zero-copy prober)
 
