@@ -1,5 +1,26 @@
 # Release Notes
 
+## v2.0.1 - 2026-11-04 (PC color rewrite hotfix)
+
+Version 2.0.1 fixes a blocking X1T For PC failure when the color tag or
+metadata scrub is enabled. The rewrite now runs on the preflight copy before
+the PC ghost NAL tail is appended; without a preflight copy the patch still
+succeeds and logs a `[COLOR] skipped` warning instead of failing.
+
+**The Windows build is unsigned; the manual QA checklist remains pending.**
+
+### Fixed
+
+- X1T For PC + "Write a lossless Rec.709 color tag" / "Remove editor metadata"
+  no longer ends with `color/metadata rewrite failed: invalid top-level
+  b'\x00\x00\x00\x00' box size 4`.
+- The no-preflight PC path now keeps the patch result and explains that the
+  color/metadata rewrite was skipped.
+
+### Verification
+
+- 593 tests, ruff and mypy clean, plus the Windows build smoke test.
+
 ## v2.0.0 - 2026-11-04 (Autonomous Multi-Platform Studio)
 
 Version 2.0.0 turns readiness into opt-in remediation, exports several platform

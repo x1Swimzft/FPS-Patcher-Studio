@@ -2,6 +2,15 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
+## [2.0.1] - 2026-11-04
+
+### Fixed
+- X1T For PC no longer fails after a successful patch when "Write a lossless Rec.709 color tag" or "Remove editor metadata" is enabled. The color/metadata rewrite now runs on the preflight copy before the PC ghost NAL tail is appended, so the finished file is never handed to a parser that rejects trailing zero boxes.
+- PC patches without a preflight copy keep patching and log a clear `[COLOR] skipped` warning instead of failing; use X1T For Mobile or a preflight fix when the color/metadata rewrite is required.
+
+### Verification
+- 593 tests, ruff and mypy clean; regression coverage for the PC color path.
+
 ## [2.0.0] - 2026-11-04
 
 ### Added

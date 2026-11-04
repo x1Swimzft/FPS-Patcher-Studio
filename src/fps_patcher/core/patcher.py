@@ -386,6 +386,28 @@ def patch(
                 work_before = probe(work_src, ffprobe_bin)
                 emit(LogEvent("[PREFLIGHT] Done; patching the fixed copy.", "OK"))
 
+        norm_name = strategy.name.replace("x1t-", "bxd-")
+        is_pc = norm_name in ("bxd-experimental", "bxd-pc")
+        color_done = False
+        if is_pc and (req.fix_color_tag or req.scrub_metadata) and work_src != src:
+            # PC ghost NAL blocks make the finished file unparseable for the
+            # color rewriter, so apply it to the preflight copy first.
+            try:
+                colr = sanitize(
+                    work_src,
+                    fix_color=req.fix_color_tag,
+                    scrub_metadata=req.scrub_metadata,
+                )
+            except ColrError as exc:
+                raise PatchError(f"color/metadata rewrite failed: {exc}") from exc
+            emit(
+                LogEvent(
+                    f"[COLOR] {colr.status}: {colr.reason}",
+                    "WARN" if colr.status == "skipped" else "OK",
+                )
+            )
+            color_done = True
+
         if strategy.name == "v4-forensic":
             emit(LogEvent("Executing Method V4 Forensic Lossless Patch...", "INFO"))
 
@@ -435,8 +457,6 @@ def patch(
                 )
                 emit(LogEvent(msg, lvl))
 
-            norm_name = strategy.name.replace("x1t-", "bxd-")
-            is_pc = norm_name in ("bxd-experimental", "bxd-pc")
             bxd_patcher = MethodBXDDirectPatch(
                 src=work_src,
                 out=tmp,
@@ -468,21 +488,31 @@ def patch(
             if code != 0:
                 raise PatchError(f"ffmpeg exited with code {code}", list(stderr_tail))
 
-        if req.fix_color_tag or req.scrub_metadata:
-            try:
-                colr = sanitize(
-                    tmp,
-                    fix_color=req.fix_color_tag,
-                    scrub_metadata=req.scrub_metadata,
+        if (req.fix_color_tag or req.scrub_metadata) and not color_done:
+            if is_pc:
+                emit(
+                    LogEvent(
+                        "[COLOR] skipped: X1T For PC ghost bytes are not compatible "
+                        "with color/metadata rewrite; use X1T For Mobile or enable a "
+                        "preflight fix.",
+                        "WARN",
+                    )
                 )
-            except ColrError as exc:
-                raise PatchError(f"color/metadata rewrite failed: {exc}") from exc
-            emit(
-                LogEvent(
-                    f"[COLOR] {colr.status}: {colr.reason}",
-                    "WARN" if colr.status == "skipped" else "OK",
+            else:
+                try:
+                    colr = sanitize(
+                        tmp,
+                        fix_color=req.fix_color_tag,
+                        scrub_metadata=req.scrub_metadata,
+                    )
+                except ColrError as exc:
+                    raise PatchError(f"color/metadata rewrite failed: {exc}") from exc
+                emit(
+                    LogEvent(
+                        f"[COLOR] {colr.status}: {colr.reason}",
+                        "WARN" if colr.status == "skipped" else "OK",
+                    )
                 )
-            )
 
         after = probe(tmp, ffprobe_bin)
         experimental = False

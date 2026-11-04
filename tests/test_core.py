@@ -329,6 +329,54 @@ def test_patch_rejects_bad_ext(ff: FFmpegPaths, tmp_path: Path) -> None:
         patch(PatchRequest(src=bad, out_dir=tmp_path, timescale=60000), ff, lambda e: None)
 
 
+def test_pc_color_rewrite_skips_ghost_bytes_without_preflight(
+    clip30: Path, ff: FFmpegPaths, tmp_path: Path
+) -> None:
+    events: list[object] = []
+    result = patch(
+        PatchRequest(
+            src=clip30,
+            out_dir=tmp_path,
+            timescale=60000,
+            strategy="x1t-pc",
+            fix_color_tag=True,
+            scrub_metadata=True,
+        ),
+        ff,
+        events.append,
+    )
+
+    assert result.output.is_file()
+    assert any(
+        "[COLOR] skipped" in getattr(event, "message", "") for event in events
+    )
+
+
+def test_pc_patch_preserves_presanitized_color(
+    clip30: Path, ff: FFmpegPaths, tmp_path: Path
+) -> None:
+    import shutil
+
+    from fps_patcher.core.bxd_patcher import MethodBXDDirectPatch
+    from fps_patcher.core.colr import sanitize
+
+    src = tmp_path / "sanitized.mp4"
+    shutil.copy2(clip30, src)
+    sanitize(src, fix_color=True, scrub_metadata=True)
+    out = tmp_path / "pc.mp4"
+    MethodBXDDirectPatch(
+        src=src,
+        out=out,
+        target_timescale=60000,
+        multiplier=10,
+        indeterminate_mvhd=True,
+        strip_edts=True,
+        preset_mode="x1t-pc",
+    ).execute()
+
+    assert probe(out, ff.ffprobe).color_primaries == "bt709"
+
+
 def test_patch_cancel_cleans_up(clip30: Path, ff: FFmpegPaths, tmp_path: Path) -> None:
     cancel = threading.Event()
     cancel.set()
