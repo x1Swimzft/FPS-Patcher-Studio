@@ -36,7 +36,12 @@ from ..app.controller import AppController
 from ..app.queue_model import InputQueue, QueueItem
 from ..app.startup import set_startup_enabled
 from ..app.watcher import FolderWatcher
-from ..config import Settings, app_data_dir, platform_export_template
+from ..config import (
+    Settings,
+    app_data_dir,
+    network_downloads_enabled,
+    platform_export_template,
+)
 from ..core.models import (
     SUPPORTED_EXTENSIONS,
     FFmpegDownloadEvent,
@@ -466,11 +471,12 @@ class MainWindow(QMainWindow):
         lang = self.settings.language
         menu = QMenu(self)
         menu.addAction(t("test_ffmpeg", lang), self._init_ffmpeg)
-        download = menu.addAction(
-            t("ffmpeg_auto_download_btn", lang),
-            self.controller.start_ffmpeg_download,
-        )
-        download.setEnabled(self._ff_state != "downloading")
+        if network_downloads_enabled():
+            download = menu.addAction(
+                t("ffmpeg_auto_download_btn", lang),
+                self.controller.start_ffmpeg_download,
+            )
+            download.setEnabled(self._ff_state != "downloading")
         menu.addAction(t("ffmpeg_folder_btn", lang), self._pick_ffmpeg)
         anchor = self.ffmpeg_button.mapToGlobal(
             QPoint(0, self.ffmpeg_button.height())

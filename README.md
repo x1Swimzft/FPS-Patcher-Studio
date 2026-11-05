@@ -54,7 +54,7 @@ The builds are unsigned. Windows SmartScreen may show an "Unknown publisher" war
 4. Press **Start Patch**.
 5. Patched files land next to the source unless you set another output folder in Settings.
 
-FFmpeg is used for thumbnails, audio normalization, and bitrate capping. FFprobe gives richer metadata when present, but the app can fall back to its own container parser. If neither binary is found, the app offers to download a build, or you can point Settings at an existing `bin` folder.
+FFmpeg is used for thumbnails, audio normalization, and bitrate capping. FFprobe gives richer metadata when present, but the app can fall back to its own container parser. This build does not download FFmpeg; if neither binary is found, point Settings at an existing `bin` folder.
 
 ## Presets
 
@@ -118,7 +118,7 @@ The script builds with PyInstaller through `uv`. Inno Setup 6 or 7 is optional a
 
 ## Privacy and network access
 
-The app has no telemetry, analytics, or crash reporting. Media files are processed locally and never uploaded. Network access happens in two cases: the startup update check against GitHub release metadata, and an FFmpeg download that you request from Settings. [docs/PRIVACY.md](docs/PRIVACY.md) has the full policy.
+The app has no telemetry, analytics, or crash reporting. Media files are processed locally and never uploaded. This build disables both network download paths: there is no startup update check against GitHub and no FFmpeg download from Settings. [docs/PRIVACY.md](docs/PRIVACY.md) has the full policy.
 
 ## Limitations
 

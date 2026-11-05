@@ -25,6 +25,12 @@ from fps_patcher.core.ffmpeg_locator import FFmpegPaths, locate
 
 
 @pytest.fixture(autouse=True)
+def _allow_network_downloads(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep existing update/FFmpeg tests exercising the enabled path."""
+    monkeypatch.setenv("FPS_PATCHER_ALLOW_NETWORK", "1")
+
+
+@pytest.fixture(autouse=True)
 def _flush_qt_deferred_deletes() -> Generator[None, None, None]:
     """Process Qt's deleteLater queue between tests so windows do not pile up."""
     if "PySide6" in sys.modules:

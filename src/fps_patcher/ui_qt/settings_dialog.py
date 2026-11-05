@@ -48,6 +48,7 @@ from ..config import (
     THEME_PRESETS,
     Settings,
     app_data_dir,
+    network_downloads_enabled,
     render_filename_template,
 )
 from ..core.ffmpeg_locator import locate
@@ -960,6 +961,9 @@ class SettingsDialog(QDialog):
         self._check_updates = self._switch(
             startup, "check_updates_on_start", draft.check_updates_on_start
         )
+        if not network_downloads_enabled():
+            self._check_updates.setChecked(False)
+            self._check_updates.setEnabled(False)
         self._remember_geometry = self._switch(
             startup, "remember_geometry", draft.remember_geometry
         )
@@ -1131,14 +1135,15 @@ class SettingsDialog(QDialog):
                 variant="secondary",
             )
         )
-        test_row.addWidget(
-            text_button(
-                self._tr("ffmpeg_auto_download_btn"),
-                theme,
-                self.download_requested.emit,
-                variant="secondary",
+        if network_downloads_enabled():
+            test_row.addWidget(
+                text_button(
+                    self._tr("ffmpeg_auto_download_btn"),
+                    theme,
+                    self.download_requested.emit,
+                    variant="secondary",
+                )
             )
-        )
         location.addLayout(test_row)
 
         self._ff_status = WrapLabel()

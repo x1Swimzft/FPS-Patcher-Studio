@@ -24,29 +24,30 @@ app.
 
 ## Network access
 
-The app makes network requests only in these cases:
+This build disables network downloads. The app does not check GitHub for updates
+and does not download FFmpeg. Use a bundled or locally installed FFmpeg binary;
+the FFmpeg download buttons are hidden.
+
+For development and testing only, the underlying download paths can be enabled
+by starting the process with `FPS_PATCHER_ALLOW_NETWORK=1`. When that override is
+set, the app may make these requests:
 
 1. **Update check on startup (optional).** If `Check for updates on startup` is
-   enabled (default), the app requests the latest release metadata from
+   enabled, the app requests the latest release metadata from
    `https://api.github.com/repos/x1Swimzft/FPS-Patcher-Studio/releases/latest`.
-   GitHub receives standard HTTP request information such as your IP address and
-   user agent. No media, local paths, or settings are sent. Disable this in
-   **Settings → Behavior → Check for updates on startup**.
-2. **Update download (user action).** If you choose to download an update, the
-   installer is fetched from the GitHub release asset URL. The app verifies the
-   published SHA-256 before launching it.
-3. **FFmpeg download (user action).** If you click the FFmpeg download button,
-   the app downloads a BtbN FFmpeg build from
-   `https://github.com/BtbN/FFmpeg-Builds/releases`. Nothing is downloaded
-   unless you request it.
+2. **Update download (user action).** The installer is fetched from the GitHub
+   release asset URL and verified with SHA-256 before launch.
+3. **FFmpeg download (user action).** A BtbN FFmpeg build is fetched from
+   `https://github.com/BtbN/FFmpeg-Builds/releases`.
 
 No other network requests are made. The readiness scoring feature is completely
 offline.
 
 ## Third-party services
 
-- **GitHub** hosts release metadata and downloadable artifacts. GitHub's privacy
-  statement applies to those requests: <https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement>
+- **GitHub** hosts release metadata and downloadable artifacts. It is contacted
+  only when the development override is enabled. GitHub's privacy statement
+  applies to those requests: <https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement>
 - **BtbN FFmpeg-Builds** is hosted on GitHub. The FFmpeg binaries are subject to
   their own licenses; see `THIRD_PARTY_NOTICES.md`.
 

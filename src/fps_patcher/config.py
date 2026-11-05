@@ -27,6 +27,12 @@ _SAVE_LOCK = threading.Lock()
 APP_DIR_NAME = "FPSPatcherStudio"
 MAX_BXD_PADDING_BYTES = 512 * 1024 * 1024  # 512 MB ceiling
 
+
+def network_downloads_enabled() -> bool:
+    """Network downloads are off by default; opt in only when explicitly needed."""
+    return os.environ.get("FPS_PATCHER_ALLOW_NETWORK") == "1"
+
+
 DEFAULT_THEME_PRESET = "Crimson Gamer"
 
 THEME_PRESETS = [
@@ -152,7 +158,7 @@ class Settings:
     auto_fix_codec: bool = False
     auto_cap_resolution: bool = False
     bitrate_target_mbps: int = 16
-    check_updates_on_start: bool = True
+    check_updates_on_start: bool = False
 
     # V2 FFmpeg
     check_ffmpeg_on_start: bool = True
