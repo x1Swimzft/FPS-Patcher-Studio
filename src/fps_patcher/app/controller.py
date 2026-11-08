@@ -14,7 +14,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from ..config import Settings, network_downloads_enabled, platform_export_template
+from ..config import Settings, ffmpeg_downloads_enabled, platform_export_template
 from ..core.errors import (
     FFmpegNotFoundError,
     FPSPatcherError,
@@ -139,8 +139,8 @@ class AppController:
 
     def start_ffmpeg_download(self) -> None:
         """Download + install FFmpeg on a background thread; result via FFmpegDownloadEvent."""
-        if not network_downloads_enabled():
-            message = "Network downloads are disabled in this build."
+        if not ffmpeg_downloads_enabled():
+            message = "FFmpeg downloads are disabled in this build."
             self.emit(LogEvent(message, "WARN"))
             self.emit(FFmpegDownloadEvent("error", error=message))
             return

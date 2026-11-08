@@ -1,15 +1,14 @@
-"""FFmpeg downloads are off by default; auto-update is independent of that policy."""
+"""FFmpeg downloads are off by default; the app updater is independent of that policy."""
 
 from __future__ import annotations
 
-import time
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 from fps_patcher.app.controller import AppController
-from fps_patcher.config import Settings, network_downloads_enabled
+from fps_patcher.config import Settings, ffmpeg_downloads_enabled
 from fps_patcher.core.models import (
     FFmpegDownloadEvent,
     LogEvent,
@@ -34,7 +33,7 @@ def _fake_update() -> UpdateInfo:
 
 def test_network_downloads_off_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("FPS_PATCHER_ALLOW_NETWORK", raising=False)
-    assert network_downloads_enabled() is False
+    assert ffmpeg_downloads_enabled() is False
 
     ctrl = AppController(Settings())
     ctrl.start_ffmpeg_download()
@@ -80,10 +79,10 @@ def test_update_download_runs_without_ffmpeg_network(
 
     ctrl.start_update_download(info)
 
-    deadline = time.time() + 2.0
-    while time.time() < deadline:
-        event = ctrl.events.get(timeout=0.2)
-        if isinstance(event, UpdateDownloadEvent) and event.stage == "done":
-            assert event.path == expected
-            return
-    pytest.fail("update download did not emit a done event")
+    worker = ctrl._update_worker
+    assert worker is not None
+    worker.join(timeout=2.0)
+    event = ctrl.events.get(timeout=0.2)
+    assert isinstance(event, UpdateDownloadEvent)
+    assert event.stage == "done"
+    assert event.path == expected

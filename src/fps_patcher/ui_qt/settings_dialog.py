@@ -48,7 +48,7 @@ from ..config import (
     THEME_PRESETS,
     Settings,
     app_data_dir,
-    network_downloads_enabled,
+    ffmpeg_downloads_enabled,
     render_filename_template,
 )
 from ..core.ffmpeg_locator import locate
@@ -1138,7 +1138,7 @@ class SettingsDialog(QDialog):
                 variant="secondary",
             )
         )
-        if network_downloads_enabled():
+        if ffmpeg_downloads_enabled():
             test_row.addWidget(
                 text_button(
                     self._tr("ffmpeg_auto_download_btn"),

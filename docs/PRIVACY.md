@@ -33,9 +33,9 @@ The app can make these requests:
 2. **Update download (user action).** When you accept an update, the installer or
    portable ZIP is fetched from the GitHub release asset URL and verified with
    SHA-256 before use. Builds are currently unsigned; when the release publishes a
-   SHA-256, the app warns and installs the unsigned installer only after that
-   checksum matches. If no checksum is published, Authenticode verification is
-   required.
+   SHA-256, the app warns and applies the unsigned installer or portable update
+   only after that checksum matches. If no checksum is published, Authenticode
+   verification is required.
 3. **FFmpeg download (opt-in).** FFmpeg auto-download stays disabled by default.
    The download buttons are hidden unless the process is started with
    `FPS_PATCHER_ALLOW_NETWORK=1`; then a BtbN FFmpeg build is fetched from

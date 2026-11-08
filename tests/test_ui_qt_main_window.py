@@ -567,6 +567,31 @@ def test_apply_update_uses_sha_when_installer_is_unsigned(
     window.close()
 
 
+def test_apply_portable_update_uses_sha_when_unsigned(
+    qtbot: Any, monkeypatch: Any, tmp_path: Path
+) -> None:
+    from types import SimpleNamespace
+
+    from qt_support import make_main_window
+
+    window = make_main_window(qtbot, monkeypatch, tmp_path)
+    calls: list[tuple[Path, bool]] = []
+
+    def fake_apply(path: Path, verify_signature: bool = True) -> None:
+        calls.append((path, verify_signature))
+
+    monkeypatch.setattr("fps_patcher.core.updater.apply_portable_update", fake_apply)
+    archive = tmp_path / "update.zip"
+    archive.write_bytes(b"zip")
+    window._update_info = SimpleNamespace(sha256="a" * 64)
+    window._pending_update_path = archive
+
+    window._apply_downloaded_update(archive)
+
+    assert calls == [(archive, False)]
+    window.close()
+
+
 def test_apply_update_requires_signature_without_sha(
     qtbot: Any, monkeypatch: Any, tmp_path: Path
 ) -> None:

@@ -39,7 +39,7 @@ from ..app.watcher import FolderWatcher
 from ..config import (
     Settings,
     app_data_dir,
-    network_downloads_enabled,
+    ffmpeg_downloads_enabled,
     platform_export_template,
 )
 from ..core.models import (
@@ -471,7 +471,7 @@ class MainWindow(QMainWindow):
         lang = self.settings.language
         menu = QMenu(self)
         menu.addAction(t("test_ffmpeg", lang), self._init_ffmpeg)
-        if network_downloads_enabled():
+        if ffmpeg_downloads_enabled():
             download = menu.addAction(
                 t("ffmpeg_auto_download_btn", lang),
                 self.controller.start_ffmpeg_download,
@@ -1184,21 +1184,19 @@ class MainWindow(QMainWindow):
             self.console.append(t("update_busy_deferred", lang), "INFO")
             return
         self._pending_update_path = None
+        # download_update enforced this checksum before emitting the path.
+        sha_published = bool(getattr(self._update_info, "sha256", None))
+        if sha_published:
+            self.console.append(t("update_unsigned_sha", lang), "WARN")
         try:
             if path.suffix.lower() == ".zip":
                 from ..core.updater import apply_portable_update
 
-                apply_portable_update(path)
+                apply_portable_update(path, verify_signature=not sha_published)
             else:
                 from ..core.updater import launch_installer
 
-                sha_verified = bool(getattr(self._update_info, "sha256", None))
-                if sha_verified:
-                    self.console.append(
-                        "Unsigned build: installer verified by SHA-256 from the GitHub release.",
-                        "WARN",
-                    )
-                launch_installer(path, verify_signature=not sha_verified)
+                launch_installer(path, verify_signature=not sha_published)
         except Exception as exc:
             QMessageBox.critical(
                 self,

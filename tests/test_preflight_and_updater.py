@@ -368,6 +368,19 @@ def test_update_check_enabled_by_default() -> None:
     assert Settings().check_updates_on_start is True
 
 
+def test_legacy_settings_enable_updates_once() -> None:
+    from fps_patcher.config import Settings
+
+    settings = Settings(check_updates_on_start=False, updates_default_migrated=False)
+    settings._clamp()
+    assert settings.check_updates_on_start is True
+    assert settings.updates_default_migrated is True
+
+    settings.check_updates_on_start = False
+    settings._clamp()
+    assert settings.check_updates_on_start is False
+
+
 def test_controller_check_for_updates_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
     from unittest.mock import MagicMock
 

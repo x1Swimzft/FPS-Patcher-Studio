@@ -325,6 +325,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "update_mode_installed": "Installed build",
         "update_mode_portable": "Portable build",
         "update_ready_install": "Update ready — click Update to install",
+        "update_unsigned_sha": (
+            "Unsigned build: update verified by SHA-256 from the GitHub release."
+        ),
         "update_busy_deferred": (
             "Update downloaded; it will install after the current batch finishes."
         ),
@@ -761,6 +764,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "update_mode_installed": "เวอร์ชันติดตั้ง",
         "update_mode_portable": "เวอร์ชันพกพา",
         "update_ready_install": "อัปเดตพร้อมติดตั้ง — กดปุ่มอัปเดตเพื่อติดตั้ง",
+        "update_unsigned_sha": "บิลด์ยังไม่ได้เซ็นชื่อ: ตรวจสอบอัปเดตด้วย SHA-256 จาก GitHub release แล้ว",
         "update_busy_deferred": "ดาวน์โหลดอัปเดตแล้ว จะติดตั้งให้เมื่องานปัจจุบันเสร็จสิ้น",
         "update_cancelled": "ยกเลิกการดาวน์โหลดอัปเดตแล้ว",
         # Compact Qt shell additions

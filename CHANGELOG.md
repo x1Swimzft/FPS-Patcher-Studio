@@ -6,7 +6,8 @@ All notable changes to FPS Patcher Studio are documented in this file.
 
 ### Added
 - Auto-update checks on startup are enabled by default. The app contacts GitHub Releases and asks before downloading; the setting remains user-controlled.
-- Unsigned installers are accepted only after the release's SHA-256 matches the GitHub asset. Authenticode is still required when no checksum is published.
+- Unsigned installers and portable ZIP updates are accepted only after the release's SHA-256 matches the GitHub asset. Authenticode is still required when no checksum is published.
+- Existing settings from the off-by-default era are migrated once to enable update checks; a later explicit opt-out is preserved.
 
 ### Changed
 - Update check and update download no longer depend on the FFmpeg network gate. FFmpeg auto-download remains opt-in through `FPS_PATCHER_ALLOW_NETWORK=1`.

@@ -28,8 +28,8 @@ APP_DIR_NAME = "FPSPatcherStudio"
 MAX_BXD_PADDING_BYTES = 512 * 1024 * 1024  # 512 MB ceiling
 
 
-def network_downloads_enabled() -> bool:
-    """Network downloads are off by default; opt in only when explicitly needed."""
+def ffmpeg_downloads_enabled() -> bool:
+    """FFmpeg auto-download is off by default; opt in only when explicitly needed."""
     return os.environ.get("FPS_PATCHER_ALLOW_NETWORK") == "1"
 
 
@@ -159,6 +159,7 @@ class Settings:
     auto_cap_resolution: bool = False
     bitrate_target_mbps: int = 16
     check_updates_on_start: bool = True
+    updates_default_migrated: bool = False
 
     # V2 FFmpeg
     check_ffmpeg_on_start: bool = True
@@ -360,6 +361,12 @@ class Settings:
                 setattr(self, name, False)
             else:
                 setattr(self, name, bool(raw))
+
+        # 2.0.1-2.0.3 shipped with update checks off by default. Enable them once
+        # for existing settings; a later explicit opt-out is preserved.
+        if not self.updates_default_migrated:
+            self.check_updates_on_start = True
+            self.updates_default_migrated = True
 
     def save(self, path: Path | None = None, async_write: bool = False) -> None:
         self._clamp()
