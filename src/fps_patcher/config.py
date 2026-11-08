@@ -112,7 +112,7 @@ class Settings:
     output_dir: str = ""  # empty = same folder as source
     last_preset: str = "60 FPS"
     custom_timescale: int = 90000
-    strategy: str = "tiktok-ts"
+    strategy: str = "tiktok-ts-remux"
     appearance: str = "dark"
     overwrite: bool = False
     auto_rename: bool = True

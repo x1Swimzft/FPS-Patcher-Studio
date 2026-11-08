@@ -230,7 +230,7 @@ class TikTokTSRemuxStrategy:
     """
 
     name = "tiktok-ts-remux"
-    label = "TikTok Remux"
+    label = "X1T Remux"
     direct = False
 
     def build_args(self, req: PatchRequest, info: VideoInfo, out: Path) -> list[str]:
@@ -289,9 +289,9 @@ UI_PRESETS: dict[str, PatchStrategy] = _PresetDict({
     "bxd-mobile": BXDMobileStrategy(),
     "bxd-hybrid": BXDHybridStrategy(),
     "bxd-clean": BXDCleanStrategy(),
-    "tiktok-ts": TikTokTSStrategy("tiktok-ts", "TikTok 60fps"),
+    "tiktok-ts": TikTokTSStrategy("tiktok-ts", "X1T 60fps"),
     "tiktok-ts-1080": TikTokTSStrategy(
-        "tiktok-ts-1080", "TikTok 1080p", force_1080=True
+        "tiktok-ts-1080", "X1T 1080p", force_1080=True
     ),
     "tiktok-ts-remux": TikTokTSRemuxStrategy(),
 })

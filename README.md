@@ -50,7 +50,7 @@ The builds are unsigned. Windows SmartScreen may show an "Unknown publisher" war
 
 1. Launch the app.
 2. Drop one or more `.mp4`, `.mov`, or `.m4v` files on the window, or use **Add Files**.
-3. Pick 60, 120, or Custom, then choose a preset. TikTok 60fps is the default. TikTok 60fps and TikTok 1080p always encode 60 fps; the FPS choice only affects the output filename. For an already-H.264 1080p60 source, choose **TikTok Remux** to preserve its exact video fingerprint.
+3. Pick 60, 120, or Custom, then choose a preset. **X1T Remux** is the default for an already-H.264 source. It copies the video fingerprint exactly; AV1/HEVC sources must use X1T 60fps or X1T 1080p instead. The re-encode presets always encode 60 fps; the FPS choice only affects the output filename.
 4. Press **Start Patch**.
 5. Patched files land next to the source unless you set another output folder in Settings.
 
@@ -60,11 +60,11 @@ FFmpeg is used for thumbnails, audio normalization, and bitrate capping. FFprobe
 
 | Preset | Best for | What changes |
 | --- | --- | --- |
-| **TikTok 60fps** (default) | Social uploads that need the reference MPEG-TS fingerprint | Lossy H.264 Main/CAVLC + AAC re-encode to MPEG-TS saved as `.mp4`. Keeps the source resolution and forces 60 fps. |
-| **TikTok 1080p** | 1080p60 deliverables | Same lossy re-encode, letterboxed to exactly 1920x1080 at 60 fps. |
-| **TikTok Remux** | An already-H.264 1080p60 source | Copies the video bitstream unchanged and re-encodes only audio to AAC 128k in MPEG-TS. This reproduces the reference upload exactly (same video MD5, SEI and bitrate). Requires an H.264 source. |
+| **X1T Remux** (default) | An already-H.264 1080p60 source | Copies the video bitstream unchanged and re-encodes only audio to AAC 128k in MPEG-TS. This reproduces the reference upload exactly (same video MD5, SEI and bitrate). Requires an H.264 source. |
+| **X1T 60fps** | Social uploads that need the reference MPEG-TS fingerprint | Lossy H.264 Main/CAVLC + AAC re-encode to MPEG-TS saved as `.mp4`. Keeps the source resolution and forces 60 fps. |
+| **X1T 1080p** | 1080p60 deliverables | Same lossy re-encode, letterboxed to exactly 1920x1080 at 60 fps. |
 
-`TikTok 60fps` and `TikTok 1080p` require Windows Media Foundation (`h264_mf`); there is no software fallback. `TikTok Remux` does not re-encode video, so it works with any H.264 source. Use the remux preset for an H.264 1080p60 file and the re-encode presets for AV1, HEVC or arbitrary sources.
+`X1T 60fps` and `X1T 1080p` require Windows Media Foundation (`h264_mf`); there is no software fallback. `X1T Remux` does not re-encode video, so it works with any H.264 source. Use the remux preset for an H.264 1080p60 file and the re-encode presets for AV1, HEVC or arbitrary sources.
 
 The four X1T presets remain available to saved settings and the CLI (`--strategy bxd-pc`, `bxd-mobile`, `bxd-hybrid`, `bxd-clean`) but are hidden from the pickers. They are the original lossless container patches and write an indeterminate `mvhd` duration (`-1`). Platform ingest pipelines can still re-encode or reject a file no matter what the header says, so treat the X1T behaviour as a heuristic. [docs/PLATFORM_PRESETS.md](docs/PLATFORM_PRESETS.md) lists the published platform rules and labels each check as documented, recommended, or heuristic.
 

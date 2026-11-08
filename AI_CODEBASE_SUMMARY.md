@@ -213,9 +213,9 @@ flowchart TD
 
 | Preset ID | UI role |
 | --- | --- |
-| `tiktok-ts` | Default lossy TikTok TS preset (60 fps, source resolution) |
+| `tiktok-ts` | Lossy TikTok TS preset (60 fps, source resolution) |
 | `tiktok-ts-1080` | Lossy TikTok TS preset letterboxed to 1920x1080 |
-| `tiktok-ts-remux` | Copies H.264 video, re-encodes audio; exact reference match |
+| `tiktok-ts-remux` | Default; copies H.264 video, re-encodes audio; exact reference match |
 | `bxd-mobile` | Legacy mobile-safe X1T preset (hidden from pickers) |
 | `bxd-hybrid` | Legacy mobile-safe structure with a bounded tail extension |
 | `bxd-clean` | Legacy timing/faststart rewrite without extra padding |

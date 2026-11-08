@@ -163,7 +163,7 @@ def test_row_pills_cover_resolution_fps_mode_and_size(
 
     assert pills["resolution"] == "1920×1080"
     assert pills["fps"] == "30 → 90 fps"
-    assert pills["mode"] == "h264 · TikTok 60"
+    assert pills["mode"] == "h264 · X1T Remux"
     assert pills["bitrate"] == "12.0 Mbps"
     assert pills["size"] == "12.0 MB"
 
@@ -195,7 +195,7 @@ def test_profile_strip_follows_preset_strategy_and_output(
     queue_view.refresh_profile()
     summary = queue_view.drop_card.profile_summary.fullText()
     assert "60 FPS" in summary
-    assert "TikTok 60fps" in summary
+    assert "X1T Remux" in summary
     assert t("drop_profile_output_same", "en") in summary
 
     queue_view.settings.last_preset = "120 FPS"

@@ -24,7 +24,7 @@ There are two families of engines:
    - Add either **ISO-BMFF `free` padding** (Mobile/Hybrid), **trailing ghost audio samples outside `mdat`** (PC), or nothing (Clean).
    - Hybrid additionally extends the last video sample by up to `bxd_max_tail_ms` (default 50 ms).
 
-The default GUI preset is **TikTok 60fps**. The four X1T presets are still registered for saved settings and the CLI but are hidden from the pickers. The default CLI strategy is whatever is in `settings.json`; new installs start at `tiktok-ts`.
+The default GUI preset is **X1T Remux**. The four X1T presets are still registered for saved settings and the CLI but are hidden from the pickers. The default CLI strategy is whatever is in `settings.json`; new installs start at `tiktok-ts-remux`.
 
 Two important truths about the product:
 
@@ -1520,4 +1520,4 @@ The reference file is a **remux, not a re-encode**. Its video MD5 (`cd919e08e8f0
 
 The encoder writes the settings string `pf:77 b:2 gop:60 idr:60 slc:1 rc:2 qp:26 rate:20480000 peak:0 buff:0 ref:2 cabac:0 aud:1 vui:1` as an SEI user_data_unregistered payload. The preset passes the numeric Main profile (`-profile:v 77`) because the bundled `h264_mf` build registers no named profile table. Output resolution follows the source for `tiktok-ts` and is letterboxed to 1920x1080 for `tiktok-ts-1080`.
 
-The Inspector, Settings and queue pickers now offer only the three TikTok TS presets. The four X1T/BXD keys remain registered for saved settings, queue overrides and `--strategy bxd-*`; a saved X1T preset is kept as a legacy entry so it is not changed silently. New installs default to `tiktok-ts`.
+The Inspector, Settings and queue pickers now offer only the three TikTok TS presets. The four X1T/BXD keys remain registered for saved settings, queue overrides and `--strategy bxd-*`; a saved X1T preset is kept as a legacy entry so it is not changed silently. New installs default to `tiktok-ts-remux`.

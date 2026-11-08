@@ -310,7 +310,7 @@ def patch(
         emit(LogEvent("Variable frame rate detected; result may differ per player.", "WARN"))
     if strategy.name == "tiktok-ts-remux" and before.codec != "h264":
         raise PatchError(
-            "TikTok Remux requires an H.264 source; use TikTok 1080p to re-encode."
+            "X1T Remux requires an H.264 source; use X1T 1080p to re-encode."
         )
     trigger_mbps = BITRATE_TRIGGER_BPS // 1_000_000
     if before.bit_rate is not None and before.bit_rate > BITRATE_TRIGGER_BPS:

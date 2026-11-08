@@ -180,7 +180,7 @@ def test_rich_empty_state_has_actions_badges_and_profile_strip(
     assert drop.profile_title.text() == t("active_patch_profile", "en")
     summary = drop.profile_summary.fullText()
     assert "60 FPS" in summary
-    assert "TikTok 60fps" in summary
+    assert "X1T Remux" in summary
     assert t("drop_profile_output_same", "en") in summary
     assert drop.reassure_label.text() == t("drop_reassure", "en")
     window.close()
@@ -305,7 +305,7 @@ def test_override_card_applies_to_controller_item(
 
     inspector.override_switch.setChecked(True)
     inspector.override_fps_edit.setText("90000")
-    inspector.override_preset_combo.setCurrentText("TikTok 1080p")
+    inspector.override_preset_combo.setCurrentText("X1T 1080p")
     inspector.override_apply_btn.click()
 
     item = window.controller.items.get(video)
@@ -378,31 +378,31 @@ def test_preset_pickers_hide_x1t_but_keep_saved_legacy(
     window = make_main_window(qtbot, monkeypatch, tmp_path)
     combo = window.inspector.strategy_combo
     assert [combo.itemText(i) for i in range(combo.count())] == [
-        "TikTok 60fps",
-        "TikTok 1080p",
-        "TikTok Remux",
+        "X1T 60fps",
+        "X1T 1080p",
+        "X1T Remux",
     ]
-    assert combo.currentText() == "TikTok 60fps"
-    assert combo.width() >= combo.fontMetrics().horizontalAdvance("TikTok 1080p") + 32
+    assert combo.currentText() == "X1T Remux"
+    assert combo.width() >= combo.fontMetrics().horizontalAdvance("X1T 1080p") + 32
     window.close()
 
     legacy = make_main_window(qtbot, monkeypatch, tmp_path, strategy="bxd-mobile")
     combo = legacy.inspector.strategy_combo
     assert [combo.itemText(i) for i in range(combo.count())] == [
-        "TikTok 60fps",
-        "TikTok 1080p",
-        "TikTok Remux",
+        "X1T 60fps",
+        "X1T 1080p",
+        "X1T Remux",
         "X1T For Mobile",
     ]
     assert combo.currentText() == "X1T For Mobile"
 
-    legacy.inspector._strategy_activated(combo.findText("TikTok 1080p"))
+    legacy.inspector._strategy_activated(combo.findText("X1T 1080p"))
     assert [combo.itemText(i) for i in range(combo.count())] == [
-        "TikTok 60fps",
-        "TikTok 1080p",
-        "TikTok Remux",
+        "X1T 60fps",
+        "X1T 1080p",
+        "X1T Remux",
     ]
-    assert combo.currentText() == "TikTok 1080p"
+    assert combo.currentText() == "X1T 1080p"
     legacy.close()
 
 

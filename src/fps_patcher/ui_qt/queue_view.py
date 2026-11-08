@@ -96,9 +96,9 @@ _ACTION_SIZE = 28.0
 
 # Short row-pill labels for presets whose full label is too wide.
 _PRESET_SHORT_LABELS = {
-    "tiktok-ts": "TikTok 60",
-    "tiktok-ts-1080": "TikTok 1080",
-    "tiktok-ts-remux": "Remux",
+    "tiktok-ts": "X1T 60",
+    "tiktok-ts-1080": "X1T 1080",
+    "tiktok-ts-remux": "X1T Remux",
 }
 
 

@@ -239,8 +239,8 @@ def test_x1t_presets_are_hidden_from_pickers() -> None:
         assert get_strategy(key).name == key
 
 
-def test_new_install_defaults_to_tiktok_ts() -> None:
-    assert Settings().strategy == "tiktok-ts"
+def test_new_install_defaults_to_tiktok_ts_remux() -> None:
+    assert Settings().strategy == "tiktok-ts-remux"
 
 
 def test_ts_verify_rejects_wrong_1080_size(tmp_path: Path) -> None:

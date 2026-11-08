@@ -2,6 +2,15 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
+## [2.0.3] - 2026-11-08
+
+### Changed
+- Every visible preset label now starts with `X1T`: `X1T 60fps`, `X1T 1080p`, `X1T Remux`.
+- `X1T Remux` (`tiktok-ts-remux`) is now the default preset for new installs and CLI runs without `--strategy`. Existing `settings.json` values are preserved. Non-H.264 sources must select `X1T 60fps` or `X1T 1080p`.
+
+### Verification
+- 650 tests, ruff and mypy clean.
+
 ## [2.0.2] - 2026-11-08
 
 ### Added
