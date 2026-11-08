@@ -773,9 +773,7 @@ class AppController:
 
     def check_for_updates_background(self, current_version: str) -> None:
         """Run update check in background thread if enabled in settings."""
-        if not network_downloads_enabled():
-            return
-        if not getattr(self.settings, "check_updates_on_start", False):
+        if not getattr(self.settings, "check_updates_on_start", True):
             return
         threading.Thread(
             target=self._update_check_worker,
@@ -796,13 +794,6 @@ class AppController:
 
     def start_update_download(self, info: Any) -> None:
         """Download update in background thread and emit progress/completion events."""
-        if not network_downloads_enabled():
-            self.emit(
-                UpdateDownloadEvent(
-                    "error", error="Network downloads are disabled in this build."
-                )
-            )
-            return
         if self._update_worker is not None and self._update_worker.is_alive():
             return
         self._update_cancel.clear()

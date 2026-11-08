@@ -965,9 +965,6 @@ class SettingsDialog(QDialog):
         self._check_updates = self._switch(
             startup, "check_updates_on_start", draft.check_updates_on_start
         )
-        if not network_downloads_enabled():
-            self._check_updates.setChecked(False)
-            self._check_updates.setEnabled(False)
         self._remember_geometry = self._switch(
             startup, "remember_geometry", draft.remember_geometry
         )

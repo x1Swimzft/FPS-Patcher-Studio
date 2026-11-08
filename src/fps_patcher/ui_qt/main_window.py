@@ -1192,7 +1192,13 @@ class MainWindow(QMainWindow):
             else:
                 from ..core.updater import launch_installer
 
-                launch_installer(path)
+                sha_verified = bool(getattr(self._update_info, "sha256", None))
+                if sha_verified:
+                    self.console.append(
+                        "Unsigned build: installer verified by SHA-256 from the GitHub release.",
+                        "WARN",
+                    )
+                launch_installer(path, verify_signature=not sha_verified)
         except Exception as exc:
             QMessageBox.critical(
                 self,

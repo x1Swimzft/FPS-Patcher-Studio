@@ -162,6 +162,20 @@ def test_settings_template_toggle_round_trips_and_preview(
         dialog._strategy.itemText(index) for index in range(dialog._strategy.count())
     ]
     assert strategy_labels == ["X1T 60fps", "X1T 1080p", "X1T Remux"]
+
+
+def test_update_toggle_enabled_without_ffmpeg_network(
+    qtbot: Any, monkeypatch: Any, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(config, "app_data_dir", lambda: tmp_path)
+    monkeypatch.delenv("FPS_PATCHER_ALLOW_NETWORK", raising=False)
+    settings = Settings(reduce_motion=True)
+
+    dialog = SettingsDialog(settings, ThemeManager(settings))
+    qtbot.addWidget(dialog)
+
+    assert dialog._check_updates.isEnabled()
+    assert dialog._check_updates.isChecked()
     assert not dialog._use_template.isChecked()
     assert not dialog._template.isEnabled()
     assert "sample_clip_ts60000.mp4" in dialog._template_preview.text()

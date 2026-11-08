@@ -158,7 +158,7 @@ class Settings:
     auto_fix_codec: bool = False
     auto_cap_resolution: bool = False
     bitrate_target_mbps: int = 16
-    check_updates_on_start: bool = False
+    check_updates_on_start: bool = True
 
     # V2 FFmpeg
     check_ffmpeg_on_start: bool = True

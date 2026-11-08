@@ -542,6 +542,56 @@ def test_update_available_prompts_on_startup(
     window.close()
 
 
+def test_apply_update_uses_sha_when_installer_is_unsigned(
+    qtbot: Any, monkeypatch: Any, tmp_path: Path
+) -> None:
+    from types import SimpleNamespace
+
+    from qt_support import make_main_window
+
+    window = make_main_window(qtbot, monkeypatch, tmp_path)
+    calls: list[tuple[Path, bool]] = []
+
+    def fake_launch(path: Path, verify_signature: bool = True) -> None:
+        calls.append((path, verify_signature))
+
+    monkeypatch.setattr("fps_patcher.core.updater.launch_installer", fake_launch)
+    installer = tmp_path / "Setup.exe"
+    installer.write_bytes(b"MZ")
+    window._update_info = SimpleNamespace(sha256="a" * 64)
+    window._pending_update_path = installer
+
+    window._apply_downloaded_update(installer)
+
+    assert calls == [(installer, False)]
+    window.close()
+
+
+def test_apply_update_requires_signature_without_sha(
+    qtbot: Any, monkeypatch: Any, tmp_path: Path
+) -> None:
+    from types import SimpleNamespace
+
+    from qt_support import make_main_window
+
+    window = make_main_window(qtbot, monkeypatch, tmp_path)
+    calls: list[tuple[Path, bool]] = []
+
+    def fake_launch(path: Path, verify_signature: bool = True) -> None:
+        calls.append((path, verify_signature))
+
+    monkeypatch.setattr("fps_patcher.core.updater.launch_installer", fake_launch)
+    installer = tmp_path / "Setup.exe"
+    installer.write_bytes(b"MZ")
+    window._update_info = SimpleNamespace(sha256=None)
+    window._pending_update_path = installer
+
+    window._apply_downloaded_update(installer)
+
+    assert calls == [(installer, True)]
+    window.close()
+
+
 def test_update_prompt_yes_starts_download(
     qtbot: Any, monkeypatch: Any, tmp_path: Path
 ) -> None:

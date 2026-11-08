@@ -2,6 +2,18 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
+## [2.0.4] - 2026-11-08
+
+### Added
+- Auto-update checks on startup are enabled by default. The app contacts GitHub Releases and asks before downloading; the setting remains user-controlled.
+- Unsigned installers are accepted only after the release's SHA-256 matches the GitHub asset. Authenticode is still required when no checksum is published.
+
+### Changed
+- Update check and update download no longer depend on the FFmpeg network gate. FFmpeg auto-download remains opt-in through `FPS_PATCHER_ALLOW_NETWORK=1`.
+
+### Verification
+- ruff and mypy clean; full pytest suite passing.
+
 ## [2.0.3] - 2026-11-08
 
 ### Changed

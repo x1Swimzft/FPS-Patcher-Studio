@@ -1,143 +1,139 @@
 # FPS Patcher Studio
 
-A Windows desktop app and CLI that change the timing metadata of MP4, MOV, and M4V files without re-encoding the video.
+A Windows desktop app and headless CLI for patching video container timing and producing TikTok-ready MPEG-TS presets.
 
-![Latest release](https://img.shields.io/github/v/release/x1Swimzft/FPS-Patcher-Studio?label=release)
-![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-0078D6)
-![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)
-![License](https://img.shields.io/badge/license-MIT-green)
+- **MP4/MOV patches are lossless.** The container atoms are rewritten; the encoded samples are not touched.
+- **TikTok TS presets match the reference upload.** `X1T Remux` copies an existing H.264 video bitstream and re-encodes only audio; `X1T 60fps` and `X1T 1080p` are lossy H.264/AAC re-encodes for other sources.
+- **Auto-update is on by default.** The app checks GitHub Releases on startup and asks before downloading.
+- **No telemetry. No media uploads.** Files stay on your PC.
 
-<p align="center">
-  <img src="images/ui-redesign/dark-queue.png" width="840" alt="FPS Patcher Studio with three clips in the batch queue">
-</p>
-
-## How it works
-
-A converter that changes frame rate typically decodes the video and encodes it again. FPS Patcher Studio works on the container instead. It parses the ISO-BMFF structure, rewrites the atoms that hold timing and offsets, and copies the `mdat` payload byte for byte.
-
-The video payload comes out unchanged. The audio payload is copied as well, except when the app's default pre-flight pass converts a non-AAC track to AAC 48 kHz stereo (see Limitations). The layout also stays progressive: `moov` moves in front of `mdat` and chunk offsets are recalculated, so players can start before the file is fully read.
-
-## Features
-
-- Set a 60 fps or 120 fps timescale, or enter a custom value.
-- Edit `mvhd`, `tkhd`, `mdhd`, `stts`, `ctts`, `stco`, `co64`, and `elst` in place.
-- Convert QuickTime `.mov` files to standard MP4 branding.
-- Tag untagged SDR video as Rec.709, or strip leftover metadata.
-- Repair a PC-only X1T clip from the Forensic window.
-- Queue batches with thumbnails, per-item overrides, selection checkboxes, and live probe data.
-- Watch a folder and pick up clips when renders finish.
-- Run in the system tray after closing the window, and optionally start with Windows.
-- Configure the essentials in four Settings tabs, with technical options under Advanced.
-- Patch straight from Explorer with **Quick Patch with X1T**.
-- Score clips against TikTok, Instagram Reels, YouTube Shorts, or generic upload rules.
-- Inspect atoms, color parameters, sample counts, A/V drift, and payload hashes in the Forensic window.
-- Choose from seven theme presets in the Crimson Graphite design, with an English or Thai interface.
-
-## Install
-
-Download the installer or the portable zip from [Releases](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases). The newest public build can lag behind `main`.
-
-Verify the download before running it:
-
-```powershell
-Get-FileHash .\FPSPatcherStudio-*-Setup.exe -Algorithm SHA256
-Get-Content .\FPSPatcherStudio-*-Setup.exe.sha256
-```
-
-The builds are unsigned. Windows SmartScreen may show an "Unknown publisher" warning. Use the hash to confirm the file matches the published build. Signing policy and the SignPath Foundation application are documented in [docs/CODE_SIGNING_POLICY.md](docs/CODE_SIGNING_POLICY.md).
-
-## Patch a file
-
-1. Launch the app.
-2. Drop one or more `.mp4`, `.mov`, or `.m4v` files on the window, or use **Add Files**.
-3. Pick 60, 120, or Custom, then choose a preset. **X1T Remux** is the default for an already-H.264 source. It copies the video fingerprint exactly; AV1/HEVC sources must use X1T 60fps or X1T 1080p instead. The re-encode presets always encode 60 fps; the FPS choice only affects the output filename.
-4. Press **Start Patch**.
-5. Patched files land next to the source unless you set another output folder in Settings.
-
-FFmpeg is used for thumbnails, audio normalization, and bitrate capping. FFprobe gives richer metadata when present, but the app can fall back to its own container parser. This build does not download FFmpeg; if neither binary is found, point Settings at an existing `bin` folder.
+[Download v2.0.4](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases/tag/v2.0.4) · [Website](https://x1t-web.vercel.app/) · [Release notes](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases) · [Privacy](docs/PRIVACY.md)
 
 ## Presets
 
-| Preset | Best for | What changes |
-| --- | --- | --- |
-| **X1T Remux** (default) | An already-H.264 1080p60 source | Copies the video bitstream unchanged and re-encodes only audio to AAC 128k in MPEG-TS. This reproduces the reference upload exactly (same video MD5, SEI and bitrate). Requires an H.264 source. |
-| **X1T 60fps** | Social uploads that need the reference MPEG-TS fingerprint | Lossy H.264 Main/CAVLC + AAC re-encode to MPEG-TS saved as `.mp4`. Keeps the source resolution and forces 60 fps. |
-| **X1T 1080p** | 1080p60 deliverables | Same lossy re-encode, letterboxed to exactly 1920x1080 at 60 fps. |
+| Preset | Use for | Video | Audio | Container |
+| --- | --- | --- | --- | --- |
+| **X1T Remux** (default) | An already-H.264 1080p60 source | **Copied unchanged** | AAC 128k, 48 kHz stereo | MPEG-TS, `.mp4` extension |
+| **X1T 60fps** | AV1, HEVC, or arbitrary sources | H.264 Main/CAVLC re-encode, source resolution, 60 fps | AAC 128k, 48 kHz stereo | MPEG-TS, `.mp4` extension |
+| **X1T 1080p** | 1080p60 deliverables | H.264 Main/CAVLC re-encode, letterboxed to 1920x1080, 60 fps | AAC 128k, 48 kHz stereo | MPEG-TS, `.mp4` extension |
 
-`X1T 60fps` and `X1T 1080p` require Windows Media Foundation (`h264_mf`); there is no software fallback. `X1T Remux` does not re-encode video, so it works with any H.264 source. Use the remux preset for an H.264 1080p60 file and the re-encode presets for AV1, HEVC or arbitrary sources.
+`X1T Remux` preserves the source H.264 bitstream — including its encoder SEI and bitrate — so a matching source reproduces the reference video MD5 exactly. The two re-encode presets cannot match that bitstream by design.
 
-The four X1T presets remain available to saved settings and the CLI (`--strategy bxd-pc`, `bxd-mobile`, `bxd-hybrid`, `bxd-clean`) but are hidden from the pickers. They are the original lossless container patches and write an indeterminate `mvhd` duration (`-1`). Platform ingest pipelines can still re-encode or reject a file no matter what the header says, so treat the X1T behaviour as a heuristic. [docs/PLATFORM_PRESETS.md](docs/PLATFORM_PRESETS.md) lists the published platform rules and labels each check as documented, recommended, or heuristic.
+`X1T 60fps` and `X1T 1080p` require Windows Media Foundation (`h264_mf`). `X1T Remux` does not re-encode video and works with any H.264 source. If you give `X1T Remux` an AV1/HEVC file, it stops with a clear message to choose `X1T 1080p`.
 
-## Command line
+The four original X1T presets (`X1T For PC`, `X1T For Mobile`, `X1T Hybrid`, `X1T Clean`) remain available to saved settings and the CLI via `--strategy bxd-pc`, `bxd-mobile`, `bxd-hybrid`, and `bxd-clean`, but are hidden from the pickers. They are lossless ISO-BMFF container patches.
+
+TikTok upload behaviour is not guaranteed. Matching the reference fingerprint does not prove that TikTok will skip re-encoding.
+
+## Install
+
+Windows 10/11 x64. Pick one:
+
+- **Installer:** `FPSPatcherStudio-v2.0.4-Setup.exe`
+- **Portable:** `FPSPatcherStudio-v2.0.4-win64.zip` — extract the whole folder, then run `FPSPatcherStudio.exe`
+
+The builds are **unsigned**, so Windows SmartScreen may warn. Verify the SHA-256 against the release checksum before running.
+
+FFmpeg and FFprobe are bundled in the release. FFmpeg auto-download is disabled by default.
+
+## GUI quick start
+
+1. Launch `FPSPatcherStudio.exe` (or `uv run fps-patcher-studio` from source).
+2. Drop `.mp4`, `.mov`, or `.m4v` files on the window, or use **Add Files**.
+3. Choose the target FPS and a preset. **X1T Remux** is the default for an H.264 source.
+4. Press **Start Patch**.
+5. Set the output folder in **Settings → Output** if you do not want files beside the source.
+
+The queue supports per-item overrides for preset, timescale, and platform profile. The Inspector shows source/output bitrate and readiness checks. The Watch Folder processes new files as they appear.
+
+For `X1T Remux`, use the H.264 source; for AV1/HEVC, choose `X1T 60fps` or `X1T 1080p`. The target FPS only affects the `_ts<timescale>` filename for the TS presets; the stream itself is always 60 fps.
+
+## CLI
 
 ```powershell
+# Lossless video remux + AAC audio, matching the reference
+fps-patcher-studio --cli patch "clip.mp4" --preset 60 --strategy tiktok-ts-remux --output out
+
+# Lossy re-encode for AV1/HEVC or arbitrary sources
+fps-patcher-studio --cli patch "clip.mp4" --preset 60 --strategy tiktok-ts-1080 --output out
+
+# Batch, JSON output
+fps-patcher-studio --cli patch "a.mp4" "b.mov" --preset 60 --strategy tiktok-ts --output out --json
+
+# Inspect metadata and readiness
 fps-patcher-studio --cli probe "clip.mp4"
-fps-patcher-studio --cli patch "clip.mp4" --preset 60 --strategy tiktok-ts --output out
 fps-patcher-studio --cli score "clip.mp4" --profile tiktok --json
+
+# Job history and rollback
+fps-patcher-studio --cli history
+fps-patcher-studio --cli undo --last
 ```
 
-In the installed build, start with `FPSPatcherStudio.exe --cli` instead. `--preset` accepts `60` or `120`; use `--timescale` for anything else. `--strategy` accepts `tiktok-ts`, `tiktok-ts-1080`, `tiktok-ts-remux`, or the legacy X1T keys (`bxd-pc`, `bxd-mobile`, `bxd-hybrid`, `bxd-clean`). Exit codes are 0 for success, 1 for a file error, 2 for a usage error, and 130 for a cancelled run. `patch` also accepts `--overwrite` or `--auto-rename`, `--normalize-audio`, `--cap-bitrate`, `--tag-bt709`, `--scrub-metadata`, and `--json`.
+`--preset` accepts `60` or `120` (or `--timescale` for a custom value). `--overwrite` replaces an existing output; the default is to add a ` (n)` suffix. A replaced output is backed up as `.bak` when backups are enabled. `--strategy` accepts `tiktok-ts`, `tiktok-ts-1080`, `tiktok-ts-remux`, and the legacy X1T keys.
+
+Preflight switches such as `--normalize-audio`, `--cap-bitrate`, and `--fix-vfr` are skipped for the TS presets: `X1T Remux` normalises audio itself, and the re-encode presets already set the audio and frame rate. `--tag-bt709` and `--scrub-metadata` are also skipped for TS with a `[COLOR] skipped: not ISO-BMFF` log.
+
+## Auto-update
+
+- **Check on startup:** enabled by default. The app requests the latest release from `https://api.github.com/repos/x1Swimzft/FPS-Patcher-Studio/releases/latest`.
+- **Download:** only after you accept the update. The asset is fetched from GitHub and verified with SHA-256.
+- **Unsigned builds:** when the release publishes a SHA-256, the app warns and installs the unsigned installer only after that checksum matches. If no checksum is published, Authenticode verification is required.
+- **Disable:** turn off **Check for updates on startup** in Settings.
+- **FFmpeg:** auto-download stays opt-in behind `FPS_PATCHER_ALLOW_NETWORK=1`; the updater does not depend on that override.
+
+No telemetry, analytics, or media uploads. See [docs/PRIVACY.md](docs/PRIVACY.md).
 
 ## What gets verified
 
-For MP4/MOV output, after each patch the app checks the new file and writes the results to the Activity Console:
+For MP4/MOV output:
 
 - atom structure and trailing data
-- chunk offsets after the faststart shift
-- sample tables and track durations
-- basic mobile playback compatibility
-- sampled SHA-256 of the `mdat` head, middle, and tail, plus the per-track sample bytes
+- chunk offsets and sample tables
+- playback metadata and mobile compatibility
+- optional Rec.709 colour tag and metadata scrub
+- sampled SHA-256 of the `mdat` payload and per-track samples
 
-The TikTok TS presets produce MPEG-TS, so they use a different check: first byte `0x47`, H.264 codec, and duration within tolerance. The atom/mdat checks and the Forensic window apply only to MP4/MOV output. A payload failure is logged as an error, but the check does not replace a playback test on a real device. `verify_after` turns the report off. When the destination already exists and backups are enabled, the old file is kept as a `.bak` copy before the atomic replace.
+For MPEG-TS presets:
+
+- first byte `0x47`
+- H.264 output
+- 60 fps for the re-encode presets (source frame rate for remux)
+- exactly 1920x1080 for `X1T 1080p`
+- duration within tolerance of the source
 
 ## Build from source
 
-Python 3.11 or newer and [uv](https://docs.astral.sh/uv/) are required.
+Python 3.11+ and [uv](https://docs.astral.sh/uv/):
 
 ```powershell
-git clone https://github.com/x1Swimzft/FPS-Patcher-Studio.git
-cd FPS-Patcher-Studio
 uv sync
 uv run fps-patcher-studio
 ```
 
-Run the quality gates:
+Quality gates:
 
 ```powershell
-uv run pytest -q
-uv run mypy src tests tools
 uv run ruff check src tests tools
+uv run mypy src tests tools
+uv run pytest -q
 ```
 
-To build the portable zip and installer:
+Release build (PyInstaller one-folder + portable ZIP; Inno Setup 6/7 adds the installer):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File build\release.ps1
 ```
 
-The script builds with PyInstaller through `uv`. Inno Setup 6 or 7 is optional and only needed for `Setup.exe`. Artifacts, SHA-256 sidecars, a JSON manifest, and a CycloneDX SBOM are written to `release/`. [BUILDING.md](BUILDING.md) has the full toolchain and troubleshooting notes.
+The script writes `dist\FPSPatcherStudio\`, the portable ZIP, checksums, SBOM, and release manifest to `release\`. See [BUILDING.md](BUILDING.md) for the full release and signing flow.
 
-## Privacy and network access
+## Project layout
 
-The app has no telemetry, analytics, or crash reporting. Media files are processed locally and never uploaded. This build disables both network download paths: there is no startup update check against GitHub and no FFmpeg download from Settings. [docs/PRIVACY.md](docs/PRIVACY.md) has the full policy.
-
-## Limitations
-
-- A timing change is not frame interpolation. A 30 fps recording still holds 30 frames for every second of content; the container just presents a different clock. Motion will not become smoother.
-- The X1T engine rejects fragmented MP4 files (`moof`).
-- Bitrate capping re-encodes video above the target. It is off by default.
-- Audio normalization converts non-AAC audio to AAC 48 kHz stereo and is on by default in the app. Turn it off in Settings to keep the original audio stream.
-- Platform profiles score local files against published and heuristic rules. They do not guarantee that a platform will skip re-encoding, keep the uploaded resolution, or accept the file.
-- The published builds target Windows 10 and 11 on x64.
-
-## Security and project docs
-
-- [SECURITY.md](SECURITY.md): vulnerability disclosure and response targets.
-- [docs/CODE_SIGNING_POLICY.md](docs/CODE_SIGNING_POLICY.md): signing policy and SignPath Foundation details.
-- [docs/FALSE_POSITIVE_DISPUTES.md](docs/FALSE_POSITIVE_DISPUTES.md): false-positive dossier for antivirus vendors.
-- [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md): bundled components, fonts, and FFmpeg licensing.
-- [CHANGELOG.md](CHANGELOG.md): release history.
+- `src/fps_patcher/core/` — probing, patching, strategies, preflight, verification, updater
+- `src/fps_patcher/app/` — controller, queue, watcher, quick patch
+- `src/fps_patcher/ui_qt/` — PySide6 desktop UI
+- `tests/` — pytest suite, including real FFmpeg encode/remux checks
+- `build/` — PyInstaller spec, Inno Setup script, release script
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+MIT. Third-party components and licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

@@ -1,10 +1,11 @@
 # Privacy policy — FPS Patcher Studio
 
-**Effective date:** 2026-10-25
+**Effective date:** 2026-11-08
 
 FPS Patcher Studio is a local Windows desktop utility for editing MP4/MOV
-container metadata. It does not require an account and does not include
-telemetry, analytics, advertising, or crash-reporting SDKs.
+container metadata and producing TikTok MPEG-TS presets. It does not require an
+account and does not include telemetry, analytics, advertising, or
+crash-reporting SDKs.
 
 ## Data the app processes locally
 
@@ -24,32 +25,33 @@ app.
 
 ## Network access
 
-This build disables network downloads. The app does not check GitHub for updates
-and does not download FFmpeg. Use a bundled or locally installed FFmpeg binary;
-the FFmpeg download buttons are hidden.
+The app can make these requests:
 
-For development and testing only, the underlying download paths can be enabled
-by starting the process with `FPS_PATCHER_ALLOW_NETWORK=1`. When that override is
-set, the app may make these requests:
-
-1. **Update check on startup (optional).** If `Check for updates on startup` is
-   enabled, the app requests the latest release metadata from
+1. **Update check on startup (on by default).** If `Check for updates on startup`
+   is enabled in Settings, the app requests the latest release metadata from
    `https://api.github.com/repos/x1Swimzft/FPS-Patcher-Studio/releases/latest`.
-2. **Update download (user action).** The installer is fetched from the GitHub
-   release asset URL and verified with SHA-256 before launch.
-3. **FFmpeg download (user action).** A BtbN FFmpeg build is fetched from
+2. **Update download (user action).** When you accept an update, the installer or
+   portable ZIP is fetched from the GitHub release asset URL and verified with
+   SHA-256 before use. Builds are currently unsigned; when the release publishes a
+   SHA-256, the app warns and installs the unsigned installer only after that
+   checksum matches. If no checksum is published, Authenticode verification is
+   required.
+3. **FFmpeg download (opt-in).** FFmpeg auto-download stays disabled by default.
+   The download buttons are hidden unless the process is started with
+   `FPS_PATCHER_ALLOW_NETWORK=1`; then a BtbN FFmpeg build is fetched from
    `https://github.com/BtbN/FFmpeg-Builds/releases`.
 
-No other network requests are made. The readiness scoring feature is completely
-offline.
+No other network requests are made. Media files are never uploaded. The readiness
+scoring feature is completely offline.
 
 ## Third-party services
 
 - **GitHub** hosts release metadata and downloadable artifacts. It is contacted
-  only when the development override is enabled. GitHub's privacy statement
-  applies to those requests: <https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement>
-- **BtbN FFmpeg-Builds** is hosted on GitHub. The FFmpeg binaries are subject to
-  their own licenses; see `THIRD_PARTY_NOTICES.md`.
+  for the update check and update download. GitHub's privacy statement applies:
+  <https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement>
+- **BtbN FFmpeg-Builds** is hosted on GitHub and is contacted only when the FFmpeg
+  download override is enabled. The FFmpeg binaries are subject to their own
+  licenses; see `THIRD_PARTY_NOTICES.md`.
 
 ## Data sharing and retention
 

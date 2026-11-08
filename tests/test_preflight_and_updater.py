@@ -362,6 +362,12 @@ def test_preflight_cancel_leaves_no_partial_temp(
     assert not list(tmp_path.glob(".*.preflight-owner.json"))
 
 
+def test_update_check_enabled_by_default() -> None:
+    from fps_patcher.config import Settings
+
+    assert Settings().check_updates_on_start is True
+
+
 def test_controller_check_for_updates_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
     from unittest.mock import MagicMock
 
