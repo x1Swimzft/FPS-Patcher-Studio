@@ -2,6 +2,28 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
+## [2.0.2] - 2026-11-08
+
+### Added
+- `tiktok-ts-remux` (`TikTok Remux`) preset: copies an existing H.264 video bitstream unchanged and re-encodes only audio to AAC 128k in MPEG-TS. The reference upload is a remux of an already-H.264 1080p60 source, so this preset reproduces its video MD5, SEI (`cmp:6 rnd:1 wrk:16`) and ~13.1 Mbps bitrate; a video re-encode cannot. It requires an H.264 source and fails with a clear message otherwise.
+- `tiktok-ts` and `tiktok-ts-1080` presets: a deliberate lossy re-encode into MPEG-TS saved with a `.mp4` extension, matching the reference upload fingerprint (Media Foundation H.264 Main/CAVLC, 1 s GOP, unconstrained VBR at 20.48 Mbps, AAC-LC 48 kHz stereo). `tiktok-ts` keeps the source resolution and forces 60 fps CFR; `tiktok-ts-1080` letterboxes to 1920x1080 at 60 fps. Use these for AV1/HEVC or arbitrary sources.
+- The new presets skip the ISO-BMFF preflight and `colr` rewrite, and verify the TS sync byte, H.264 codec, frame rate and duration instead of atom payload integrity.
+
+### Changed
+- The Inspector, Settings and queue pickers now offer only `tiktok-ts`, `tiktok-ts-1080` and `tiktok-ts-remux`. The four X1T/BXD presets remain registered for saved settings, queue overrides and `--strategy bxd-*` scripts; when one is already active it is shown as a legacy entry so it is not changed silently.
+- New installs and CLI runs without an explicit `--strategy` now default to `tiktok-ts`. Existing `settings.json` values are preserved.
+
+### Fixed
+- The Inspector preset picker no longer clips the TikTok preset labels: the labels are `TikTok 60fps`, `TikTok 1080p` and `TikTok Remux`, and the picker is wide enough to show them in full.
+- The `tiktok-ts-1080` output is now verified as 60 fps and exactly 1920x1080; a wrong size or frame rate raises `VerifyError` instead of completing silently.
+
+### Notes
+- `tiktok-ts` and `tiktok-ts-1080` require Windows Media Foundation (`h264_mf`). Missing or failing Media Foundation support raises a clear error; there is no software fallback by design. `tiktok-ts-remux` does not require Media Foundation.
+- The X1T/BXD engine code is unchanged and still available by key, but those presets are hidden from the pickers.
+
+### Verification
+- 650 tests, ruff and mypy clean; real CLI remux validation against the reference (identical video MD5).
+
 ## [2.0.1] - 2026-11-04
 
 ### Fixed

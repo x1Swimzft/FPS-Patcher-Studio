@@ -40,7 +40,7 @@ def test_startup_command_source_uses_pythonw(monkeypatch: Any, tmp_path: Path) -
 
 
 def test_startup_is_noop_off_windows(monkeypatch: Any) -> None:
-    monkeypatch.setattr(startup.os, "name", "posix")
+    monkeypatch.setattr("fps_patcher.app.startup.os.name", "posix")
 
     assert startup.set_startup_enabled(True) is True
     assert startup.set_startup_enabled(False) is True

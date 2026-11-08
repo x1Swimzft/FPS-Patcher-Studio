@@ -264,7 +264,10 @@ def test_verify_dynamic_tolerance_default() -> None:
 # ---------- end-to-end ----------
 
 
-@pytest.mark.parametrize("strategy", sorted(STRATEGIES))
+# tiktok-ts presets are lossy re-encodes covered by test_tiktok_ts_strategy.py.
+@pytest.mark.parametrize(
+    "strategy", sorted(k for k in STRATEGIES if not k.startswith("tiktok-ts"))
+)
 @pytest.mark.parametrize("timescale", [60000, 120000])
 def test_patch_end_to_end(
     clip30: Path, ff: FFmpegPaths, tmp_path: Path, strategy: str, timescale: int

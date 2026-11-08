@@ -55,7 +55,7 @@ from ..core.ffmpeg_locator import locate
 from ..core.models import FPS_PRESETS
 from ..core.platform_profiles import PLATFORM_PROFILES
 from ..core.preflight import BITRATE_TARGET_MBPS_MAX, BITRATE_TARGET_MBPS_MIN
-from ..core.strategies import UI_PRESETS, migrate_strategy_name
+from ..core.strategies import UI_PRESETS, migrate_strategy_name, visible_presets
 from ..ui.strings import t
 from .icons import get_icon
 from .motion import fade_in
@@ -931,12 +931,16 @@ class SettingsDialog(QDialog):
             )
             return
         template = self._template.text().strip() or "{name}_{fps}fps"
+        strategy = self._draft.strategy
+        combo = getattr(self, "_strategy", None)
+        if combo is not None:
+            strategy = self._strategy_label_to_key.get(combo.currentText(), strategy)
         rendered = render_filename_template(
             template,
             "sample_clip",
             60,
             platform="tiktok",
-            strategy="bxd-mobile",
+            strategy=strategy,
         )
         self._template_preview.setText(self._tr("template_preview", preview=f"{rendered}.mp4"))
 
@@ -1021,18 +1025,20 @@ class SettingsDialog(QDialog):
         )
         self._timescale.setEnabled(current_fps == self._custom_fps)
 
-        strategy_labels = [preset.label for preset in UI_PRESETS.values()]
+        strategy_labels = [preset.label for preset in visible_presets()]
         self._strategy_label_to_key = {
             preset.label: preset.name for preset in UI_PRESETS.values()
         }
         resolved, _old = migrate_strategy_name(draft.strategy)
         current_strategy = UI_PRESETS.get(resolved)
+        if current_strategy is not None and current_strategy.label not in strategy_labels:
+            strategy_labels.append(current_strategy.label)
         self._strategy = self._combo(
             target,
             "default_strategy",
             strategy_labels,
             current_strategy.label if current_strategy else strategy_labels[0],
-            lambda _value: None,
+            lambda _value: self._update_template_preview(),
         )
 
         safety = self._card(grid, 2, 1)

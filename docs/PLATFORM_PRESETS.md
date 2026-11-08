@@ -28,7 +28,7 @@ guarantee that a social platform will not re-encode an uploaded video.
 | **X1T — YouTube Shorts** | MP4; H.264 recommended — **documented** | square or vertical — **documented**; ≤1080p upload — **documented** | upload at source rate; 24–60 fps common — **documented** recommendation | 3 min — **documented** | AAC-LC 48 kHz stereo — **documented** recommendation | none: YouTube states no bitrate limit is required — **documented** |
 
 The selector applies globally to the queue and is stored in `settings.json`. The
-patch preset (`X1T For Mobile`, etc.) remains independently selectable; choosing
+patch preset (`TikTok 60fps`, etc.) remains independently selectable; choosing
 a platform profile does not silently change the patch strategy, codec, bitrate,
 or container.
 

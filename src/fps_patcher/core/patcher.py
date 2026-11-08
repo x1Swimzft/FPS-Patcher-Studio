@@ -32,6 +32,7 @@ from .models import (
     PatchRequest,
     PatchResult,
     ProgressEvent,
+    VideoInfo,
 )
 from .platform_profiles import get_profile
 from .preflight import (
@@ -66,7 +67,9 @@ def validate_input(path: Path) -> None:
 def output_base_for(req: PatchRequest) -> Path:
     """Deterministic output name before collision handling."""
     is_x1t = req.strategy.startswith(("bxd-", "x1t-"))
-    out_ext = ".mp4" if (is_x1t and req.src.suffix.lower() == ".mov") else req.src.suffix
+    is_ts = req.strategy.startswith("tiktok-ts")
+    force_mp4 = is_ts or (is_x1t and req.src.suffix.lower() == ".mov")
+    out_ext = ".mp4" if force_mp4 else req.src.suffix
     if not req.filename_template:
         return req.out_dir / f"{req.src.stem}_ts{req.timescale}{out_ext}"
     # config imports core.models, so import here to keep the module graph acyclic.
@@ -227,6 +230,49 @@ def _parse_progress(line: str, duration_s: float) -> float | None:
     return None
 
 
+def _verify_ts_output(
+    before: VideoInfo,
+    after: VideoInfo,
+    path: Path,
+    *,
+    expected_size: tuple[int, int] | None = None,
+    expected_fps: float | None = None,
+) -> None:
+    """Validate an MPEG-TS re-encode without ISO-BMFF atom checks."""
+    try:
+        with path.open("rb") as fh:
+            sync = fh.read(1)
+    except OSError as exc:
+        raise VerifyError(f"could not read MPEG-TS output: {exc}") from exc
+    if sync != b"\x47":
+        raise VerifyError("output is not MPEG-TS (first byte is not 0x47)")
+    if after.codec != "h264":
+        raise VerifyError(f"expected H.264 output, got '{after.codec}'")
+    if expected_fps is not None:
+        if abs(after.fps - expected_fps) > 0.5:
+            raise VerifyError(
+                f"expected {expected_fps:g} fps output, got {after.fps:.3f}"
+            )
+    elif before.fps > 0 and abs(after.fps - before.fps) > 0.5:
+        raise VerifyError(
+            f"frame rate changed {before.fps:.3f} -> {after.fps:.3f}"
+        )
+    if expected_size is not None and (after.width, after.height) != expected_size:
+        raise VerifyError(
+            f"expected {expected_size[0]}x{expected_size[1]} output, "
+            f"got {after.width}x{after.height}"
+        )
+    if after.duration_s <= 0:
+        raise VerifyError("output duration is zero or unknown")
+    if before.duration_s > 0:
+        tolerance = max(0.1, before.duration_s * 0.001)
+        delta = abs(after.duration_s - before.duration_s)
+        if delta > tolerance:
+            raise VerifyError(
+                f"duration difference {delta:.3f}s exceeds tolerance {tolerance:.3f}s"
+            )
+
+
 def patch(
     req: PatchRequest,
     paths: FFmpegPaths | None,
@@ -244,6 +290,7 @@ def patch(
     req.out_dir.mkdir(parents=True, exist_ok=True)
 
     strategy = get_strategy(req.strategy)
+    is_ts = strategy.name.startswith("tiktok-ts")
     if not strategy.direct and paths is None:
         raise FFmpegNotFoundError(
             f"Strategy '{strategy.label}' requires FFmpeg executable, but FFmpeg is not configured."
@@ -261,6 +308,10 @@ def patch(
     )
     if before.is_vfr:
         emit(LogEvent("Variable frame rate detected; result may differ per player.", "WARN"))
+    if strategy.name == "tiktok-ts-remux" and before.codec != "h264":
+        raise PatchError(
+            "TikTok Remux requires an H.264 source; use TikTok 1080p to re-encode."
+        )
     trigger_mbps = BITRATE_TRIGGER_BPS // 1_000_000
     if before.bit_rate is not None and before.bit_rate > BITRATE_TRIGGER_BPS:
         mbps = before.bit_rate / 1_000_000
@@ -299,15 +350,19 @@ def patch(
     # original source is never modified. ``work_src`` feeds the patch strategies.
     work_src = src
     work_before = before
-    plan = make_plan(
-        before,
-        normalize_audio=req.auto_normalize_audio,
-        cap_bitrate=req.auto_cap_bitrate,
-        target_mbps=req.bitrate_target_mbps,
-        fix_vfr=req.auto_fix_vfr,
-        fix_codec=req.auto_fix_codec,
-        cap_resolution=req.auto_cap_resolution,
-        profile=get_profile(req.platform_profile),
+    plan = (
+        None
+        if is_ts
+        else make_plan(
+            before,
+            normalize_audio=req.auto_normalize_audio,
+            cap_bitrate=req.auto_cap_bitrate,
+            target_mbps=req.bitrate_target_mbps,
+            fix_vfr=req.auto_fix_vfr,
+            fix_codec=req.auto_fix_codec,
+            cap_resolution=req.auto_cap_resolution,
+            profile=get_profile(req.platform_profile),
+        )
     )
 
     # Re-encoding HDR to 8-bit yuv420p without tone-mapping silently destroys the
@@ -315,7 +370,8 @@ def patch(
     # keeps its existing behaviour.
     hdr_transfer = (before.color_transfer or "").strip().lower()
     if (
-        plan.needs_video_encode
+        plan is not None
+        and plan.needs_video_encode
         and not plan.cap_bitrate
         and hdr_transfer in ("smpte2084", "arib-std-b67")
     ):
@@ -344,7 +400,7 @@ def patch(
             )
         _cleanup_stale_temps(final)
         tmp = _temp_output(final)
-        if plan.needed:
+        if plan is not None and plan.needed:
             if paths is None:
                 emit(LogEvent("[PREFLIGHT] Skipped: FFmpeg is not configured.", "WARN"))
             else:
@@ -486,7 +542,15 @@ def patch(
                 paths.ffmpeg, args, on_stdout, on_stderr, cancel_event, force_event
             )
             if code != 0:
-                raise PatchError(f"ffmpeg exited with code {code}", list(stderr_tail))
+                tail = list(stderr_tail)
+                tail_lower = "\n".join(tail).lower()
+                if is_ts and ("h264_mf" in tail_lower or "mft" in tail_lower):
+                    raise PatchError(
+                        "Media Foundation H.264 encoder unavailable or failed "
+                        "(Windows only); no fallback by design.",
+                        tail,
+                    )
+                raise PatchError(f"ffmpeg exited with code {code}", tail)
 
         if (req.fix_color_tag or req.scrub_metadata) and not color_done:
             if is_pc:
@@ -498,6 +562,8 @@ def patch(
                         "WARN",
                     )
                 )
+            elif is_ts:
+                emit(LogEvent("[COLOR] skipped: not ISO-BMFF", "WARN"))
             else:
                 try:
                     colr = sanitize(
@@ -517,26 +583,50 @@ def patch(
         after = probe(tmp, ffprobe_bin)
         experimental = False
         if req.verify_after:
-            dur_tol: float | None = None
-            norm_strat = strategy.name.replace("x1t-", "bxd-")
-            if norm_strat == "bxd-hybrid" and req.bxd_max_tail_ms > 0:
-                dur_tol = max(0.25, (req.bxd_max_tail_ms / 1000.0) + 0.1)
-            warnings = verify(
-                work_before, after, req.timescale, duration_tolerance_s=dur_tol
-            )
-            for w in warnings:
-                emit(LogEvent(w, "WARN"))
-
-            # Output detailed payload integrity log
-            integrity = verify_payload_integrity(work_src, tmp)
-            experimental = any(status == "EXPERIMENTAL" for status in integrity.values())
-            for item, status in integrity.items():
-                level: LogLevel = (
-                    "OK"
-                    if status == "PASS"
-                    else ("WARN" if status == "EXPERIMENTAL" else "ERROR")
+            if is_ts:
+                expected_size = (
+                    (1920, 1080)
+                    if getattr(strategy, "force_1080", False)
+                    else None
                 )
-                emit(LogEvent(f"[VERIFY] {item:<18} {status}", level))
+                expected_fps = (
+                    None if strategy.name == "tiktok-ts-remux" else 60.0
+                )
+                _verify_ts_output(
+                    work_before,
+                    after,
+                    tmp,
+                    expected_size=expected_size,
+                    expected_fps=expected_fps,
+                )
+                emit(
+                    LogEvent(
+                        "[VERIFY] MPEG-TS sync byte, H.264 codec, frame rate, "
+                        "duration PASS",
+                        "OK",
+                    )
+                )
+            else:
+                dur_tol: float | None = None
+                norm_strat = strategy.name.replace("x1t-", "bxd-")
+                if norm_strat == "bxd-hybrid" and req.bxd_max_tail_ms > 0:
+                    dur_tol = max(0.25, (req.bxd_max_tail_ms / 1000.0) + 0.1)
+                warnings = verify(
+                    work_before, after, req.timescale, duration_tolerance_s=dur_tol
+                )
+                for w in warnings:
+                    emit(LogEvent(w, "WARN"))
+
+                # Output detailed payload integrity log
+                integrity = verify_payload_integrity(work_src, tmp)
+                experimental = any(status == "EXPERIMENTAL" for status in integrity.values())
+                for item, status in integrity.items():
+                    level: LogLevel = (
+                        "OK"
+                        if status == "PASS"
+                        else ("WARN" if status == "EXPERIMENTAL" else "ERROR")
+                    )
+                    emit(LogEvent(f"[VERIFY] {item:<18} {status}", level))
         else:
             emit(LogEvent("[VERIFY] Skipped: verify_after is disabled.", "WARN"))
 

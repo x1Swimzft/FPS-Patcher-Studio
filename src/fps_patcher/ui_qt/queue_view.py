@@ -76,7 +76,7 @@ from ..core.platform_profiles import (
     get_profile,
 )
 from ..core.preflight import planned_output_bitrate
-from ..core.strategies import UI_PRESETS, migrate_strategy_name
+from ..core.strategies import UI_PRESETS, migrate_strategy_name, visible_presets
 from ..ui.strings import readiness_check_label, t
 from .icons import get_icon
 from .motion import animate, fade_in
@@ -93,6 +93,13 @@ ROW_HEIGHT = 56
 _INVALID_INDEX = QModelIndex()
 _MAX_THUMBS = 240
 _ACTION_SIZE = 28.0
+
+# Short row-pill labels for presets whose full label is too wide.
+_PRESET_SHORT_LABELS = {
+    "tiktok-ts": "TikTok 60",
+    "tiktok-ts-1080": "TikTok 1080",
+    "tiktok-ts-remux": "Remux",
+}
 
 
 def _fps_text(value: float) -> str:
@@ -1228,6 +1235,9 @@ class QueueView(QWidget):
 
     def strategy_short_label(self, strategy: str | None) -> str:
         key = migrate_strategy_name(str(strategy or self.global_strategy()))[0]
+        short = _PRESET_SHORT_LABELS.get(key)
+        if short is not None:
+            return short
         preset = UI_PRESETS.get(key)
         if preset is None:
             return key
@@ -1597,8 +1607,8 @@ class QueueView(QWidget):
         set_fps = menu.addAction(self.tr("set_fps"))
         preset_menu = menu.addMenu(self.tr("set_strategy"))
         preset_actions = {
-            preset_menu.addAction(preset.label): key
-            for key, preset in UI_PRESETS.items()
+            preset_menu.addAction(preset.label): preset.name
+            for preset in visible_presets()
         }
         profile_menu = menu.addMenu(self.tr("set_platform_profile"))
         profile_actions: dict[QAction, str | None] = {}

@@ -180,7 +180,7 @@ def test_rich_empty_state_has_actions_badges_and_profile_strip(
     assert drop.profile_title.text() == t("active_patch_profile", "en")
     summary = drop.profile_summary.fullText()
     assert "60 FPS" in summary
-    assert "X1T For Mobile" in summary
+    assert "TikTok 60fps" in summary
     assert t("drop_profile_output_same", "en") in summary
     assert drop.reassure_label.text() == t("drop_reassure", "en")
     window.close()
@@ -238,7 +238,7 @@ def test_tray_enabled_hides_on_close_and_quits_from_tray(
     )
     window = make_main_window(qtbot, monkeypatch, tmp_path, tray_enabled=True)
     app = QApplication.instance()
-    assert app is not None
+    assert isinstance(app, QApplication)
     assert window._tray is not None
     assert app.quitOnLastWindowClosed() is False
 
@@ -269,7 +269,9 @@ def test_tray_disabled_keeps_normal_close(
     window = make_main_window(qtbot, monkeypatch, tmp_path, tray_enabled=False)
 
     assert window._tray is None
-    assert QApplication.instance().quitOnLastWindowClosed() is True
+    app = QApplication.instance()
+    assert isinstance(app, QApplication)
+    assert app.quitOnLastWindowClosed() is True
     window.close()
 
 
@@ -303,13 +305,13 @@ def test_override_card_applies_to_controller_item(
 
     inspector.override_switch.setChecked(True)
     inspector.override_fps_edit.setText("90000")
-    inspector.override_preset_combo.setCurrentText("X1T Clean")
+    inspector.override_preset_combo.setCurrentText("TikTok 1080p")
     inspector.override_apply_btn.click()
 
     item = window.controller.items.get(video)
     assert item is not None
     assert item.timescale == 90000
-    assert item.strategy == "bxd-clean"
+    assert item.strategy == "tiktok-ts-1080"
     assert inspector.override_state.text() == t("inspector_override_active", "en")
 
     inspector.override_clear_btn.click()
@@ -366,6 +368,42 @@ def test_settings_apply_refreshes_profile_strip(
     assert "X1T Clean" in summary
     assert t("drop_profile_output_custom", "en") in summary
     window.close()
+
+
+def test_preset_pickers_hide_x1t_but_keep_saved_legacy(
+    qtbot: Any, monkeypatch: Any, tmp_path: Path
+) -> None:
+    from qt_support import make_main_window
+
+    window = make_main_window(qtbot, monkeypatch, tmp_path)
+    combo = window.inspector.strategy_combo
+    assert [combo.itemText(i) for i in range(combo.count())] == [
+        "TikTok 60fps",
+        "TikTok 1080p",
+        "TikTok Remux",
+    ]
+    assert combo.currentText() == "TikTok 60fps"
+    assert combo.width() >= combo.fontMetrics().horizontalAdvance("TikTok 1080p") + 32
+    window.close()
+
+    legacy = make_main_window(qtbot, monkeypatch, tmp_path, strategy="bxd-mobile")
+    combo = legacy.inspector.strategy_combo
+    assert [combo.itemText(i) for i in range(combo.count())] == [
+        "TikTok 60fps",
+        "TikTok 1080p",
+        "TikTok Remux",
+        "X1T For Mobile",
+    ]
+    assert combo.currentText() == "X1T For Mobile"
+
+    legacy.inspector._strategy_activated(combo.findText("TikTok 1080p"))
+    assert [combo.itemText(i) for i in range(combo.count())] == [
+        "TikTok 60fps",
+        "TikTok 1080p",
+        "TikTok Remux",
+    ]
+    assert combo.currentText() == "TikTok 1080p"
+    legacy.close()
 
 
 def _quicktime_info(path: Path) -> Any:

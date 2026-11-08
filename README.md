@@ -50,7 +50,7 @@ The builds are unsigned. Windows SmartScreen may show an "Unknown publisher" war
 
 1. Launch the app.
 2. Drop one or more `.mp4`, `.mov`, or `.m4v` files on the window, or use **Add Files**.
-3. Pick 60, 120, or Custom, then choose a preset. X1T For Mobile is the default.
+3. Pick 60, 120, or Custom, then choose a preset. TikTok 60fps is the default. TikTok 60fps and TikTok 1080p always encode 60 fps; the FPS choice only affects the output filename. For an already-H.264 1080p60 source, choose **TikTok Remux** to preserve its exact video fingerprint.
 4. Press **Start Patch**.
 5. Patched files land next to the source unless you set another output folder in Settings.
 
@@ -60,26 +60,27 @@ FFmpeg is used for thumbnails, audio normalization, and bitrate capping. FFprobe
 
 | Preset | Best for | What changes |
 | --- | --- | --- |
-| **X1T For Mobile** (default) | Phones and social uploads | Faststart `moov`, rewritten timing, `free` box padding, `mvhd` duration set to -1. No ghost samples. |
-| **X1T Hybrid** | Mixed desktop and mobile playback | Mobile-safe structure plus a tail extension on the last video sample (default 50 ms). |
-| **X1T Clean** | Archival and strict players | Faststart and timing rewrite only. No padding, no ghost samples. |
-| **X1T For PC** (legacy) | Desktop players | Ghost audio samples and trailing bytes from the original method. Some mobile decoders reject it. |
+| **TikTok 60fps** (default) | Social uploads that need the reference MPEG-TS fingerprint | Lossy H.264 Main/CAVLC + AAC re-encode to MPEG-TS saved as `.mp4`. Keeps the source resolution and forces 60 fps. |
+| **TikTok 1080p** | 1080p60 deliverables | Same lossy re-encode, letterboxed to exactly 1920x1080 at 60 fps. |
+| **TikTok Remux** | An already-H.264 1080p60 source | Copies the video bitstream unchanged and re-encodes only audio to AAC 128k in MPEG-TS. This reproduces the reference upload exactly (same video MD5, SEI and bitrate). Requires an H.264 source. |
 
-All four presets write an indeterminate `mvhd` duration (`-1`), which makes the container report a stream of unknown length. Platform ingest pipelines can still re-encode or reject a file no matter what the header says, so treat this as a heuristic. [docs/PLATFORM_PRESETS.md](docs/PLATFORM_PRESETS.md) lists the published platform rules and labels each check as documented, recommended, or heuristic.
+`TikTok 60fps` and `TikTok 1080p` require Windows Media Foundation (`h264_mf`); there is no software fallback. `TikTok Remux` does not re-encode video, so it works with any H.264 source. Use the remux preset for an H.264 1080p60 file and the re-encode presets for AV1, HEVC or arbitrary sources.
+
+The four X1T presets remain available to saved settings and the CLI (`--strategy bxd-pc`, `bxd-mobile`, `bxd-hybrid`, `bxd-clean`) but are hidden from the pickers. They are the original lossless container patches and write an indeterminate `mvhd` duration (`-1`). Platform ingest pipelines can still re-encode or reject a file no matter what the header says, so treat the X1T behaviour as a heuristic. [docs/PLATFORM_PRESETS.md](docs/PLATFORM_PRESETS.md) lists the published platform rules and labels each check as documented, recommended, or heuristic.
 
 ## Command line
 
 ```powershell
 fps-patcher-studio --cli probe "clip.mp4"
-fps-patcher-studio --cli patch "clip.mp4" --preset 60 --output out
+fps-patcher-studio --cli patch "clip.mp4" --preset 60 --strategy tiktok-ts --output out
 fps-patcher-studio --cli score "clip.mp4" --profile tiktok --json
 ```
 
-In the installed build, start with `FPSPatcherStudio.exe --cli` instead. `--preset` accepts `60` or `120`; use `--timescale` for anything else. Exit codes are 0 for success, 1 for a file error, 2 for a usage error, and 130 for a cancelled run. `patch` also accepts `--overwrite` or `--auto-rename`, `--normalize-audio`, `--cap-bitrate`, `--tag-bt709`, `--scrub-metadata`, and `--json`.
+In the installed build, start with `FPSPatcherStudio.exe --cli` instead. `--preset` accepts `60` or `120`; use `--timescale` for anything else. `--strategy` accepts `tiktok-ts`, `tiktok-ts-1080`, `tiktok-ts-remux`, or the legacy X1T keys (`bxd-pc`, `bxd-mobile`, `bxd-hybrid`, `bxd-clean`). Exit codes are 0 for success, 1 for a file error, 2 for a usage error, and 130 for a cancelled run. `patch` also accepts `--overwrite` or `--auto-rename`, `--normalize-audio`, `--cap-bitrate`, `--tag-bt709`, `--scrub-metadata`, and `--json`.
 
 ## What gets verified
 
-After each patch, the app checks the new file and writes the results to the Activity Console:
+For MP4/MOV output, after each patch the app checks the new file and writes the results to the Activity Console:
 
 - atom structure and trailing data
 - chunk offsets after the faststart shift
@@ -87,7 +88,7 @@ After each patch, the app checks the new file and writes the results to the Acti
 - basic mobile playback compatibility
 - sampled SHA-256 of the `mdat` head, middle, and tail, plus the per-track sample bytes
 
-The same checks are available in the Forensic window. A payload failure is logged as an error, but the check does not replace a playback test on a real device. `verify_after` turns the report off. When the destination already exists and backups are enabled, the old file is kept as a `.bak` copy before the atomic replace.
+The TikTok TS presets produce MPEG-TS, so they use a different check: first byte `0x47`, H.264 codec, and duration within tolerance. The atom/mdat checks and the Forensic window apply only to MP4/MOV output. A payload failure is logged as an error, but the check does not replace a playback test on a real device. `verify_after` turns the report off. When the destination already exists and backups are enabled, the old file is kept as a `.bak` copy before the atomic replace.
 
 ## Build from source
 

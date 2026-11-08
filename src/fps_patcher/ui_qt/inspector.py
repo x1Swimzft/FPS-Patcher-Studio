@@ -40,7 +40,12 @@ from ..core.platform_profiles import (
     remediable_checks,
 )
 from ..core.preflight import planned_output_bitrate
-from ..core.strategies import UI_PRESETS, migrate_strategy_name
+from ..core.strategies import (
+    UI_PRESETS,
+    PatchStrategy,
+    migrate_strategy_name,
+    visible_presets,
+)
 from ..ui.strings import readiness_check_label, t
 from .icons import get_icon
 from .motion import MotionProgressBar, animate_height, fade
@@ -221,13 +226,11 @@ class Inspector(QWidget):
 
         self.strategy_combo = QComboBox()
         self.strategy_combo.setFixedHeight(theme.combo_height)
-        self.strategy_combo.setFixedWidth(148)
+        self.strategy_combo.setFixedWidth(200)
         self.strategy_combo.setAccessibleName(t("strategy_lbl", lang))
-        self.strategy_combo.addItems(list(self._label_to_strategy))
         resolved_key, _ = migrate_strategy_name(str(self.settings.strategy))
         resolved_preset = UI_PRESETS.get(resolved_key)
-        if resolved_preset is not None:
-            self.strategy_combo.setCurrentText(resolved_preset.label)
+        self._sync_preset_items(self.strategy_combo, resolved_preset)
         self.strategy_combo.activated.connect(self._strategy_activated)
         self.strategy_row = self.output_group.add_row(
             t("strategy_lbl", lang), self.strategy_combo
@@ -360,7 +363,7 @@ class Inspector(QWidget):
         self.override_preset_combo = QComboBox()
         self.override_preset_combo.setFixedHeight(theme.combo_height)
         self.override_preset_combo.setAccessibleName(t("inspector_override_preset", lang))
-        self.override_preset_combo.addItems(list(self._label_to_strategy))
+        self._sync_preset_items(self.override_preset_combo, None)
         self._override_form_layout.addWidget(self.override_preset_combo)
 
         self.override_profile_label = QLabel(t("inspector_override_profile", lang))
@@ -994,10 +997,24 @@ QWidget#Inspector QProgressBar::chunk {{
     def refresh_override(self) -> None:
         self._refresh_override_card()
 
-    def _override_preset_label(self, strategy: str | None) -> str:
+    def _sync_preset_items(self, combo: QComboBox, active: PatchStrategy | None) -> None:
+        """Show the visible line-up plus the active preset, never stale entries."""
+        labels = [preset.label for preset in visible_presets()]
+        if active is not None and active.label not in labels:
+            labels.append(active.label)
+        combo.blockSignals(True)
+        try:
+            if [combo.itemText(i) for i in range(combo.count())] != labels:
+                combo.clear()
+                combo.addItems(labels)
+            if active is not None:
+                combo.setCurrentText(active.label)
+        finally:
+            combo.blockSignals(False)
+
+    def _override_preset(self, strategy: str | None) -> PatchStrategy | None:
         key = migrate_strategy_name(str(strategy or self.settings.strategy))[0]
-        preset = UI_PRESETS.get(key)
-        return preset.label if preset is not None else self.strategy_combo.currentText()
+        return UI_PRESETS.get(key)
 
     def _refresh_override_card(self) -> None:
         item = self._focused_item
@@ -1016,8 +1033,8 @@ QWidget#Inspector QProgressBar::chunk {{
         self.override_switch.blockSignals(False)
         timescale = item.timescale if item.timescale is not None else self.timescale()
         self.override_fps_edit.setText("" if timescale is None else str(timescale))
-        self.override_preset_combo.setCurrentText(
-            self._override_preset_label(item.strategy)
+        self._sync_preset_items(
+            self.override_preset_combo, self._override_preset(item.strategy)
         )
         profile_index = self.override_profile_combo.findData(item.platform_profile)
         self.override_profile_combo.setCurrentIndex(max(0, profile_index))
@@ -1220,6 +1237,7 @@ QWidget#Inspector QProgressBar::chunk {{
             return
         self.settings.strategy = key
         self.settings.save_async()
+        self._sync_preset_items(self.strategy_combo, UI_PRESETS.get(key))
         self._update_warn(key)
         self.strategy_changed.emit()
 

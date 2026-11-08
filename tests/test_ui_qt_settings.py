@@ -107,6 +107,7 @@ def test_sidebar_search_filters_and_shows_empty_state(qtbot: Any, appdata: Path)
     assert dialog._stack.currentWidget() is dialog._search_scroll
     matching = [row for row, _text in dialog._search_rows if row.isVisible()]
     assert matching
+    assert dialog._search_empty is not None
     assert not dialog._search_empty.isVisible()
 
     dialog._search.setText("definitely-no-such-setting")

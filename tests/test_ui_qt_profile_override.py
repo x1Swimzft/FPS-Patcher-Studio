@@ -68,12 +68,12 @@ def test_inspector_override_emits_profile_and_clear_emits_all_none(
 
     inspector.override_switch.setChecked(True)
     inspector.override_fps_edit.setText("90000")
-    inspector.override_preset_combo.setCurrentText("X1T Clean")
+    inspector.override_preset_combo.setCurrentText("TikTok 1080p")
     inspector.override_profile_combo.setCurrentIndex(tiktok_index)
     inspector.override_apply_btn.click()
 
     assert len(emitted[-1]) == 4
-    assert emitted[-1] == (video, 90000, "bxd-clean", "tiktok")
+    assert emitted[-1] == (video, 90000, "tiktok-ts-1080", "tiktok")
     item = window.controller.items.get(video)
     assert item is not None
     assert item.platform_profile == "tiktok"
@@ -158,6 +158,10 @@ def test_settings_template_toggle_round_trips_and_preview(
 
     dialog = SettingsDialog(settings, ThemeManager(settings))
     qtbot.addWidget(dialog)
+    strategy_labels = [
+        dialog._strategy.itemText(index) for index in range(dialog._strategy.count())
+    ]
+    assert strategy_labels == ["TikTok 60fps", "TikTok 1080p", "TikTok Remux"]
     assert not dialog._use_template.isChecked()
     assert not dialog._template.isEnabled()
     assert "sample_clip_ts60000.mp4" in dialog._template_preview.text()
@@ -166,7 +170,7 @@ def test_settings_template_toggle_round_trips_and_preview(
     dialog._use_template.setChecked(True)
     dialog._template.setText(template)
     assert dialog._template.isEnabled()
-    assert "sample_clip_tiktok_bxd-mobile_60fps.mp4" in dialog._template_preview.text()
+    assert "sample_clip_tiktok_tiktok-ts_60fps.mp4" in dialog._template_preview.text()
     dialog._apply()
 
     assert settings.use_filename_template is True
@@ -175,7 +179,7 @@ def test_settings_template_toggle_round_trips_and_preview(
     reopened = SettingsDialog(settings, ThemeManager(settings))
     qtbot.addWidget(reopened)
     assert reopened._use_template.isChecked()
-    assert "sample_clip_tiktok_bxd-mobile_60fps.mp4" in reopened._template_preview.text()
+    assert "sample_clip_tiktok_tiktok-ts_60fps.mp4" in reopened._template_preview.text()
 
 
 def test_context_menu_profile_action_keeps_other_overrides(

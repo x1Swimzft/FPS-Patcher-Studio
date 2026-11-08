@@ -152,7 +152,7 @@ no second UI toolkit in the runtime.
 | `core/prober.py` | Extracts `VideoInfo` (codec, dimensions, FPS, duration, bitrate, audio, color) using ffprobe when available. |
 | `core/patcher.py` | Orchestrates one file: validate → probe → preflight plan → strategy patch → color/metadata → verify → atomic replace. Also handles destination locks, backups, overwrite policy, and `preserve_mtime`. |
 | `core/preflight.py` | Pure planning helpers (`needs_audio_normalize`, `needs_bitrate_cap`, `planned_output_bitrate`, `make_plan`) and the FFmpeg preflight runner. Owns `BITRATE_TARGET_MBPS_MIN/MAX` (1/24), default 16, hardware-encoder order and `d3d11va` fallback. |
-| `core/strategies.py` | Strategy registry: `bxd-pc`, `bxd-mobile`, `bxd-hybrid`, `bxd-clean`, `direct-atom`, `v4-forensic`, `bxd-experimental`, `ffmpeg-copy`, plus legacy aliases. |
+| `core/strategies.py` | Strategy registry: `tiktok-ts`, `tiktok-ts-1080`, `tiktok-ts-remux`, `bxd-pc`, `bxd-mobile`, `bxd-hybrid`, `bxd-clean`, `direct-atom`, `v4-forensic`, `bxd-experimental`, `ffmpeg-copy`, plus legacy aliases. `VISIBLE_PRESET_KEYS` controls the pickers. |
 | `core/bxd_patcher.py` | BXD direct patch engine and preset variants. |
 | `core/v4_patcher.py` | Strict V4 forensic patch engine. |
 | `core/atom_patcher.py` | ISO-BMFF box parser/writer and video-track timescale patch. |
@@ -213,9 +213,12 @@ flowchart TD
 
 | Preset ID | UI role |
 | --- | --- |
-| `bxd-mobile` | Default mobile-safe X1T preset |
-| `bxd-hybrid` | Mobile-safe structure with a bounded tail extension |
-| `bxd-clean` | Timing/faststart rewrite without extra padding |
+| `tiktok-ts` | Default lossy TikTok TS preset (60 fps, source resolution) |
+| `tiktok-ts-1080` | Lossy TikTok TS preset letterboxed to 1920x1080 |
+| `tiktok-ts-remux` | Copies H.264 video, re-encodes audio; exact reference match |
+| `bxd-mobile` | Legacy mobile-safe X1T preset (hidden from pickers) |
+| `bxd-hybrid` | Legacy mobile-safe structure with a bounded tail extension |
+| `bxd-clean` | Legacy timing/faststart rewrite without extra padding |
 | `bxd-pc` | Legacy PC-oriented X1T behavior |
 | `direct-atom` | Lightweight direct box editor |
 | `v4-forensic` | Strict V4 re-mapper with optional report/dry-run |

@@ -1,7 +1,8 @@
 """Pluggable patch strategies. Each builds an ffmpeg argument list or flags direct atom patch.
 
-All strategies use stream copy (``-c copy``) or direct binary atom patching:
-no re-encode, header/container rewrite only.
+Most strategies use stream copy (``-c copy``) or direct binary atom patching:
+no re-encode, header/container rewrite only. The two ``tiktok-ts`` presets are
+a deliberate exception and lossily re-encode video and audio into MPEG-TS.
 """
 
 from __future__ import annotations
@@ -154,6 +155,115 @@ class FFmpegStrategy:
         ]
 
 
+class TikTokTSStrategy:
+    """TikTok TS: re-encode via Media Foundation H.264 into MPEG-TS saved as .mp4.
+
+    Mirrors the reference upload fingerprint (Main/CAVLC, 1 s GOP, u_vbr 20.48 Mbps).
+    """
+
+    direct = False
+
+    def __init__(self, name: str, label: str, force_1080: bool = False) -> None:
+        self.name = name
+        self.label = label
+        self.force_1080 = force_1080
+
+    def build_args(self, req: PatchRequest, info: VideoInfo, out: Path) -> list[str]:
+        vf = "fps=60"
+        if self.force_1080:
+            vf = (
+                "scale=1920:1080:force_original_aspect_ratio=decrease"
+                ":force_divisible_by=2,"
+                "pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1," + vf
+            )
+        # h264_mf in the bundled ffmpeg has no named profile table; 77 is H.264 Main.
+        return [
+            "-hide_banner",
+            "-nostats",
+            "-y",
+            "-i",
+            str(req.src),
+            "-map",
+            "0:v:0",
+            "-map",
+            "0:a:0?",
+            "-map_metadata",
+            "-1",
+            "-vf",
+            vf,
+            "-pix_fmt",
+            "nv12",
+            "-c:v",
+            "h264_mf",
+            "-profile:v",
+            "77",
+            "-rate_control",
+            "u_vbr",
+            "-b:v",
+            "20480k",
+            "-g",
+            "60",
+            "-bf",
+            "2",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "128k",
+            "-ar",
+            "48000",
+            "-ac",
+            "2",
+            "-progress",
+            "pipe:1",
+            "-f",
+            "mpegts",
+            str(out),
+        ]
+
+
+class TikTokTSRemuxStrategy:
+    """TikTok TS remux: copy an H.264 video bitstream and re-encode audio only.
+
+    The reference upload was a remux of an already-H.264 1080p60 source: its
+    video SEI and bitrate survive unchanged. Re-encoding cannot reproduce that,
+    so this preset copies the video and normalises only the audio and container.
+    """
+
+    name = "tiktok-ts-remux"
+    label = "TikTok Remux"
+    direct = False
+
+    def build_args(self, req: PatchRequest, info: VideoInfo, out: Path) -> list[str]:
+        return [
+            "-hide_banner",
+            "-nostats",
+            "-y",
+            "-i",
+            str(req.src),
+            "-map",
+            "0:v:0",
+            "-map",
+            "0:a:0?",
+            "-map_metadata",
+            "-1",
+            "-c:v",
+            "copy",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "128k",
+            "-ar",
+            "48000",
+            "-ac",
+            "2",
+            "-progress",
+            "pipe:1",
+            "-f",
+            "mpegts",
+            str(out),
+        ]
+
+
 class _PresetDict(dict[str, PatchStrategy]):
     """Preset mapping dictionary with transparent x1t-* alias support."""
 
@@ -179,13 +289,35 @@ UI_PRESETS: dict[str, PatchStrategy] = _PresetDict({
     "bxd-mobile": BXDMobileStrategy(),
     "bxd-hybrid": BXDHybridStrategy(),
     "bxd-clean": BXDCleanStrategy(),
+    "tiktok-ts": TikTokTSStrategy("tiktok-ts", "TikTok 60fps"),
+    "tiktok-ts-1080": TikTokTSStrategy(
+        "tiktok-ts-1080", "TikTok 1080p", force_1080=True
+    ),
+    "tiktok-ts-remux": TikTokTSRemuxStrategy(),
 })
+
+# The X1T/BXD family stays registered for saved settings, queue overrides and
+# CLI compatibility, but it is no longer offered for new selections.
+HIDDEN_PRESET_KEYS: frozenset[str] = frozenset(
+    {"bxd-pc", "bxd-mobile", "bxd-hybrid", "bxd-clean"}
+)
+VISIBLE_PRESET_KEYS: tuple[str, ...] = tuple(
+    key for key in UI_PRESETS if key not in HIDDEN_PRESET_KEYS
+)
+
+
+def visible_presets() -> list[PatchStrategy]:
+    """Presets offered for new selections in the Inspector, Settings and queue."""
+    return [UI_PRESETS[key] for key in VISIBLE_PRESET_KEYS]
 
 STRATEGIES: dict[str, PatchStrategy] = {
     "bxd-pc": UI_PRESETS["bxd-pc"],
     "bxd-mobile": UI_PRESETS["bxd-mobile"],
     "bxd-hybrid": UI_PRESETS["bxd-hybrid"],
     "bxd-clean": UI_PRESETS["bxd-clean"],
+    "tiktok-ts": UI_PRESETS["tiktok-ts"],
+    "tiktok-ts-1080": UI_PRESETS["tiktok-ts-1080"],
+    "tiktok-ts-remux": UI_PRESETS["tiktok-ts-remux"],
     "x1t-pc": UI_PRESETS["bxd-pc"],
     "x1t-mobile": UI_PRESETS["bxd-mobile"],
     "x1t-hybrid": UI_PRESETS["bxd-hybrid"],
@@ -232,7 +364,15 @@ def migrate_strategy_name(name: str) -> tuple[str, str | None]:
 
     Returns (resolved_preset_key, original_legacy_key_if_migrated).
     """
-    if name in ("bxd-pc", "bxd-mobile", "bxd-hybrid", "bxd-clean"):
+    if name in (
+        "bxd-pc",
+        "bxd-mobile",
+        "bxd-hybrid",
+        "bxd-clean",
+        "tiktok-ts",
+        "tiktok-ts-1080",
+        "tiktok-ts-remux",
+    ):
         return name, None
     if name in ("x1t-pc", "x1t-mobile", "x1t-hybrid", "x1t-clean"):
         return name.replace("x1t-", "bxd-"), None
