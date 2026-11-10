@@ -8,7 +8,7 @@ A Windows desktop app and headless CLI for patching video container timing and p
 - **Auto-update is on by default.** The app checks GitHub Releases on startup and asks before downloading.
 - **No telemetry. No media uploads.** Files stay on your PC.
 
-[Download v2.2.1](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases/tag/v2.2.1) · [Website](https://x1t-web.vercel.app/) · [Release notes](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases) · [Zilem method](docs/ZILEM_METHOD.md) · [Privacy](docs/PRIVACY.md)
+[Download v2.2.2](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases/tag/v2.2.2) · [Website](https://x1t-web.vercel.app/) · [Release notes](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases) · [Zilem method](docs/ZILEM_METHOD.md) · [Privacy](docs/PRIVACY.md)
 
 ## Presets
 
@@ -38,14 +38,14 @@ TikTok upload behaviour is not guaranteed. Matching a container fingerprint does
 
 `X1T Zilem` replaces `X1T Remux` as the shipped default. On the first 2.1.0 launch only, a saved `settings.json` value of exactly `tiktok-ts-remux` is migrated to `zilem`. Any other saved preset is left untouched, including a later explicit choice of `X1T Remux`.
 
-If you are still on **2.0.1–2.0.3**, install 2.2.1 manually once. Those builds hard-disable the startup update toggle unless network downloads are enabled with an environment override, and they require an Authenticode-signed installer; the current build is unsigned and uses the SHA-256 policy added in 2.0.4. From 2.0.4 onward, startup update checks are enabled by default and unsigned installers are accepted after the release SHA-256 matches.
+If you are still on **2.0.1–2.0.3**, install 2.2.2 manually once. Those builds hard-disable the startup update toggle unless network downloads are enabled with an environment override, and they require an Authenticode-signed installer; the current build is unsigned and uses the SHA-256 policy added in 2.0.4. From 2.0.4 onward, startup update checks are enabled by default and unsigned installers are accepted after the release SHA-256 matches.
 
 ## Install
 
 Windows 10/11 x64. Pick one:
 
-- **Installer:** `FPSPatcherStudio-v2.2.1-Setup.exe`
-- **Portable:** `FPSPatcherStudio-v2.2.1-win64.zip` — extract the whole folder, then run `FPSPatcherStudio.exe`
+- **Installer:** `FPSPatcherStudio-v2.2.2-Setup.exe`
+- **Portable:** `FPSPatcherStudio-v2.2.2-win64.zip` — extract the whole folder, then run `FPSPatcherStudio.exe`
 
 The builds are **unsigned**, so Windows SmartScreen may warn. Verify the SHA-256 against the release checksum before running.
 

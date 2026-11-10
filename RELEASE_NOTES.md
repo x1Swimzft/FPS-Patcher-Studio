@@ -1,5 +1,30 @@
 # Release Notes
 
+## v2.2.2 - 2026-11-10 (General settings cleanup)
+
+Version 2.2.2 cleans up Settings → General. It is a UI-only change: patching
+behavior, presets and verification are unchanged.
+
+### Changed
+
+- General uses two content-sized columns instead of fixed-height cards:
+  Language & updates, Window and Notifications on the left; Default preset and
+  Safety on the right. Cards no longer leave empty gaps.
+- Window and startup hints are gone, labels are shorter, and the static
+  "Lossless by default" badge is removed from Safety.
+- Re-encode fallbacks and Advanced Container Options remain full-width
+  collapsed sections below the columns.
+
+### Verification
+
+- 687 tests, 2 skipped; ruff and mypy clean.
+- All primary General settings fit at the default 920x640.
+
+**The Windows build is unsigned; verify the release SHA-256 before running.**
+
+Auto Update remains enabled by default and will offer this build on the next
+startup.
+
 ## v2.2.1 - 2026-11-10 (Settings cleanup)
 
 Version 2.2.1 cleans up Settings → Output. It is a UI-only change: patching

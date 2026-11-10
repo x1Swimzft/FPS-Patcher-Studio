@@ -188,13 +188,10 @@ STRINGS: dict[str, dict[str, str]] = {
             'Add "Quick Patch with X1T" to the Explorer right-click menu (current user)'
         ),
         # Patching Tab
-        "default_target_preset": "Default Target FPS",
-        "default_timescale": "Default Timescale",
-        "default_strategy": "Default Preset",
-        "default_strategy_hint": (
-            "X1T Zilem is the default: it rewrites the MP4 container only and "
-            "never re-encodes video or audio."
-        ),
+        "default_target_preset": "Default target FPS",
+        "default_timescale": "Default timescale",
+        "default_strategy": "Default preset",
+        "default_strategy_hint": "X1T Zilem rewrites the container only.",
         "zilem_tip": "Container-only • no re-encode • no quality loss",
         "zilem_v3_tip": (
             "Reference-exact • same container, tag and ZETA trailer as the "
@@ -210,8 +207,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "v4_sync_mvhd": "Synchronize mvhd timescale",
         "v4_export_report": "Export JSON Forensic Report",
         "v4_dry_run": "Dry Run (Analyze only, do not write)",
-        "verify_after": "Verify output integrity after patching",
-        "backup_original": "Backup original before in-place overwrite (.bak)",
+        "verify_after": "Verify output after patching",
+        "backup_original": "Back up original files (.bak)",
         "stop_on_error": "Stop batch on first error",
         "preflight_section": "Smart Pre-Flight",
         "auto_normalize_audio": "Convert audio to AAC 48 kHz stereo",
@@ -248,15 +245,20 @@ STRINGS: dict[str, dict[str, str]] = {
         "log_to_file": "Save log session to file",
         "open_log_folder": "Open Logs Folder",
         # Behavior Tab
-        "remember_geometry": "Remember Window Size and Position",
-        "always_on_top": "Always on Top",
-        "confirm_cancel": "Confirm before cancelling running patch",
-        "confirm_overwrite": "Confirm before overwriting existing files",
-        "notify_done": "Batch Done Notification",
+        "remember_geometry": "Remember window size and position",
+        "always_on_top": "Always on top",
+        "confirm_cancel": "Confirm before cancelling",
+        "confirm_overwrite": "Confirm before overwriting",
+        "notify_done": "When a batch finishes",
         "notify_none": "None",
         "notify_sound": "System Beep / Sound",
         "notify_toast": "Windows Toast Notification",
-        "language_choice": "Language / ภาษา",
+        "language_choice": "Language",
+        "general_group_language": "Language & updates",
+        "general_group_window": "Window",
+        "general_group_notifications": "Notifications",
+        "general_group_preset": "Default preset",
+        "general_group_safety": "Safety",
         # About / Data Tab
         "app_info": "FPS Patcher Studio v{version}",
         "about_desc": "High-precision MP4 atom timescale patcher for TikTok & desktop players.",
@@ -326,7 +328,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "status_done": "Done",
         "status_failed": "Error",
         "status_skipped": "Skipped",
-        "check_updates_on_start": "Automatically check for updates on startup",
+        "check_updates_on_start": "Check for updates on startup",
         "update_available_btn": "Update v{version}",
         "update_dialog_title": "Update Available",
         "update_dialog_prompt": (
@@ -656,11 +658,8 @@ STRINGS: dict[str, dict[str, str]] = {
         # Patching Tab
         "default_target_preset": "FPS เริ่มต้น",
         "default_timescale": "Timescale เริ่มต้น",
-        "default_strategy": "พรีเซ็ตเริ่มต้น (Default Preset)",
-        "default_strategy_hint": (
-            "X1T Zilem เป็นค่าเริ่มต้น: ปรับเฉพาะคอนเทนเนอร์ MP4 "
-            "โดยไม่เข้ารหัสวิดีโอหรือเสียงใหม่"
-        ),
+        "default_strategy": "พรีเซ็ตเริ่มต้น",
+        "default_strategy_hint": "X1T Zilem ปรับเฉพาะคอนเทนเนอร์",
         "zilem_tip": "ปรับคอนเทนเนอร์เท่านั้น • คุณภาพไม่ลด",
         "zilem_v3_tip": (
             "เหมือน reference ทุกไบต์ • คอนเทนเนอร์ แท็ก และ trailer ZETA "
@@ -676,9 +675,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "v4_sync_mvhd": "ปรับ timescale ของ mvhd ให้ตรงกัน",
         "v4_export_report": "ส่งออกรายงาน Forensic JSON",
         "v4_dry_run": "ทดลองตรวจวิเคราะห์โดยไม่เขียนไฟล์",
-        "verify_after": "ตรวจสอบความสมบูรณ์ไฟล์หลังแปลงเสร็จ",
+        "verify_after": "ตรวจสอบผลลัพธ์หลังแพตช์",
         "backup_original": "สำรองไฟล์เดิมก่อนเขียนทับ (.bak)",
-        "stop_on_error": "หยุดการทำงานทันทีหากพบข้อผิดพลาด",
+        "stop_on_error": "หยุดแบตช์เมื่อเกิดข้อผิดพลาดแรก",
         "preflight_section": "ตรวจและซ่อมไฟล์อัตโนมัติก่อนแพตช์",
         "auto_normalize_audio": "แปลงเสียงเป็น AAC 48 kHz สเตอริโอ",
         "auto_cap_bitrate": "จำกัดบิตเรตวิดีโอ",
@@ -717,13 +716,18 @@ STRINGS: dict[str, dict[str, str]] = {
         # Behavior Tab
         "remember_geometry": "จำขนาดและตำแหน่งหน้าต่าง",
         "always_on_top": "อยู่ด้านบนสุดเสมอ",
-        "confirm_cancel": "ยืนยันก่อนยกเลิกการแปลงที่กำลังทำงาน",
-        "confirm_overwrite": "ยืนยันก่อนเขียนทับไฟล์เดิม",
-        "notify_done": "การแจ้งเตือนเมื่อแปลงเสร็จ",
+        "confirm_cancel": "ยืนยันก่อนยกเลิก",
+        "confirm_overwrite": "ยืนยันก่อนเขียนทับ",
+        "notify_done": "เมื่อแบตช์เสร็จ",
         "notify_none": "ไม่แจ้งเตือน",
         "notify_sound": "เสียงบี๊บจากระบบ",
         "notify_toast": "การแจ้งเตือน Windows Toast",
-        "language_choice": "ภาษา (Language)",
+        "language_choice": "ภาษา",
+        "general_group_language": "ภาษาและการอัปเดต",
+        "general_group_window": "หน้าต่าง",
+        "general_group_notifications": "การแจ้งเตือน",
+        "general_group_preset": "ค่าเริ่มต้นการแพตช์",
+        "general_group_safety": "ความปลอดภัย",
         # About / Data Tab
         "app_info": "FPS Patcher Studio v{version}",
         "about_desc": "เครื่องมือแก้ไข atom timescale วิดีโอ MP4 สำหรับ TikTok และโปรแกรมเล่นวิดีโอ",
@@ -785,7 +789,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "status_done": "เสร็จสิ้น",
         "status_failed": "ข้อผิดพลาด",
         "status_skipped": "ข้าม",
-        "check_updates_on_start": "ตรวจหาการอัปเดตอัตโนมัติเมื่อเปิดโปรแกรม",
+        "check_updates_on_start": "ตรวจหาอัปเดตเมื่อเปิดโปรแกรม",
         "update_available_btn": "อัปเดต v{version}",
         "update_dialog_title": "มีอัปเดตเวอร์ชันใหม่",
         "update_dialog_prompt": (

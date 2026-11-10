@@ -2,6 +2,17 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
+## [2.2.2] - 2026-11-10
+
+### Changed
+- Settings → General now uses two content-sized columns instead of fixed-height cards: Language & updates, Window and Notifications on the left; Default preset and Safety on the right. No empty gaps between cards.
+- Window and startup hints are gone, labels are shorter, and the static "Lossless by default" badge is removed from Safety.
+- Re-encode fallbacks and Advanced Container Options remain full-width collapsed sections below the columns.
+
+### Verification
+- 687 tests, 2 skipped; ruff and mypy clean.
+- General page captured at 920x640; all primary settings fit without scrolling.
+
 ## [2.2.1] - 2026-11-10
 
 ### Changed

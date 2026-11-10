@@ -431,6 +431,19 @@ class SettingsDialog(QDialog):
         self._themed_widgets.append(card)
         return layout
 
+    def _card_in(self, layout: QVBoxLayout) -> QVBoxLayout:
+        """Add a content-sized card to a column and return its body layout."""
+        theme = self._theme_manager.theme
+        card = Card(theme)
+        card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
+        body = QVBoxLayout()
+        body.setContentsMargins(14, 12, 14, 12)
+        body.setSpacing(8)
+        card.body.addLayout(body)
+        layout.addWidget(card)
+        self._themed_widgets.append(card)
+        return body
+
     def _advanced(
         self,
         grid: QGridLayout,
@@ -945,37 +958,52 @@ class SettingsDialog(QDialog):
         draft = self._draft
         theme = self._theme_manager.theme
 
-        startup = self._card(grid, 1, 0)
+        top = QWidget()
+        top_layout = QHBoxLayout(top)
+        top_layout.setContentsMargins(0, 0, 0, 0)
+        top_layout.setSpacing(GRID_GAP)
+        left = QVBoxLayout()
+        left.setSpacing(GRID_GAP)
+        right = QVBoxLayout()
+        right.setSpacing(GRID_GAP)
+        top_layout.addLayout(left, 1)
+        top_layout.addLayout(right, 1)
+        grid.addWidget(top, 1, 0, 1, 2)
+
+        basics = self._card_in(left)
+        self._section(basics, "general_group_language")
         self._language_labels = [
             f"{self._tr('language_en')} (en)",
             f"{self._tr('language_th')} (th)",
         ]
         self._language = self._combo(
-            startup,
+            basics,
             "language_choice",
             self._language_labels,
             self._language_labels[1 if draft.language == "th" else 0],
             self._on_language,
         )
         self._check_updates = self._switch(
-            startup, "check_updates_on_start", draft.check_updates_on_start
+            basics, "check_updates_on_start", draft.check_updates_on_start
         )
+
+        window = self._card_in(left)
+        self._section(window, "general_group_window")
         self._remember_geometry = self._switch(
-            startup, "remember_geometry", draft.remember_geometry
+            window, "remember_geometry", draft.remember_geometry
         )
         self._always_on_top = self._switch(
-            startup, "always_on_top", draft.always_on_top
+            window, "always_on_top", draft.always_on_top
         )
         self._tray_enabled = self._switch(
-            startup, "tray_enabled", draft.tray_enabled
+            window, "tray_enabled", draft.tray_enabled
         )
-        self._hint(startup, "tray_hint")
         self._start_with_windows = self._switch(
-            startup, "start_with_windows", draft.start_with_windows
+            window, "start_with_windows", draft.start_with_windows
         )
-        self._hint(startup, "startup_hint")
 
-        notifications = self._card(grid, 1, 1)
+        notifications = self._card_in(left)
+        self._section(notifications, "general_group_notifications")
         self._notify_labels = [
             self._tr("notify_none"),
             self._tr("notify_sound"),
@@ -1000,7 +1028,8 @@ class SettingsDialog(QDialog):
             notifications, "confirm_overwrite", draft.confirm_overwrite
         )
 
-        target = self._card(grid, 2, 0)
+        target = self._card_in(right)
+        self._section(target, "general_group_preset")
         self._custom_fps = self._tr("custom")
         fps_items = [*FPS_PRESETS, self._custom_fps]
         if draft.last_preset == CUSTOM_PRESET:
@@ -1034,19 +1063,18 @@ class SettingsDialog(QDialog):
         )
         self._hint(target, "default_strategy_hint")
 
-        safety = self._card(grid, 2, 1)
+        safety = self._card_in(right)
+        self._section(safety, "general_group_safety")
         self._verify = self._switch(safety, "verify_after", draft.verify_after)
         self._backup = self._switch(safety, "backup_original", draft.backup_original)
         self._stop_on_error = self._switch(
             safety, "stop_on_error", draft.stop_on_error
         )
-        safety.addWidget(
-            ConsequenceBadge(
-                self._tr("settings_badge_lossless"), "lossless", theme
-            )
-        )
 
-        fallbacks = self._collapsible(grid, 3, 0, "reecode_section", column_span=2)
+        left.addStretch(1)
+        right.addStretch(1)
+
+        fallbacks = self._collapsible(grid, 2, 0, "reecode_section", column_span=2)
         self._hint(fallbacks, "reecode_hint")
         self._fallback_badge = ConsequenceBadge(
             self._tr("reecode_badge_lossless"), "lossless", theme
@@ -1092,7 +1120,7 @@ class SettingsDialog(QDialog):
             switch.toggled.connect(lambda _checked: self._update_fallback_badge())
         self._update_fallback_badge()
 
-        advanced = self._advanced(grid, 4, 0, column_span=2)
+        advanced = self._advanced(grid, 3, 0, column_span=2)
         self._mask_paths = self._switch(
             advanced, "mask_paths_lbl", draft.mask_diagnostic_paths
         )

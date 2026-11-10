@@ -1,6 +1,6 @@
 # X1T Zilem — container-only MP4 method
 
-X1T Zilem is the default preset in FPS Patcher Studio 2.2.1. It rewrites an
+X1T Zilem is the default preset in FPS Patcher Studio 2.2.2. It rewrites an
 MP4 container without touching a single encoded video or audio sample. There is
 no FFmpeg call, no re-encode, and no quality loss.
 
