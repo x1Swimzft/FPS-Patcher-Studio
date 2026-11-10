@@ -1,5 +1,39 @@
 # Release Notes
 
+## v2.1.1 - 2026-11-10 (Zilem duration hotfix)
+
+Version 2.1.1 fixes a Zilem compatibility bug found on a real upload. If the
+source MP4 had the indeterminate movie duration (`mvhd = -1`) left by an older
+PC patcher, Zilem copied that value into the rebuilt file. Desktop players could
+still open it, but mobile players and upload services that rely on `mvhd` could
+show a loading state and fail with a server error.
+
+Zilem now replaces an indeterminate movie duration with the longest finite
+video/audio track duration, and the verifier rejects an indeterminate or wrong
+`mvhd` duration.
+
+**The Windows build is unsigned; verify the release SHA-256 before running.**
+
+### Fixed
+
+- X1T Zilem output always has a finite movie duration, even when the source
+  carries `mvhd = 0xFFFFFFFF` (version 0) or `0xFFFFFFFFFFFFFFFF` (version 1).
+- Zilem verification checks the rebuilt `mvhd` duration against the expected
+  longest track duration.
+
+### Verification
+
+- 683 tests, ruff and mypy clean.
+- Real-world 1080x1920 Zilem source with `mvhd = -1` rebuilt and verified; the
+  output now reports the correct 32.32 s duration.
+- Windows build and launch smoke test passed.
+
+### Upgrading
+
+Users on 2.1.0 can update normally. Users still on 2.0.1–2.0.3 must install
+2.1.1 manually once because those builds disable the startup update toggle and
+only accept Authenticode-signed installers.
+
 ## v2.1.0 - 2026-11-10 (X1T Zilem)
 
 Version 2.1.0 adds `X1T Zilem`, a container-only MP4 preset that becomes the

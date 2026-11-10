@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import struct
 import subprocess
 from pathlib import Path
@@ -111,6 +112,35 @@ def _mdat_offsets(data: bytes | bytearray) -> list[tuple[int, int]]:
     ]
 
 
+def _set_indeterminate_mvhd(path: Path) -> None:
+    """Rewrite a source's mvhd duration to the all-ones sentinel."""
+    data = bytearray(path.read_bytes())
+    moov_start = data.find(b"moov")
+    assert moov_start != -1
+    type_offset = data.find(b"mvhd", moov_start)
+    assert type_offset != -1
+    box = type_offset - 4
+    version = data[box + 8]
+    if version == 0:
+        struct.pack_into(">I", data, box + 24, 0xFFFFFFFF)
+    elif version == 1:
+        struct.pack_into(">Q", data, box + 32, 0xFFFFFFFFFFFFFFFF)
+    else:
+        raise AssertionError(f"unexpected mvhd version {version}")
+    path.write_bytes(data)
+
+
+def _movie_duration(path: Path) -> int:
+    data = path.read_bytes()
+    moov_start = data.find(b"moov")
+    type_offset = data.find(b"mvhd", moov_start)
+    box = type_offset - 4
+    version = data[box + 8]
+    if version == 0:
+        return int(struct.unpack_from(">I", data, box + 24)[0])
+    return int(struct.unpack_from(">Q", data, box + 32)[0])
+
+
 @pytest.fixture(scope="module")
 def zilem_source(ff: FFmpegPaths, tmp_path_factory: pytest.TempPathFactory) -> Path:
     path = tmp_path_factory.mktemp("zilem") / "source.mp4"
@@ -199,6 +229,22 @@ def test_source_media_is_not_touched(zilem_source: Path, tmp_path: Path) -> None
     out = tmp_path / "out.mp4"
     build_zilem(zilem_source, out)
     assert hashlib.sha256(zilem_source.read_bytes()).hexdigest() == before
+
+
+def test_indeterminate_mvhd_source_gets_finite_duration(
+    zilem_source: Path, tmp_path: Path
+) -> None:
+    src = tmp_path / "indeterminate.mp4"
+    shutil.copy2(zilem_source, src)
+    _set_indeterminate_mvhd(src)
+
+    out = tmp_path / "out.mp4"
+    stats = build_zilem(src, out)
+    verify_zilem_output(src, out)
+
+    duration = _movie_duration(out)
+    assert duration != 0xFFFFFFFF
+    assert duration == stats.movie_duration
 
 
 @pytest.mark.parametrize(

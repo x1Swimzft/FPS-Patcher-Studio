@@ -1,6 +1,6 @@
 # X1T Zilem — container-only MP4 method
 
-X1T Zilem is the default preset in FPS Patcher Studio 2.1.0. It rewrites an
+X1T Zilem is the default preset in FPS Patcher Studio 2.1.1. It rewrites an
 MP4 container without touching a single encoded video or audio sample. There is
 no FFmpeg call, no re-encode, and no quality loss.
 
@@ -56,7 +56,11 @@ change:
    tag `X1T Zilem v1`. Existing per-track metadata is kept. The old
    movie-level `udta` is dropped.
 6. **Movie header.** `mvhd` duration is set to the longest track duration and
-   `next_track_ID` is advanced past the new track.
+   `next_track_ID` is advanced past the new track. If the source has the
+   indeterminate duration `-1` (`0xFFFFFFFF` in version 0 or
+   `0xFFFFFFFFFFFFFFFF` in version 1), that value is ignored and replaced with
+   the longest finite video/audio track duration. Mobile players and upload
+   services can otherwise reject a file whose movie duration never resolves.
 7. **New `moov` at EOF.** The rebuilt movie box is written after the appended
    audio data. The top-level order becomes:
 
@@ -97,7 +101,8 @@ temporary output is promoted:
 - every source `mdat` payload hash is unchanged;
 - the appended `mdat` contains exactly the 17 expected silence frames;
 - the rebuilt movie has two audio tracks, the expected durations, and the
-  expected tag.
+  expected tag;
+- the movie duration is finite and matches the longest video/audio track.
 
 A failure raises `VerifyError`; the partial output is removed and the source is
 never modified.

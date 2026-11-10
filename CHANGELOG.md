@@ -2,6 +2,15 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
+## [2.1.1] - 2026-11-10
+
+### Fixed
+- X1T Zilem no longer preserves an indeterminate `mvhd` duration (`0xFFFFFFFF` or `0xFFFFFFFFFFFFFFFF`) from sources previously written by an older PC patcher. The rebuilt movie now uses the longest finite video/audio track duration, so mobile players and upload services can read a real duration instead of `-1`.
+- Zilem verification now rejects an output whose movie duration is indeterminate or does not match the expected longest track duration.
+
+### Verification
+- 683 tests, ruff and mypy clean, plus a real-world 1080x1920 Zilem source with `mvhd = -1` rebuilt and verified end to end.
+
 ## [2.1.0] - 2026-11-10
 
 ### Added

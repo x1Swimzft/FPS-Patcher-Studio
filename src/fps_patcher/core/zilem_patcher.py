@@ -527,6 +527,16 @@ def _mvhd_info(mvhd: _Atom) -> tuple[int, int, int]:
     raise ZilemSourceError(f"unsupported mvhd version {version}")
 
 
+def _is_indeterminate_movie_duration(mvhd: _Atom, duration: int) -> bool:
+    """True for the all-ones duration some PC patchers write."""
+    version = mvhd.data[0]
+    if version == 0:
+        return duration == 0xFFFFFFFF
+    if version == 1:
+        return duration == 0xFFFFFFFFFFFFFFFF
+    return False
+
+
 def _patch_mvhd(mvhd: _Atom, duration: int, next_track_id: int) -> None:
     version = mvhd.data[0]
     if version == 0:
@@ -930,6 +940,11 @@ def _new_moov(
     if mvhd is None:
         raise ZilemSourceError("moov has no mvhd box")
     movie_timescale, old_movie_duration, old_next_track = _mvhd_info(mvhd)
+    base_movie_duration = (
+        0
+        if _is_indeterminate_movie_duration(mvhd, old_movie_duration)
+        else old_movie_duration
+    )
 
     traks = [child for child in children if child.type == b"trak"]
     video = [trak for trak in traks if _handler_type(trak) == b"vide"][0]
@@ -998,7 +1013,7 @@ def _new_moov(
         if trak.type == b"trak"
         and _handler_type(trak) in (b"vide", b"soun")
     ]
-    movie_duration = max([old_movie_duration, *track_durations])
+    movie_duration = max([base_movie_duration, *track_durations])
     _patch_mvhd(mvhd, movie_duration, new_next_track)
     return moov, movie_duration, new_track_id
 
@@ -1299,6 +1314,24 @@ def verify_zilem_output(
                 f"audio mdhd duration {actual} != {expected_media_duration}"
             )
 
-    movie_timescale, _, _ = _mvhd_info(output_moov.require(b"mvhd"))
+    output_mvhd = output_moov.require(b"mvhd")
+    movie_timescale, movie_duration, _ = _mvhd_info(output_mvhd)
     if movie_timescale != source_info.movie_timescale:
         raise VerifyError("movie timescale changed")
+
+    source_mvhd = source_structure.moov.require(b"mvhd")
+    _, source_movie_duration, _ = _mvhd_info(source_mvhd)
+    if _is_indeterminate_movie_duration(source_mvhd, source_movie_duration):
+        source_movie_duration = 0
+    expected_movie_duration = max(
+        [
+            source_movie_duration,
+            *[_tkhd_duration(trak) for trak in [*video_traks, *audio_traks]],
+        ]
+    )
+    if movie_duration != expected_movie_duration:
+        raise VerifyError(
+            f"movie duration {movie_duration} != {expected_movie_duration}"
+        )
+    if _is_indeterminate_movie_duration(output_mvhd, movie_duration):
+        raise VerifyError("output movie duration is indeterminate")

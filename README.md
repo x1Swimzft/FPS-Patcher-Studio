@@ -8,7 +8,7 @@ A Windows desktop app and headless CLI for patching video container timing and p
 - **Auto-update is on by default.** The app checks GitHub Releases on startup and asks before downloading.
 - **No telemetry. No media uploads.** Files stay on your PC.
 
-[Download v2.1.0](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases/tag/v2.1.0) · [Website](https://x1t-web.vercel.app/) · [Release notes](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases) · [Zilem method](docs/ZILEM_METHOD.md) · [Privacy](docs/PRIVACY.md)
+[Download v2.1.1](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases/tag/v2.1.1) · [Website](https://x1t-web.vercel.app/) · [Release notes](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases) · [Zilem method](docs/ZILEM_METHOD.md) · [Privacy](docs/PRIVACY.md)
 
 ## Presets
 
@@ -19,7 +19,7 @@ A Windows desktop app and headless CLI for patching video container timing and p
 | **X1T 60fps** | AV1, HEVC, or arbitrary sources | H.264 Main/CAVLC re-encode, source resolution, 60 fps | AAC 128k, 48 kHz stereo | MPEG-TS, `.mp4` extension |
 | **X1T 1080p** | 1080p60 deliverables | H.264 Main/CAVLC re-encode, letterboxed to 1920x1080, 60 fps | AAC 128k, 48 kHz stereo | MPEG-TS, `.mp4` extension |
 
-`X1T Zilem` reproduces the Zilem v1 container fingerprint without re-encoding. The source must be a non-fragmented MP4 with one H.264 video track and one AAC-LC 48 kHz stereo audio track. It writes `<stem>_zilem.mp4`, appends 17 silent AAC frames, duplicates the audio track, moves the rebuilt `moov` to the end of the file, and tags the video track `X1T Zilem v1`. See [docs/ZILEM_METHOD.md](docs/ZILEM_METHOD.md) for the full box-by-box description and limits.
+`X1T Zilem` reproduces the Zilem v1 container fingerprint without re-encoding. The source must be a non-fragmented MP4 with one H.264 video track and one AAC-LC 48 kHz stereo audio track. It writes `<stem>_zilem.mp4`, appends 17 silent AAC frames, duplicates the audio track, moves the rebuilt `moov` to the end of the file, and tags the video track `X1T Zilem v1`. If a source carries the indeterminate `mvhd` duration `-1` from an older PC patcher, Zilem replaces it with a finite duration so mobile players and upload services can seek and validate the result. See [docs/ZILEM_METHOD.md](docs/ZILEM_METHOD.md) for the full box-by-box description and limits.
 
 The target FPS setting is ignored by Zilem. Preflight fixes and the colour/metadata rewrite are skipped for Zilem as well: any source that needs them is not a Zilem source. Use `X1T 60fps` or `X1T 1080p` for a lossy re-encode instead.
 
@@ -35,14 +35,14 @@ TikTok upload behaviour is not guaranteed. Matching a container fingerprint does
 
 `X1T Zilem` replaces `X1T Remux` as the shipped default. On the first 2.1.0 launch only, a saved `settings.json` value of exactly `tiktok-ts-remux` is migrated to `zilem`. Any other saved preset is left untouched, including a later explicit choice of `X1T Remux`.
 
-If you are still on **2.0.1–2.0.3**, install 2.1.0 manually once. Those builds hard-disable the startup update toggle unless network downloads are enabled with an environment override, and they require an Authenticode-signed installer; the current build is unsigned and uses the SHA-256 policy added in 2.0.4. From 2.0.4 onward, startup update checks are enabled by default and unsigned installers are accepted after the release SHA-256 matches.
+If you are still on **2.0.1–2.0.3**, install 2.1.1 manually once. Those builds hard-disable the startup update toggle unless network downloads are enabled with an environment override, and they require an Authenticode-signed installer; the current build is unsigned and uses the SHA-256 policy added in 2.0.4. From 2.0.4 onward, startup update checks are enabled by default and unsigned installers are accepted after the release SHA-256 matches.
 
 ## Install
 
 Windows 10/11 x64. Pick one:
 
-- **Installer:** `FPSPatcherStudio-v2.1.0-Setup.exe`
-- **Portable:** `FPSPatcherStudio-v2.1.0-win64.zip` — extract the whole folder, then run `FPSPatcherStudio.exe`
+- **Installer:** `FPSPatcherStudio-v2.1.1-Setup.exe`
+- **Portable:** `FPSPatcherStudio-v2.1.1-win64.zip` — extract the whole folder, then run `FPSPatcherStudio.exe`
 
 The builds are **unsigned**, so Windows SmartScreen may warn. Verify the SHA-256 against the release checksum before running.
 
@@ -110,6 +110,7 @@ For `X1T Zilem`:
 - every source `mdat` payload hash unchanged;
 - the appended `mdat` contains exactly 17 silence frames;
 - two audio tracks with the expected extended durations;
+- a finite movie duration (`mvhd` is never left at `-1`);
 - the `X1T Zilem v1` tag and no trailing trailer.
 
 For other MP4/MOV output:
