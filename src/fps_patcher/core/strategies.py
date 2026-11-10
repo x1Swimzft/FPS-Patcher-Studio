@@ -230,7 +230,7 @@ class TikTokTSRemuxStrategy:
     """
 
     name = "tiktok-ts-remux"
-    label = "X1T Remux"
+    label = "X1T 720p"
     direct = False
 
     def build_args(self, req: PatchRequest, info: VideoInfo, out: Path) -> list[str]:
@@ -291,7 +291,7 @@ class ZilemV3Strategy:
     """
 
     name = "zilem-v3"
-    label = "X1T Zilem V3"
+    label = "X1T 1080p"
     direct = True
 
     def build_args(self, req: PatchRequest, info: VideoInfo, out: Path) -> list[str]:
@@ -329,7 +329,7 @@ UI_PRESETS: dict[str, PatchStrategy] = _PresetDict({
     "bxd-clean": BXDCleanStrategy(),
     "tiktok-ts": TikTokTSStrategy("tiktok-ts", "X1T 60fps"),
     "tiktok-ts-1080": TikTokTSStrategy(
-        "tiktok-ts-1080", "X1T 1080p", force_1080=True
+        "tiktok-ts-1080", "X1T 1080p Re-encode", force_1080=True
     ),
     "tiktok-ts-remux": TikTokTSRemuxStrategy(),
 })

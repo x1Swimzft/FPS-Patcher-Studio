@@ -26,7 +26,8 @@ A file must satisfy all of these conditions:
 Fragmented MP4 (`moof`/`mvex`), multiple video or audio tracks, HEVC/AV1/VP9
 video, non-AAC audio, 44.1 kHz audio, mono audio, and fixed-size audio sample
 tables are rejected before any output is written. The rejection message names
-the problem and, where relevant, points to `X1T 1080p` for a lossy re-encode.
+the problem and, where relevant, points to `X1T 1080p Re-encode` for a lossy
+re-encode.
 
 ## What the patch changes
 
@@ -85,14 +86,15 @@ metadata rewriter:
 - target timescale, `--preset`, and `--timescale` do not alter the output.
 
 If the source needs a preflight change, the source is incompatible with Zilem
-by definition. Use `X1T 1080p` or `X1T 60fps` for a lossy re-encode, or remux
+by definition. Use `X1T 1080p Re-encode` or `X1T 60fps` for a lossy re-encode, or remux
 the source to AAC-LC 48 kHz stereo MP4 first.
 
-## X1T Zilem V3 (reference-exact)
+## X1T 1080p (reference-exact Zilem)
 
-`X1T Zilem V3` (`zilem-v3`, alias `x1t-zilem-v3`) is the same byte-preserving
+`X1T 1080p` (`zilem-v3`, alias `x1t-zilem-v3`) is the same byte-preserving
 transform with the original reference tag and the reference trailer restored. It
-is opt-in and does not change the default preset.
+is opt-in and does not change the default preset. It is not the same preset as
+`X1T 1080p Re-encode`, which is the lossy letterbox path.
 
 Differences from `X1T Zilem`:
 
@@ -138,7 +140,7 @@ The method was derived from a real reference pair:
 The reference was built with the original tag
 `TikQuick Quality Method - https://tikquick.online/ - v25 - Orion`, plus a
 71-byte `free` trailer. The default `X1T Zilem` writes the neutral
-`X1T Zilem v1` tag and omits the trailer; `X1T Zilem V3` reproduces the
+`X1T Zilem v1` tag and omits the trailer; `X1T 1080p` reproduces the
 original tag and trailer exactly.
 
 The 161 MB reference media is not committed. To run the v1 golden test locally:
@@ -170,5 +172,5 @@ those exact values, and asserts full byte equality.
   Matching a container fingerprint is not proof of upload behaviour.
 - It cannot process fragmented MP4 or more than one video/audio track.
 - The default `X1T Zilem` does not write the reference trailer and does not use
-  the original reference tag. Only the opt-in `X1T Zilem V3` does, to reproduce
+  the original reference tag. Only the opt-in `X1T 1080p` does, to reproduce
   the reference fingerprint exactly.

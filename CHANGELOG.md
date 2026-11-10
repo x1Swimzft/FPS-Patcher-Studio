@@ -2,6 +2,12 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
+## [Unreleased]
+
+### Changed
+- Renamed the visible preset labels: `zilem-v3` is now **X1T 1080p**, `tiktok-ts-remux` is now **X1T 720p**, and the lossy letterbox preset `tiktok-ts-1080` is now **X1T 1080p Re-encode**. Internal keys, aliases, behavior and output naming are unchanged.
+- Re-encode hints and error messages now point at `X1T 1080p Re-encode` so they do not collide with the lossless `X1T 1080p` preset.
+
 ## [2.2.2] - 2026-11-10
 
 ### Changed

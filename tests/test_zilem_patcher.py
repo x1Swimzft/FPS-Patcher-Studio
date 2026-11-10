@@ -487,7 +487,7 @@ def test_zilem_is_the_default_and_visible_first() -> None:
     assert VISIBLE_PRESET_KEYS[0] == "zilem"
     assert get_strategy("zilem").label == "X1T Zilem"
     assert get_strategy("x1t-zilem").name == "zilem"
-    assert get_strategy("zilem-v3").label == "X1T Zilem V3"
+    assert get_strategy("zilem-v3").label == "X1T 1080p"
     assert get_strategy("x1t-zilem-v3").name == "zilem-v3"
     assert all(
         preset.label.startswith("X1T")

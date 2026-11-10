@@ -305,7 +305,7 @@ def test_override_card_applies_to_controller_item(
 
     inspector.override_switch.setChecked(True)
     inspector.override_fps_edit.setText("90000")
-    inspector.override_preset_combo.setCurrentText("X1T 1080p")
+    inspector.override_preset_combo.setCurrentText("X1T 1080p Re-encode")
     inspector.override_apply_btn.click()
 
     item = window.controller.items.get(video)
@@ -379,36 +379,39 @@ def test_preset_pickers_hide_x1t_but_keep_saved_legacy(
     combo = window.inspector.strategy_combo
     assert [combo.itemText(i) for i in range(combo.count())] == [
         "X1T Zilem",
-        "X1T Zilem V3",
-        "X1T 60fps",
         "X1T 1080p",
-        "X1T Remux",
+        "X1T 60fps",
+        "X1T 1080p Re-encode",
+        "X1T 720p",
     ]
     assert combo.currentText() == "X1T Zilem"
-    assert combo.width() >= combo.fontMetrics().horizontalAdvance("X1T 1080p") + 32
+    assert (
+        combo.width()
+        >= combo.fontMetrics().horizontalAdvance("X1T 1080p Re-encode") + 32
+    )
     window.close()
 
     legacy = make_main_window(qtbot, monkeypatch, tmp_path, strategy="bxd-mobile")
     combo = legacy.inspector.strategy_combo
     assert [combo.itemText(i) for i in range(combo.count())] == [
         "X1T Zilem",
-        "X1T Zilem V3",
-        "X1T 60fps",
         "X1T 1080p",
-        "X1T Remux",
+        "X1T 60fps",
+        "X1T 1080p Re-encode",
+        "X1T 720p",
         "X1T For Mobile",
     ]
     assert combo.currentText() == "X1T For Mobile"
 
-    legacy.inspector._strategy_activated(combo.findText("X1T 1080p"))
+    legacy.inspector._strategy_activated(combo.findText("X1T 1080p Re-encode"))
     assert [combo.itemText(i) for i in range(combo.count())] == [
         "X1T Zilem",
-        "X1T Zilem V3",
-        "X1T 60fps",
         "X1T 1080p",
-        "X1T Remux",
+        "X1T 60fps",
+        "X1T 1080p Re-encode",
+        "X1T 720p",
     ]
-    assert combo.currentText() == "X1T 1080p"
+    assert combo.currentText() == "X1T 1080p Re-encode"
     legacy.close()
 
 

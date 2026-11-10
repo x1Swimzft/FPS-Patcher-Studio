@@ -80,8 +80,8 @@ def test_ui_presets_and_strategy_migration(tmp_path: Path) -> None:
     }
     assert UI_PRESETS["zilem"].label == "X1T Zilem"
     assert UI_PRESETS["x1t-zilem"].label == "X1T Zilem"
-    assert UI_PRESETS["zilem-v3"].label == "X1T Zilem V3"
-    assert UI_PRESETS["x1t-zilem-v3"].label == "X1T Zilem V3"
+    assert UI_PRESETS["zilem-v3"].label == "X1T 1080p"
+    assert UI_PRESETS["x1t-zilem-v3"].label == "X1T 1080p"
     assert UI_PRESETS["bxd-pc"].label in ("X1T For PC", "Bxd For PC")
     assert UI_PRESETS["bxd-mobile"].label in ("X1T For Mobile", "Bxd For Mobile")
     assert UI_PRESETS["x1t-pc"].label == "X1T For PC"

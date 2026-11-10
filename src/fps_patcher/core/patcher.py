@@ -320,7 +320,8 @@ def patch(
         emit(LogEvent("Variable frame rate detected; result may differ per player.", "WARN"))
     if strategy.name == "tiktok-ts-remux" and before.codec != "h264":
         raise PatchError(
-            "X1T Remux requires an H.264 source; use X1T 1080p to re-encode."
+            f"{strategy.label} requires an H.264 source; "
+            "use X1T 1080p Re-encode for a lossy re-encode."
         )
     if is_zilem and before.codec != "h264":
         raise PatchError(

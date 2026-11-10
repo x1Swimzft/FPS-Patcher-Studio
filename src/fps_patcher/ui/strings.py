@@ -172,7 +172,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "output_group_after": "After export",
         "reecode_section": "Re-encode fallbacks",
         "reecode_hint": (
-            "Only X1T 1080p and X1T 60fps use these. X1T Zilem ignores them."
+            "Only X1T 1080p Re-encode and X1T 60fps use these. "
+            "The lossless presets ignore them."
         ),
         "reecode_badge_lossless": "Lossless (all off)",
         "reecode_badge_lossy": "May re-encode ({count} on)",
@@ -640,7 +641,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "output_group_after": "หลังส่งออก",
         "reecode_section": "ตัวเลือกเมื่อต้องเข้ารหัสใหม่",
         "reecode_hint": (
-            "ใช้เฉพาะ X1T 1080p และ X1T 60fps ส่วน X1T Zilem ไม่ใช้ตัวเลือกเหล่านี้"
+            "ใช้เฉพาะ X1T 1080p Re-encode และ X1T 60fps "
+            "ส่วนพรีเซ็ต lossless ไม่ใช้ตัวเลือกเหล่านี้"
         ),
         "reecode_badge_lossless": "Lossless (ปิดทั้งหมด)",
         "reecode_badge_lossy": "อาจเข้ารหัสใหม่ ({count} เปิดอยู่)",

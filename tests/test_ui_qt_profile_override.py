@@ -68,7 +68,7 @@ def test_inspector_override_emits_profile_and_clear_emits_all_none(
 
     inspector.override_switch.setChecked(True)
     inspector.override_fps_edit.setText("90000")
-    inspector.override_preset_combo.setCurrentText("X1T 1080p")
+    inspector.override_preset_combo.setCurrentText("X1T 1080p Re-encode")
     inspector.override_profile_combo.setCurrentIndex(tiktok_index)
     inspector.override_apply_btn.click()
 
@@ -163,10 +163,10 @@ def test_settings_template_toggle_round_trips_and_preview(
     ]
     assert strategy_labels == [
         "X1T Zilem",
-        "X1T Zilem V3",
-        "X1T 60fps",
         "X1T 1080p",
-        "X1T Remux",
+        "X1T 60fps",
+        "X1T 1080p Re-encode",
+        "X1T 720p",
     ]
 
 
