@@ -161,7 +161,13 @@ def test_settings_template_toggle_round_trips_and_preview(
     strategy_labels = [
         dialog._strategy.itemText(index) for index in range(dialog._strategy.count())
     ]
-    assert strategy_labels == ["X1T Zilem", "X1T 60fps", "X1T 1080p", "X1T Remux"]
+    assert strategy_labels == [
+        "X1T Zilem",
+        "X1T Zilem V3",
+        "X1T 60fps",
+        "X1T 1080p",
+        "X1T Remux",
+    ]
 
 
 def test_update_toggle_enabled_without_ffmpeg_network(

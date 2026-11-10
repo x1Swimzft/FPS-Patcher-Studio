@@ -1,6 +1,6 @@
 # X1T Zilem — container-only MP4 method
 
-X1T Zilem is the default preset in FPS Patcher Studio 2.1.1. It rewrites an
+X1T Zilem is the default preset in FPS Patcher Studio 2.2.0. It rewrites an
 MP4 container without touching a single encoded video or audio sample. There is
 no FFmpeg call, no re-encode, and no quality loss.
 
@@ -88,6 +88,27 @@ If the source needs a preflight change, the source is incompatible with Zilem
 by definition. Use `X1T 1080p` or `X1T 60fps` for a lossy re-encode, or remux
 the source to AAC-LC 48 kHz stereo MP4 first.
 
+## X1T Zilem V3 (reference-exact)
+
+`X1T Zilem V3` (`zilem-v3`, alias `x1t-zilem-v3`) is the same byte-preserving
+transform with the original reference tag and the reference trailer restored. It
+is opt-in and does not change the default preset.
+
+Differences from `X1T Zilem`:
+
+1. The video track tag is
+   `TikQuick Quality Method - https://tikquick.online/ - v25 - Orion`.
+2. A `free` box is appended after the rebuilt `moov` with the payload
+   `ZETA_OPTIMIZED/3 <YYYY-MM-DDTHH:MM:SS.mmmZ> <output filename>`.
+   The timestamp is the UTC build time. The filename is the final output name,
+   including a ` (n)` collision suffix. The box size follows the payload, so it
+   is 71 bytes only when the output name is 21 characters.
+
+The transform, preflight skips, source validation and output naming are
+identical to `X1T Zilem`. Because the tag and trailer are part of the
+fingerprint, the verifier checks the exact tag text and the exact trailer bytes,
+and requires `moov` at `source size + 110` rather than as the last box.
+
 ## Verification
 
 `verify_zilem_output()` checks the produced file against the source before the
@@ -116,10 +137,11 @@ The method was derived from a real reference pair:
 
 The reference was built with the original tag
 `TikQuick Quality Method - https://tikquick.online/ - v25 - Orion`, plus a
-71-byte `free` trailer. Production builds use only the neutral
-`X1T Zilem v1` tag and omit the trailer.
+71-byte `free` trailer. The default `X1T Zilem` writes the neutral
+`X1T Zilem v1` tag and omits the trailer; `X1T Zilem V3` reproduces the
+original tag and trailer exactly.
 
-The 161 MB reference media is not committed. To run the golden test locally:
+The 161 MB reference media is not committed. To run the v1 golden test locally:
 
 ```powershell
 $env:FPS_ZILEM_SOURCE = "E:\path\to\source.mp4"
@@ -127,9 +149,18 @@ $env:FPS_ZILEM_REFERENCE = "E:\path\to\reference.mp4"
 uv run pytest tests/test_zilem_patcher.py::test_golden_fixture_matches_reference -q
 ```
 
-The test is skipped when either variable is unset or the file is missing.
-With the fixtures present it asserts that the patcher output equals the
-reference minus its 71-byte trailer, byte for byte.
+For the reference-exact V3 output:
+
+```powershell
+$env:FPS_ZILEM_V3_SOURCE = "E:\path\to\source.mp4"
+$env:FPS_ZILEM_V3_REFERENCE = "E:\path\to\reference.mp4"
+uv run pytest tests/test_zilem_patcher.py::test_golden_v3_fixture_matches_reference -q
+```
+
+Both tests skip when their variables are unset or the files are missing. The v1
+test compares the patcher output with the reference minus its trailer. The V3
+test reads the timestamp and filename from the reference trailer, builds with
+those exact values, and asserts full byte equality.
 
 ## Limits
 
@@ -138,5 +169,6 @@ reference minus its 71-byte trailer, byte for byte.
 - It does not claim that TikTok or any other platform will skip transcoding.
   Matching a container fingerprint is not proof of upload behaviour.
 - It cannot process fragmented MP4 or more than one video/audio track.
-- It does not write the reference's 71-byte trailer and does not use the
-  original reference tag or any TikQuick/ZETA branding.
+- The default `X1T Zilem` does not write the reference trailer and does not use
+  the original reference tag. Only the opt-in `X1T Zilem V3` does, to reproduce
+  the reference fingerprint exactly.

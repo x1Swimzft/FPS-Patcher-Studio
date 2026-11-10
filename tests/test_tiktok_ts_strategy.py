@@ -230,6 +230,7 @@ def test_patch_tiktok_ts_runs_ts_branches(ff: FFmpegPaths, tmp_path: Path) -> No
 def test_x1t_presets_are_hidden_from_pickers() -> None:
     assert VISIBLE_PRESET_KEYS == (
         "zilem",
+        "zilem-v3",
         "tiktok-ts",
         "tiktok-ts-1080",
         "tiktok-ts-remux",

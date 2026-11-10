@@ -46,7 +46,12 @@ from .strategies import get_strategy
 from .v4_patcher import MethodV4DirectPatch
 from .verifier import verify, verify_payload_integrity
 from .win_job import NamedMutex
-from .zilem_patcher import build_zilem, verify_zilem_output
+from .zilem_patcher import (
+    PRODUCTION_TAG,
+    REFERENCE_TAG,
+    build_zilem,
+    verify_zilem_output,
+)
 
 Emit = Callable[[LogEvent | ProgressEvent], None]
 
@@ -67,7 +72,7 @@ def validate_input(path: Path) -> None:
 
 def output_base_for(req: PatchRequest) -> Path:
     """Deterministic output name before collision handling."""
-    is_zilem = req.strategy in ("zilem", "x1t-zilem")
+    is_zilem = req.strategy in ("zilem", "zilem-v3", "x1t-zilem", "x1t-zilem-v3")
     is_x1t = req.strategy.startswith(("bxd-", "x1t-"))
     is_ts = req.strategy.startswith("tiktok-ts")
     force_mp4 = is_zilem or is_ts or (is_x1t and req.src.suffix.lower() == ".mov")
@@ -295,7 +300,7 @@ def patch(
 
     strategy = get_strategy(req.strategy)
     is_ts = strategy.name.startswith("tiktok-ts")
-    is_zilem = strategy.name == "zilem"
+    is_zilem = strategy.name.startswith("zilem")
     if not strategy.direct and paths is None:
         raise FFmpegNotFoundError(
             f"Strategy '{strategy.label}' requires FFmpeg executable, but FFmpeg is not configured."
@@ -319,7 +324,7 @@ def patch(
         )
     if is_zilem and before.codec != "h264":
         raise PatchError(
-            f"X1T Zilem requires an H.264 source; found '{before.codec}'."
+            f"{strategy.label} requires an H.264 source; found '{before.codec}'."
         )
     trigger_mbps = BITRATE_TRIGGER_BPS // 1_000_000
     if before.bit_rate is not None and before.bit_rate > BITRATE_TRIGGER_BPS:
@@ -349,6 +354,8 @@ def patch(
     dest_lock = _DestinationLock(base)
     tmp: Path | None = None
     backup: Path | None = None
+    zilem_tag = PRODUCTION_TAG
+    zilem_trailer = b""
 
     emit(LogEvent(f"Strategy: {strategy.label}"))
 
@@ -473,19 +480,25 @@ def patch(
             )
             color_done = True
 
-        if strategy.name == "zilem":
+        if is_zilem:
             emit(LogEvent(f"Executing {strategy.label}...", "INFO"))
 
             def zilem_log(msg: str) -> None:
                 emit(LogEvent(msg, "DEBUG"))
 
-            build_zilem(
+            is_zilem_v3 = strategy.name == "zilem-v3"
+            if is_zilem_v3:
+                zilem_tag = REFERENCE_TAG
+            stats = build_zilem(
                 work_src,
                 tmp,
+                tag=zilem_tag,
+                trailer_name=final.name if is_zilem_v3 else None,
                 cancel_event=cancel_event,
                 on_progress=lambda fraction: emit(ProgressEvent(fraction)),
                 on_log=zilem_log,
             )
+            zilem_trailer = stats.trailer
         elif strategy.name == "v4-forensic":
             emit(LogEvent("Executing Method V4 Forensic Lossless Patch...", "INFO"))
 
@@ -589,7 +602,7 @@ def patch(
             elif is_zilem:
                 emit(
                     LogEvent(
-                        "[COLOR] skipped: X1T Zilem rewrites the container only",
+                        f"[COLOR] skipped: {strategy.label} rewrites the container only",
                         "WARN",
                     )
                 )
@@ -641,7 +654,9 @@ def patch(
                 if norm_strat == "bxd-hybrid" and req.bxd_max_tail_ms > 0:
                     dur_tol = max(0.25, (req.bxd_max_tail_ms / 1000.0) + 0.1)
                 if is_zilem:
-                    verify_zilem_output(work_src, tmp)
+                    verify_zilem_output(
+                        work_src, tmp, tag=zilem_tag, trailer=zilem_trailer
+                    )
                     emit(
                         LogEvent(
                             "[VERIFY] Zilem container fingerprint PASS",

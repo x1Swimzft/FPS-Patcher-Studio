@@ -271,7 +271,7 @@ def test_verify_dynamic_tolerance_default() -> None:
     sorted(
         k
         for k in STRATEGIES
-        if not k.startswith("tiktok-ts") and k not in ("zilem", "x1t-zilem")
+        if not k.startswith(("tiktok-ts", "zilem", "x1t-zilem"))
     ),
 )
 @pytest.mark.parametrize("timescale", [60000, 120000])

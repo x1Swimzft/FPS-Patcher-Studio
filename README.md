@@ -8,18 +8,21 @@ A Windows desktop app and headless CLI for patching video container timing and p
 - **Auto-update is on by default.** The app checks GitHub Releases on startup and asks before downloading.
 - **No telemetry. No media uploads.** Files stay on your PC.
 
-[Download v2.1.1](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases/tag/v2.1.1) · [Website](https://x1t-web.vercel.app/) · [Release notes](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases) · [Zilem method](docs/ZILEM_METHOD.md) · [Privacy](docs/PRIVACY.md)
+[Download v2.2.0](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases/tag/v2.2.0) · [Website](https://x1t-web.vercel.app/) · [Release notes](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases) · [Zilem method](docs/ZILEM_METHOD.md) · [Privacy](docs/PRIVACY.md)
 
 ## Presets
 
 | Preset | Use for | Video | Audio | Container |
 | --- | --- | --- | --- | --- |
 | **X1T Zilem** (default) | A non-fragmented H.264 MP4 with AAC-LC 48 kHz stereo | **Copied unchanged** | **Copied unchanged**, plus a silent tail and a duplicate audio track | MP4, `moov` at EOF |
+| **X1T Zilem V3** | Same sources, when the original reference fingerprint is required | **Copied unchanged** | **Copied unchanged**, plus the reference tag and `ZETA_OPTIMIZED/3` trailer | MP4, `moov` at EOF, reference trailer |
 | **X1T Remux** | An already-H.264 source | **Copied unchanged** | AAC 128k, 48 kHz stereo | MPEG-TS, `.mp4` extension |
 | **X1T 60fps** | AV1, HEVC, or arbitrary sources | H.264 Main/CAVLC re-encode, source resolution, 60 fps | AAC 128k, 48 kHz stereo | MPEG-TS, `.mp4` extension |
 | **X1T 1080p** | 1080p60 deliverables | H.264 Main/CAVLC re-encode, letterboxed to 1920x1080, 60 fps | AAC 128k, 48 kHz stereo | MPEG-TS, `.mp4` extension |
 
 `X1T Zilem` reproduces the Zilem v1 container fingerprint without re-encoding. The source must be a non-fragmented MP4 with one H.264 video track and one AAC-LC 48 kHz stereo audio track. It writes `<stem>_zilem.mp4`, appends 17 silent AAC frames, duplicates the audio track, moves the rebuilt `moov` to the end of the file, and tags the video track `X1T Zilem v1`. If a source carries the indeterminate `mvhd` duration `-1` from an older PC patcher, Zilem replaces it with a finite duration so mobile players and upload services can seek and validate the result. See [docs/ZILEM_METHOD.md](docs/ZILEM_METHOD.md) for the full box-by-box description and limits.
+
+`X1T Zilem V3` runs the same transform but writes the original reference tag (`TikQuick Quality Method - https://tikquick.online/ - v25 - Orion`) and a `ZETA_OPTIMIZED/3 <timestamp> <filename>` free-box trailer after `moov`. It exists for reproducing the original reference file byte-for-byte; the default `X1T Zilem` stays neutral. The trailer timestamp is the build time in UTC, so two builds of the same source differ only in that timestamp and the output filename.
 
 The target FPS setting is ignored by Zilem. Preflight fixes and the colour/metadata rewrite are skipped for Zilem as well: any source that needs them is not a Zilem source. Use `X1T 60fps` or `X1T 1080p` for a lossy re-encode instead.
 
@@ -35,14 +38,14 @@ TikTok upload behaviour is not guaranteed. Matching a container fingerprint does
 
 `X1T Zilem` replaces `X1T Remux` as the shipped default. On the first 2.1.0 launch only, a saved `settings.json` value of exactly `tiktok-ts-remux` is migrated to `zilem`. Any other saved preset is left untouched, including a later explicit choice of `X1T Remux`.
 
-If you are still on **2.0.1–2.0.3**, install 2.1.1 manually once. Those builds hard-disable the startup update toggle unless network downloads are enabled with an environment override, and they require an Authenticode-signed installer; the current build is unsigned and uses the SHA-256 policy added in 2.0.4. From 2.0.4 onward, startup update checks are enabled by default and unsigned installers are accepted after the release SHA-256 matches.
+If you are still on **2.0.1–2.0.3**, install 2.2.0 manually once. Those builds hard-disable the startup update toggle unless network downloads are enabled with an environment override, and they require an Authenticode-signed installer; the current build is unsigned and uses the SHA-256 policy added in 2.0.4. From 2.0.4 onward, startup update checks are enabled by default and unsigned installers are accepted after the release SHA-256 matches.
 
 ## Install
 
 Windows 10/11 x64. Pick one:
 
-- **Installer:** `FPSPatcherStudio-v2.1.1-Setup.exe`
-- **Portable:** `FPSPatcherStudio-v2.1.1-win64.zip` — extract the whole folder, then run `FPSPatcherStudio.exe`
+- **Installer:** `FPSPatcherStudio-v2.2.0-Setup.exe`
+- **Portable:** `FPSPatcherStudio-v2.2.0-win64.zip` — extract the whole folder, then run `FPSPatcherStudio.exe`
 
 The builds are **unsigned**, so Windows SmartScreen may warn. Verify the SHA-256 against the release checksum before running.
 
@@ -87,7 +90,7 @@ fps-patcher-studio --cli history
 fps-patcher-studio --cli undo --last
 ```
 
-`--preset` accepts `60` or `120` (or `--timescale` for a custom value). `--overwrite` replaces an existing output; the default is to add a ` (n)` suffix. A replaced output is backed up as `.bak` when backups are enabled. `--strategy` accepts `zilem` / `x1t-zilem`, `tiktok-ts`, `tiktok-ts-1080`, `tiktok-ts-remux`, and the legacy X1T keys.
+`--preset` accepts `60` or `120` (or `--timescale` for a custom value). `--overwrite` replaces an existing output; the default is to add a ` (n)` suffix. A replaced output is backed up as `.bak` when backups are enabled. `--strategy` accepts `zilem` / `x1t-zilem`, `zilem-v3` / `x1t-zilem-v3`, `tiktok-ts`, `tiktok-ts-1080`, `tiktok-ts-remux`, and the legacy X1T keys.
 
 Preflight switches such as `--normalize-audio`, `--cap-bitrate`, and `--fix-vfr` are skipped for Zilem and the TS presets. `--tag-bt709` and `--scrub-metadata` are skipped for Zilem and TS with a `[COLOR] skipped` log.
 
@@ -112,6 +115,8 @@ For `X1T Zilem`:
 - two audio tracks with the expected extended durations;
 - a finite movie duration (`mvhd` is never left at `-1`);
 - the `X1T Zilem v1` tag and no trailing trailer.
+
+For `X1T Zilem V3`, the same checks run with the reference tag, and the final `ZETA_OPTIMIZED/3` free box must match the trailer produced for that output name and build time.
 
 For other MP4/MOV output:
 

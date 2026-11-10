@@ -1244,7 +1244,12 @@ QWidget#Inspector QProgressBar::chunk {{
         self.strategy_changed.emit()
 
     def _update_strategy_tip(self, strategy_key: str) -> None:
-        tip = t("zilem_tip", self._lang()) if strategy_key == "zilem" else ""
+        if strategy_key == "zilem":
+            tip = t("zilem_tip", self._lang())
+        elif strategy_key == "zilem-v3":
+            tip = t("zilem_v3_tip", self._lang())
+        else:
+            tip = ""
         self.strategy_combo.setToolTip(tip)
 
     def _update_warn(self, strategy_key: str) -> None:

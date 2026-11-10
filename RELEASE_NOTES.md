@@ -1,5 +1,44 @@
 # Release Notes
 
+## v2.2.0 - 2026-11-10 (X1T Zilem V3)
+
+Version 2.2.0 adds `X1T Zilem V3`, an optional reference-exact variant of the
+container-only Zilem preset. It writes the original reference tag and the
+`ZETA_OPTIMIZED/3` free-box trailer after the rebuilt `moov`. The default
+`X1T Zilem` preset is unchanged and stays neutral.
+
+Auto Update is enabled by default. The app checks GitHub Releases on startup
+and offers v2.2.0 when it is newer than the installed build.
+
+**The Windows build is unsigned; verify the release SHA-256 before running.**
+
+### Added
+
+- **X1T Zilem V3 (`zilem-v3`, alias `x1t-zilem-v3`)** — the same
+  byte-preserving transform as X1T Zilem, plus the original reference tag
+  (`TikQuick Quality Method - https://tikquick.online/ - v25 - Orion`) and a
+  `ZETA_OPTIMIZED/3 <UTC timestamp> <output filename>` free-box trailer.
+- `build_zeta_trailer()` and a golden test that reproduces the V3 reference
+  when `FPS_ZILEM_V3_SOURCE` and `FPS_ZILEM_V3_REFERENCE` point at the fixtures.
+
+### Changed
+
+- Zilem verification accepts the optional exact trailer and checks that `moov`
+  starts at the expected offset instead of requiring it to be the final box.
+- The Zilem build/verify path now runs for every preset whose name starts with
+  `zilem`; the default X1T Zilem output is unchanged.
+
+### Verification
+
+- 687 tests, 2 skipped; ruff and mypy clean.
+- Windows build and launch smoke test passed.
+- The default X1T Zilem output is unchanged from 2.1.1.
+
+### Upgrading
+
+- Auto Update is on by default. Users on 2.0.1–2.0.3 must install manually once;
+  the current build is unsigned and uses the SHA-256 check added in 2.0.4.
+
 ## v2.1.1 - 2026-11-10 (Zilem duration hotfix)
 
 Version 2.1.1 fixes a Zilem compatibility bug found on a real upload. If the

@@ -2,6 +2,21 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
+## [2.2.0] - 2026-11-10
+
+### Added
+- `X1T Zilem V3` (`zilem-v3`, alias `x1t-zilem-v3`): the same container-only Zilem transform with the original reference tag (`TikQuick Quality Method - https://tikquick.online/ - v25 - Orion`) and the `ZETA_OPTIMIZED/3 <UTC timestamp> <output filename>` free-box trailer. It reproduces the reference file byte-for-byte when the timestamp and output name match.
+- `build_zeta_trailer()` exposes the reference trailer format, with an injectable timestamp for golden tests.
+- Golden regression test for the V3 reference via `FPS_ZILEM_V3_SOURCE` and `FPS_ZILEM_V3_REFERENCE`. The fixture is not committed and the test skips when it is absent.
+
+### Changed
+- `verify_zilem_output()` accepts an optional exact trailer and checks that `moov` starts at the expected offset instead of requiring it to be the final box.
+- The Zilem build/verify path now runs for every preset whose name starts with `zilem`; the default `X1T Zilem` output is unchanged.
+
+### Verification
+- 687 tests, 2 skipped; ruff and mypy clean.
+- Windows build and launch smoke test passed; the default X1T Zilem output is unchanged.
+
 ## [2.1.1] - 2026-11-10
 
 ### Fixed

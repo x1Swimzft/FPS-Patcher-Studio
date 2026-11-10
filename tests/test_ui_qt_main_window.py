@@ -379,6 +379,7 @@ def test_preset_pickers_hide_x1t_but_keep_saved_legacy(
     combo = window.inspector.strategy_combo
     assert [combo.itemText(i) for i in range(combo.count())] == [
         "X1T Zilem",
+        "X1T Zilem V3",
         "X1T 60fps",
         "X1T 1080p",
         "X1T Remux",
@@ -391,6 +392,7 @@ def test_preset_pickers_hide_x1t_but_keep_saved_legacy(
     combo = legacy.inspector.strategy_combo
     assert [combo.itemText(i) for i in range(combo.count())] == [
         "X1T Zilem",
+        "X1T Zilem V3",
         "X1T 60fps",
         "X1T 1080p",
         "X1T Remux",
@@ -401,6 +403,7 @@ def test_preset_pickers_hide_x1t_but_keep_saved_legacy(
     legacy.inspector._strategy_activated(combo.findText("X1T 1080p"))
     assert [combo.itemText(i) for i in range(combo.count())] == [
         "X1T Zilem",
+        "X1T Zilem V3",
         "X1T 60fps",
         "X1T 1080p",
         "X1T Remux",

@@ -12,7 +12,7 @@ This reproduces the Zilem v1 container fingerprint:
 * a duplicate audio track (same chunks, no extra media bytes);
 * a ``udta/meta/ilst`` tag inside the video track;
 * ``mvhd`` and audio durations extended by the appended 0.3627 s;
-* no trailing custom box.
+* no trailing custom box, unless the reference-exact preset asks for one.
 
 The method is deliberately strict about its input. It never calls FFmpeg and
 never re-encodes media.
@@ -28,12 +28,17 @@ import struct
 import threading
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .errors import PatchCancelledError, PatchError, VerifyError
 
 ZILEM_TAG = "X1T Zilem v1"
 PRODUCTION_TAG = ZILEM_TAG
+# The tag and trailer written by the original reference method. Only the
+# reference-exact preset uses these; the default preset stays neutral.
+REFERENCE_TAG = "TikQuick Quality Method - https://tikquick.online/ - v25 - Orion"
+ZETA_TRAILER_PREFIX = "ZETA_OPTIMIZED/3"
 
 # A 6-byte AAC-LC frame used by the reference method for silent padding.
 SILENCE_FRAME = bytes.fromhex("211004608c1c")
@@ -156,6 +161,7 @@ class ZilemStats:
     new_track_id: int
     movie_duration: int
     tag: str
+    trailer: bytes = b""
 
 
 @dataclass(frozen=True)
@@ -1032,11 +1038,30 @@ def _hash_range(mapped: mmap.mmap, start: int, size: int) -> str:
     return digest.hexdigest()
 
 
+def build_zeta_trailer(name: str, when: datetime | None = None) -> bytes:
+    """Build the 71-byte-class ``free`` trailer used by the reference method.
+
+    The payload is ``ZETA_OPTIMIZED/3 <UTC timestamp with milliseconds> <name>``.
+    The box size follows the name length, so it is only exactly 71 bytes when
+    the output name is 21 characters long.
+    """
+    stamp = (when or datetime.now(UTC)).astimezone(UTC)
+    text = (
+        f"{ZETA_TRAILER_PREFIX} "
+        f"{stamp.strftime('%Y-%m-%dT%H:%M:%S.')}{stamp.microsecond // 1000:03d}Z "
+        f"{name}"
+    )
+    payload = text.encode("utf-8")
+    return struct.pack(">I4s", 8 + len(payload), b"free") + payload
+
+
 def build_zilem(
     src: Path,
     out: Path,
     *,
     tag: str = PRODUCTION_TAG,
+    trailer_name: str | None = None,
+    trailer_time: datetime | None = None,
     cancel_event: threading.Event | None = None,
     on_progress: Callable[[float], None] | None = None,
     on_log: Callable[[str], None] | None = None,
@@ -1045,7 +1070,9 @@ def build_zilem(
 
     The source is copied unchanged except for the old ``moov`` type; no media
     bytes are re-encoded. ``tag`` is exposed for golden tests and should stay
-    at :data:`PRODUCTION_TAG` in the application.
+    at :data:`PRODUCTION_TAG` in the application. Passing ``trailer_name``
+    appends the reference method's ``ZETA_OPTIMIZED/3`` free box after the
+    rebuilt ``moov``.
     """
     if src.resolve() == out.resolve():
         raise ZilemSourceError("output path equals source; refusing to overwrite")
@@ -1059,7 +1086,10 @@ def build_zilem(
         structure, info, tag, structure.size
     )
     moov_bytes = moov.to_bytes()
-    output_size = structure.size + _MDAT2_SIZE + len(moov_bytes)
+    trailer = (
+        build_zeta_trailer(trailer_name, trailer_time) if trailer_name else b""
+    )
+    output_size = structure.size + _MDAT2_SIZE + len(moov_bytes) + len(trailer)
 
     def progress(fraction: float) -> None:
         if on_progress is not None:
@@ -1090,15 +1120,18 @@ def build_zilem(
                 + SILENCE_FRAME * APPENDED_SAMPLES
             )
             writer.write(moov_bytes)
+            if trailer:
+                writer.write(trailer)
     except OSError as exc:
         out.unlink(missing_ok=True)
         raise ZilemSourceError(f"could not write Zilem output: {exc}") from exc
     progress(1.0)
     if on_log is not None:
+        suffix = f", trailer {len(trailer)} bytes" if trailer else ""
         on_log(
             f"[ZILEM] {info.video_samples} video samples copied, "
             f"{info.audio_samples} -> {info.audio_samples + APPENDED_SAMPLES} "
-            f"audio samples, tag '{tag}'"
+            f"audio samples, tag '{tag}'{suffix}"
         )
     return ZilemStats(
         source_size=structure.size,
@@ -1112,6 +1145,7 @@ def build_zilem(
         new_track_id=new_track_id,
         movie_duration=movie_duration,
         tag=tag,
+        trailer=trailer,
     )
 
 
@@ -1166,23 +1200,49 @@ def verify_zilem_output(
     out: Path,
     *,
     tag: str = PRODUCTION_TAG,
+    trailer: bytes | None = None,
 ) -> None:
-    """Raise :class:`VerifyError` unless *out* is a valid Zilem build of *src*."""
+    """Raise :class:`VerifyError` unless *out* is a valid Zilem build of *src*.
+
+    When ``trailer`` is provided, the output must end with exactly those bytes
+    as a ``free`` box after the rebuilt ``moov``.
+    """
     source_structure = _read_structure(src)
     source_info = _validate_source(source_structure)
     target = _read_structure(out)
 
-    expected_size = source_structure.size + _MDAT2_SIZE + target.moov_size
+    expected_trailer = trailer or b""
+    expected_size = (
+        source_structure.size
+        + _MDAT2_SIZE
+        + target.moov_size
+        + len(expected_trailer)
+    )
     if target.size != expected_size:
         raise VerifyError(
-            f"output size {target.size} != source + mdat2 + moov "
+            f"output size {target.size} != source + mdat2 + moov + trailer "
             f"({expected_size})"
         )
-    if target.top[-1][3] != b"moov":
-        raise VerifyError("output does not end with a moov box (unexpected trailer)")
-    last_offset, last_size, _, _ = target.top[-1]
-    if last_offset + last_size != target.size:
+    moov_start = source_structure.size + _MDAT2_SIZE
+    moov_end = moov_start + target.moov_size
+    if target.moov_offset != moov_start:
+        raise VerifyError("rebuilt moov is not at the expected offset")
+    if moov_end + len(expected_trailer) != target.size:
         raise VerifyError("trailing bytes after the final moov box")
+    if expected_trailer:
+        trailer_box = target.top[-1]
+        if (
+            trailer_box[3] != b"free"
+            or trailer_box[0] != moov_end
+            or trailer_box[1] != len(expected_trailer)
+        ):
+            raise VerifyError("reference trailer box is missing or malformed")
+        with out.open("rb") as handle:
+            handle.seek(moov_end)
+            if handle.read(len(expected_trailer)) != expected_trailer:
+                raise VerifyError("reference trailer content mismatch")
+    elif target.top[-1][3] != b"moov":
+        raise VerifyError("output does not end with a moov box (unexpected trailer)")
 
     # The old moov must be a byte-identical free box.
     ftyp = next((item for item in source_structure.top if item[3] == b"ftyp"), None)

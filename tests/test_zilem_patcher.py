@@ -8,6 +8,7 @@ import os
 import shutil
 import struct
 import subprocess
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -25,9 +26,11 @@ from fps_patcher.core.strategies import (
     migrate_strategy_name,
 )
 from fps_patcher.core.zilem_patcher import (
+    REFERENCE_TAG,
     SILENCE_FRAME,
     ZILEM_TAG,
     ZilemSourceError,
+    build_zeta_trailer,
     build_zilem,
     inspect_zilem_source,
     verify_zilem_output,
@@ -224,6 +227,94 @@ def test_golden_fixture_matches_reference(tmp_path: Path) -> None:
     assert out.read_bytes() == expected[:-_TRAILER_SIZE]
 
 
+def test_zeta_trailer_format_and_size() -> None:
+    when = datetime(2026, 11, 10, 4, 15, 56, 568987, tzinfo=UTC)
+    trailer = build_zeta_trailer("Thekrakong1_zilem.mp4", when)
+    assert trailer == (
+        b"\x00\x00\x00Gfree"
+        b"ZETA_OPTIMIZED/3 2026-11-10T04:15:56.568Z Thekrakong1_zilem.mp4"
+    )
+    assert len(trailer) == 71
+
+
+def test_zilem_v3_writes_reference_tag_and_trailer(
+    zilem_source: Path, tmp_path: Path
+) -> None:
+    when = datetime(2026, 11, 10, 4, 15, 56, 568000, tzinfo=UTC)
+    out = tmp_path / "clip_zilem.mp4"
+    stats = build_zilem(
+        zilem_source,
+        out,
+        tag=REFERENCE_TAG,
+        trailer_name="clip_zilem.mp4",
+        trailer_time=when,
+    )
+    expected_trailer = build_zeta_trailer("clip_zilem.mp4", when)
+    data = out.read_bytes()
+    assert stats.trailer == expected_trailer
+    assert stats.output_size == len(data)
+    assert data.endswith(expected_trailer)
+    assert REFERENCE_TAG.encode() in data
+    verify_zilem_output(
+        zilem_source, out, tag=REFERENCE_TAG, trailer=expected_trailer
+    )
+
+
+def test_zilem_v3_verifier_rejects_wrong_trailer(
+    zilem_source: Path, tmp_path: Path
+) -> None:
+    when = datetime(2026, 11, 10, 4, 15, 56, 568000, tzinfo=UTC)
+    out = tmp_path / "clip_zilem.mp4"
+    build_zilem(
+        zilem_source,
+        out,
+        tag=REFERENCE_TAG,
+        trailer_name="clip_zilem.mp4",
+        trailer_time=when,
+    )
+    with pytest.raises(VerifyError, match="output size|reference trailer|trailing"):
+        verify_zilem_output(
+            zilem_source,
+            out,
+            tag=REFERENCE_TAG,
+            trailer=build_zeta_trailer("other.mp4", when),
+        )
+
+
+def test_golden_v3_fixture_matches_reference(tmp_path: Path) -> None:
+    source = os.environ.get("FPS_ZILEM_V3_SOURCE")
+    reference = os.environ.get("FPS_ZILEM_V3_REFERENCE")
+    if not source or not reference:
+        pytest.skip(
+            "set FPS_ZILEM_V3_SOURCE and FPS_ZILEM_V3_REFERENCE for the golden test"
+        )
+    source_path = Path(source)
+    reference_path = Path(reference)
+    if not source_path.is_file() or not reference_path.is_file():
+        pytest.skip("golden Zilem V3 fixture files are missing")
+
+    expected = reference_path.read_bytes()
+    offset, size, atom_type = _top_level_boxes(expected)[-1]
+    assert atom_type == b"free"
+    trailer = expected[offset : offset + size]
+    prefix, stamp, name = trailer[8:].decode("utf-8").split(" ", 2)
+    assert prefix == "ZETA_OPTIMIZED/3"
+    when = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+
+    out = tmp_path / name
+    build_zilem(
+        source_path,
+        out,
+        tag=REFERENCE_TAG,
+        trailer_name=name,
+        trailer_time=when,
+    )
+    verify_zilem_output(
+        source_path, out, tag=REFERENCE_TAG, trailer=trailer
+    )
+    assert out.read_bytes() == expected
+
+
 def test_source_media_is_not_touched(zilem_source: Path, tmp_path: Path) -> None:
     before = hashlib.sha256(zilem_source.read_bytes()).hexdigest()
     out = tmp_path / "out.mp4"
@@ -396,6 +487,8 @@ def test_zilem_is_the_default_and_visible_first() -> None:
     assert VISIBLE_PRESET_KEYS[0] == "zilem"
     assert get_strategy("zilem").label == "X1T Zilem"
     assert get_strategy("x1t-zilem").name == "zilem"
+    assert get_strategy("zilem-v3").label == "X1T Zilem V3"
+    assert get_strategy("x1t-zilem-v3").name == "zilem-v3"
     assert all(
         preset.label.startswith("X1T")
         for preset in (UI_PRESETS[key] for key in VISIBLE_PRESET_KEYS)
@@ -480,3 +573,34 @@ def test_patch_runs_zilem_branch(
     assert any("[COLOR] skipped: X1T Zilem" in message for message in messages)
     assert any("[VERIFY] Zilem container fingerprint PASS" in message for message in messages)
     verify_zilem_output(zilem_source, result.output)
+
+
+def test_patch_runs_zilem_v3_and_trailer_uses_final_name(
+    ff: FFmpegPaths, zilem_source: Path, tmp_path: Path
+) -> None:
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    (out_dir / "source_zilem.mp4").write_bytes(b"occupied")
+
+    events: list[object] = []
+    req = PatchRequest(
+        src=zilem_source,
+        out_dir=out_dir,
+        timescale=60000,
+        strategy="zilem-v3",
+    )
+    result = patch(req, ff, events.append)
+
+    expected_name = "source_zilem (1).mp4"
+    assert result.output.name == expected_name
+    data = result.output.read_bytes()
+    offset, size, atom_type = _top_level_boxes(data)[-1]
+    assert atom_type == b"free"
+    trailer = data[offset : offset + size]
+    text = trailer[8:].decode("utf-8")
+    assert text.startswith("ZETA_OPTIMIZED/3 ")
+    assert text.endswith(" " + expected_name)
+    assert REFERENCE_TAG.encode() in data
+    verify_zilem_output(
+        zilem_source, result.output, tag=REFERENCE_TAG, trailer=trailer
+    )
