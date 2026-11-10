@@ -1,5 +1,36 @@
 # Release Notes
 
+## v2.3.0 - 2026-11-10 (Two-preset picker)
+
+Version 2.3.0 narrows the visible preset picker to two choices and makes the
+reference-exact Zilem preset the default.
+
+### Changed
+
+- The picker now offers only **X1T 1080p** (`zilem-v3`) and **X1T 720p**
+  (`tiktok-ts-remux`).
+- New installs default to **X1T 1080p**. A saved `zilem`, `tiktok-ts` or
+  `tiktok-ts-1080` selection migrates to it once through
+  `preset_cleanup_migrated`.
+- The default writes the reference tag and `ZETA_OPTIMIZED/3` trailer; the
+  neutral `X1T Zilem`, `X1T 60fps`, `X1T 1080p Re-encode` and the legacy
+  X1T/BXD presets remain available to saved settings, queue overrides and the
+  CLI but are hidden from the pickers.
+- Source errors now say to convert the source to H.264 instead of pointing at a
+  hidden preset.
+
+### Verification
+
+- 688 tests, 2 skipped; ruff and mypy clean.
+- The picker lists exactly two presets with unique labels.
+- A copy of the real settings file migrated `zilem` → `zilem-v3` and showed two
+  items.
+
+**The Windows build is unsigned; verify the release SHA-256 before running.**
+
+Auto Update remains enabled by default and will offer this build on the next
+startup.
+
 ## v2.2.3 - 2026-11-10 (Preset names)
 
 Version 2.2.3 changes only the visible preset labels. Internal keys

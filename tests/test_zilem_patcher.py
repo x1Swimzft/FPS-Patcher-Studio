@@ -482,12 +482,11 @@ def test_verify_rejects_changed_old_moov_payload(
         verify_zilem_output(zilem_source, out)
 
 
-def test_zilem_is_the_default_and_visible_first() -> None:
-    assert Settings().strategy == "zilem"
-    assert VISIBLE_PRESET_KEYS[0] == "zilem"
-    assert get_strategy("zilem").label == "X1T Zilem"
-    assert get_strategy("x1t-zilem").name == "zilem"
+def test_visible_presets_are_only_1080p_and_720p() -> None:
+    assert Settings().strategy == "zilem-v3"
+    assert VISIBLE_PRESET_KEYS == ("zilem-v3", "tiktok-ts-remux")
     assert get_strategy("zilem-v3").label == "X1T 1080p"
+    assert get_strategy("tiktok-ts-remux").label == "X1T 720p"
     assert get_strategy("x1t-zilem-v3").name == "zilem-v3"
     assert all(
         preset.label.startswith("X1T")
@@ -498,34 +497,55 @@ def test_zilem_is_the_default_and_visible_first() -> None:
     assert migrate_strategy_name("tiktok-ts-remux") == ("tiktok-ts-remux", None)
 
 
-def test_zilem_migration_only_touches_the_old_default() -> None:
+def test_hidden_preset_migration_keeps_visible_choices() -> None:
     old_default = Settings(strategy="tiktok-ts-remux")
     old_default._clamp()
-    assert old_default.strategy == "zilem"
+    # Old default -> Zilem -> the visible 1080p Zilem.
+    assert old_default.strategy == "zilem-v3"
     assert old_default.zilem_default_migrated is True
+    assert old_default.preset_cleanup_migrated is True
 
-    for saved in ("tiktok-ts", "tiktok-ts-1080", "bxd-clean", "bxd-pc"):
+    for saved in ("zilem", "tiktok-ts", "tiktok-ts-1080"):
+        settings = Settings(strategy=saved)
+        settings._clamp()
+        assert settings.strategy == "zilem-v3"
+        assert settings.preset_cleanup_migrated is True
+
+    # Legacy BXD presets stay saved; they are still hidden from the picker.
+    for saved in ("bxd-clean", "bxd-pc"):
         settings = Settings(strategy=saved)
         settings._clamp()
         assert settings.strategy == saved
-        assert settings.zilem_default_migrated is True
 
-    # A later explicit return to X1T 720p is preserved once migration ran.
+    # A later explicit choice of X1T 720p is preserved once cleanup ran.
     explicit = Settings(strategy="tiktok-ts-remux", zilem_default_migrated=True)
     explicit._clamp()
     assert explicit.strategy == "tiktok-ts-remux"
 
 
-def test_zilem_migration_persists_once(tmp_path: Path) -> None:
+def test_hidden_preset_migration_persists_once(tmp_path: Path) -> None:
     path = tmp_path / "settings.json"
     path.write_text(json.dumps({"strategy": "tiktok-ts-remux"}), encoding="utf-8")
 
     migrated = Settings.load(path)
-    assert migrated.strategy == "zilem"
+    assert migrated.strategy == "zilem-v3"
     assert migrated.zilem_default_migrated is True
+    assert migrated.preset_cleanup_migrated is True
     saved = json.loads(path.read_text(encoding="utf-8"))
-    assert saved["strategy"] == "zilem"
+    assert saved["strategy"] == "zilem-v3"
     assert saved["zilem_default_migrated"] is True
+    assert saved["preset_cleanup_migrated"] is True
+
+
+def test_saved_zilem_moves_to_visible_1080p(tmp_path: Path) -> None:
+    path = tmp_path / "settings.json"
+    path.write_text(json.dumps({"strategy": "zilem"}), encoding="utf-8")
+
+    loaded = Settings.load(path)
+    assert loaded.strategy == "zilem-v3"
+    assert (
+        json.loads(path.read_text(encoding="utf-8"))["strategy"] == "zilem-v3"
+    )
 
 
 def test_zilem_migration_keeps_other_saved_preset(tmp_path: Path) -> None:

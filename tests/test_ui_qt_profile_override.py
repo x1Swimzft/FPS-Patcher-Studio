@@ -68,12 +68,12 @@ def test_inspector_override_emits_profile_and_clear_emits_all_none(
 
     inspector.override_switch.setChecked(True)
     inspector.override_fps_edit.setText("90000")
-    inspector.override_preset_combo.setCurrentText("X1T 1080p Re-encode")
+    inspector.override_preset_combo.setCurrentText("X1T 720p")
     inspector.override_profile_combo.setCurrentIndex(tiktok_index)
     inspector.override_apply_btn.click()
 
     assert len(emitted[-1]) == 4
-    assert emitted[-1] == (video, 90000, "tiktok-ts-1080", "tiktok")
+    assert emitted[-1] == (video, 90000, "tiktok-ts-remux", "tiktok")
     item = window.controller.items.get(video)
     assert item is not None
     assert item.platform_profile == "tiktok"
@@ -161,13 +161,7 @@ def test_settings_template_toggle_round_trips_and_preview(
     strategy_labels = [
         dialog._strategy.itemText(index) for index in range(dialog._strategy.count())
     ]
-    assert strategy_labels == [
-        "X1T Zilem",
-        "X1T 1080p",
-        "X1T 60fps",
-        "X1T 1080p Re-encode",
-        "X1T 720p",
-    ]
+    assert strategy_labels == ["X1T 1080p", "X1T 720p"]
 
 
 def test_update_toggle_enabled_without_ffmpeg_network(
@@ -190,7 +184,7 @@ def test_update_toggle_enabled_without_ffmpeg_network(
     dialog._use_template.setChecked(True)
     dialog._template.setText(template)
     assert dialog._template.isEnabled()
-    assert "sample_clip_tiktok_zilem_60fps.mp4" in dialog._template_preview.text()
+    assert "sample_clip_tiktok_zilem-v3_60fps.mp4" in dialog._template_preview.text()
     dialog._apply()
 
     assert settings.use_filename_template is True
@@ -199,7 +193,7 @@ def test_update_toggle_enabled_without_ffmpeg_network(
     reopened = SettingsDialog(settings, ThemeManager(settings))
     qtbot.addWidget(reopened)
     assert reopened._use_template.isChecked()
-    assert "sample_clip_tiktok_zilem_60fps.mp4" in reopened._template_preview.text()
+    assert "sample_clip_tiktok_zilem-v3_60fps.mp4" in reopened._template_preview.text()
 
 
 def test_context_menu_profile_action_keeps_other_overrides(

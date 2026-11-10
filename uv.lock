@@ -229,7 +229,7 @@ wheels = [
 
 [[package]]
 name = "fps-patcher-studio"
-version = "2.2.3"
+version = "2.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "pillow" },

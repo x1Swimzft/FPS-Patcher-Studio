@@ -228,21 +228,23 @@ def test_patch_tiktok_ts_runs_ts_branches(ff: FFmpegPaths, tmp_path: Path) -> No
 
 
 def test_x1t_presets_are_hidden_from_pickers() -> None:
-    assert VISIBLE_PRESET_KEYS == (
+    assert VISIBLE_PRESET_KEYS == ("zilem-v3", "tiktok-ts-remux")
+    hidden = {
         "zilem",
-        "zilem-v3",
+        "bxd-pc",
+        "bxd-mobile",
+        "bxd-hybrid",
+        "bxd-clean",
         "tiktok-ts",
         "tiktok-ts-1080",
-        "tiktok-ts-remux",
-    )
-    hidden = {"bxd-pc", "bxd-mobile", "bxd-hybrid", "bxd-clean"}
+    }
     assert set(UI_PRESETS) - set(VISIBLE_PRESET_KEYS) == hidden
     for key in hidden:
         assert get_strategy(key).name == key
 
 
-def test_new_install_defaults_to_zilem() -> None:
-    assert Settings().strategy == "zilem"
+def test_new_install_defaults_to_visible_1080p_zilem() -> None:
+    assert Settings().strategy == "zilem-v3"
 
 
 def test_ts_verify_rejects_wrong_1080_size(tmp_path: Path) -> None:

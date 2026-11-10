@@ -2,6 +2,17 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
+## [2.3.0] - 2026-11-10
+
+### Changed
+- The preset picker now offers only **X1T 1080p** and **X1T 720p**. `zilem`, `tiktok-ts` and `tiktok-ts-1080` remain registered for saved settings, queue overrides and the CLI, but are hidden from the pickers.
+- New installs default to `zilem-v3` (X1T 1080p). A saved `zilem`, `tiktok-ts` or `tiktok-ts-1080` selection is migrated to it once through `preset_cleanup_migrated`.
+- Source errors now tell the user to convert the source to H.264 instead of pointing at a hidden preset.
+
+### Verification
+- 688 tests, 2 skipped; ruff and mypy clean.
+- The picker lists exactly two presets and no duplicate labels.
+
 ## [2.2.3] - 2026-11-10
 
 ### Changed

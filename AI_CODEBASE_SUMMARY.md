@@ -1,4 +1,4 @@
-# AI Codebase Summary — FPS Patcher Studio (v2.2.3)
+# AI Codebase Summary — FPS Patcher Studio (v2.3.0)
 
 > **Purpose**: Master architecture, codebase map, state lifecycle, and operational guide for autonomous AI agents and engineers working on **FPS Patcher Studio**.
 
@@ -8,13 +8,13 @@
 
 - **Repository**: `fps-patcher-studio`
 - **Root Path**: `E:\Project\fps-patcher-studio`
-- **Current Version**: `2.2.3` (2026-11-10)
+- **Current Version**: `2.3.0` (2026-11-10)
 - **Python Target**: Python 3.11+
 - **Desktop Stack**: PySide6 `6.12.0`, Pillow, PyInstaller one-folder build
 - **Primary Domain**: High-precision ISO-BMFF (MP4/MOV/M4V) container timing patcher. It modifies video timescales, sample duration tables (`stts`), composition offsets (`ctts`), track/movie headers (`mvhd`, `tkhd`, `mdhd`), and edit lists (`edts`/`elst`) losslessly at the binary atom level **without re-encoding video frames** unless the optional bitrate cap is enabled.
 - **User Interface**: Qt is the only UI (`src/fps_patcher/ui_qt/`), with English and Thai localization, light/dark themes, seven theme presets, drag-and-drop, thumbnails, and a bottom activity console.
 - **Headless Surface**: `src/fps_patcher/cli.py` (`--cli patch|probe|score`), plus `--quick-patch` for the Explorer verb.
-- **Release Status**: v2.2.3 is built, tagged and published on GitHub Releases; the build is **unsigned** and uses published SHA-256 checksums for updates.
+- **Release Status**: v2.3.0 is built, tagged and published on GitHub Releases; the build is **unsigned** and uses published SHA-256 checksums for updates.
 
 ---
 
@@ -31,7 +31,7 @@ E:\Project\fps-patcher-studio\
 │   ├── version_info.txt            # Windows PE version metadata
 │   └── fps_patcher.manifest        # DPI/long-path aware application manifest
 ├── src\fps_patcher\
-│   ├── __init__.py                 # __version__ = "2.2.3", APP_NAME
+│   ├── __init__.py                 # __version__ = "2.3.0", APP_NAME
 │   ├── __main__.py                 # Entry dispatch: --cli, --quick-patch, Qt GUI
 │   ├── cli.py                      # Headless CLI: patch | probe | score
 │   ├── config.py                   # Settings persistence and clamping
@@ -93,7 +93,7 @@ E:\Project\fps-patcher-studio\
 │   └── make_icon.py
 ├── docs\                           # Policies, roadmap, signing, handoff checklists
 ├── release\                        # Built installers, zips, checksums, SBOM
-├── pyproject.toml                  # Version 2.2.3, PySide6 pin, tool config
+├── pyproject.toml                  # Version 2.3.0, PySide6 pin, tool config
 ├── uv.lock                         # Locked dependency graph
 ├── README.md
 ├── CHANGELOG.md
@@ -152,7 +152,7 @@ no second UI toolkit in the runtime.
 | `core/prober.py` | Extracts `VideoInfo` (codec, dimensions, FPS, duration, bitrate, audio, color) using ffprobe when available. |
 | `core/patcher.py` | Orchestrates one file: validate → probe → preflight plan → strategy patch → color/metadata → verify → atomic replace. Also handles destination locks, backups, overwrite policy, and `preserve_mtime`. |
 | `core/preflight.py` | Pure planning helpers (`needs_audio_normalize`, `needs_bitrate_cap`, `planned_output_bitrate`, `make_plan`) and the FFmpeg preflight runner. Owns `BITRATE_TARGET_MBPS_MIN/MAX` (1/24), default 16, hardware-encoder order and `d3d11va` fallback. |
-| `core/strategies.py` | Strategy registry: `zilem`, `zilem-v3`, `tiktok-ts`, `tiktok-ts-1080`, `tiktok-ts-remux`, `bxd-pc`, `bxd-mobile`, `bxd-hybrid`, `bxd-clean`, `direct-atom`, `v4-forensic`, `bxd-experimental`, `ffmpeg-copy`, plus legacy aliases. `VISIBLE_PRESET_KEYS` controls the pickers. |
+| `core/strategies.py` | Strategy registry: `zilem`, `zilem-v3`, `tiktok-ts`, `tiktok-ts-1080`, `tiktok-ts-remux`, `bxd-pc`, `bxd-mobile`, `bxd-hybrid`, `bxd-clean`, `direct-atom`, `v4-forensic`, `bxd-experimental`, `ffmpeg-copy`, plus legacy aliases. `VISIBLE_PRESET_KEYS` offers only `zilem-v3` (X1T 1080p) and `tiktok-ts-remux` (X1T 720p); the rest are hidden. |
 | `core/zilem_patcher.py` | Container-only Zilem v1 builder/verifier: validates a single H.264 + AAC-LC 48 kHz stereo MP4, converts the old `moov` to `free`, appends 17 silence frames, rebuilds and duplicates the audio track, tags the video track `X1T Zilem v1`, and writes `moov` at EOF. The V3 option swaps in the original reference tag and appends the `ZETA_OPTIMIZED/3` free-box trailer after `moov`. |
 | `core/bxd_patcher.py` | BXD direct patch engine and preset variants. |
 | `core/v4_patcher.py` | Strict V4 forensic patch engine. |
@@ -206,7 +206,7 @@ flowchart TD
 2. `AppController` starts a probe worker; `core/prober.py` produces `VideoInfo`, and `QueueItem` moves from `probing` to `ready`.
 3. `core/patcher.py` builds a preflight plan from that metadata. Audio normalization applies when the audio track is not AAC-LC 48 kHz stereo. Bitrate capping applies only when auto-cap is on **and** the source bitrate is above the selected target.
 4. When preflight is needed, FFmpeg writes a temporary fixed copy; the original source is never modified. The selected strategy then patches that working copy.
-5. Direct strategies (`zilem`, `bxd-*`, `direct-atom`, `v4-forensic`) rewrite container atoms. `ffmpeg-copy` remuxes with a new video-track timescale. The `mdat` payload stays byte-identical unless the bitrate cap deliberately re-encodes video. Zilem also skips the preflight plan and colour/metadata rewrite entirely.
+5. Direct strategies (`zilem`, `zilem-v3`, `bxd-*`, `direct-atom`, `v4-forensic`) rewrite container atoms. `ffmpeg-copy` remuxes with a new video-track timescale. The `mdat` payload stays byte-identical unless the bitrate cap deliberately re-encodes video. Zilem also skips the preflight plan and colour/metadata rewrite entirely.
 6. `core/colr.py` optionally writes a Rec.709 tag or scrubs metadata. Zilem skips it. `core/verifier.py` checks structure, offsets, and sampled payload hashes; Zilem uses its own fingerprint verifier.
 7. Output is written to a temp file and atomically renamed. Backups, overwrite confirmation, destination locks, and `preserve_mtime` are handled around that replace.
 8. Progress and results are pushed to `AppController.events`; `ControllerBridge` drains them on the GUI thread and emits Qt signals.
@@ -215,8 +215,8 @@ flowchart TD
 
 | Preset ID | UI role |
 | --- | --- |
-| `zilem` | Default; container-only Zilem v1 fingerprint, no re-encode |
-| `zilem-v3` | Reference-exact Zilem: original tag plus `ZETA_OPTIMIZED/3` trailer |
+| `zilem` | Hidden legacy; neutral Zilem v1 fingerprint, no re-encode |
+| `zilem-v3` | Default; reference-exact Zilem (shown as X1T 1080p), original tag plus `ZETA_OPTIMIZED/3` trailer |
 | `tiktok-ts` | Lossy TikTok TS preset (60 fps, source resolution) |
 | `tiktok-ts-1080` | Lossy TikTok TS preset letterboxed to 1920x1080 |
 | `tiktok-ts-remux` | Copies H.264 video, re-encodes audio; exact reference match |
@@ -416,7 +416,7 @@ legacy `_ts<timescale>` naming, single-platform runs, lossless atom patching and
 **Compatibility and limits**: all new behavior is opt-in and the re-encoding
 fixes are lossy. Parallel batches may reorder files when `stop_on_error` is off.
 The preflight semaphore and the job-history writes are process-local, so two app
-instances can still encode or write history simultaneously. v2.2.3 is built,
+instances can still encode or write history simultaneously. v2.3.0 is built,
 tagged and published on GitHub Releases with unsigned SHA-256 updates.
 
 ---

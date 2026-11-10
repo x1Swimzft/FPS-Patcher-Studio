@@ -172,8 +172,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "output_group_after": "After export",
         "reecode_section": "Re-encode fallbacks",
         "reecode_hint": (
-            "Only X1T 1080p Re-encode and X1T 60fps use these. "
-            "The lossless presets ignore them."
+            "The visible presets are lossless and ignore these options."
         ),
         "reecode_badge_lossless": "Lossless (all off)",
         "reecode_badge_lossy": "May re-encode ({count} on)",
@@ -192,7 +191,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "default_target_preset": "Default target FPS",
         "default_timescale": "Default timescale",
         "default_strategy": "Default preset",
-        "default_strategy_hint": "X1T Zilem rewrites the container only.",
+        "default_strategy_hint": "X1T 1080p rewrites the container only.",
         "zilem_tip": "Container-only • no re-encode • no quality loss",
         "zilem_v3_tip": (
             "Reference-exact • same container, tag and ZETA trailer as the "
@@ -661,7 +660,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "default_target_preset": "FPS เริ่มต้น",
         "default_timescale": "Timescale เริ่มต้น",
         "default_strategy": "พรีเซ็ตเริ่มต้น",
-        "default_strategy_hint": "X1T Zilem ปรับเฉพาะคอนเทนเนอร์",
+        "default_strategy_hint": "X1T 1080p ปรับเฉพาะคอนเทนเนอร์",
         "zilem_tip": "ปรับคอนเทนเนอร์เท่านั้น • คุณภาพไม่ลด",
         "zilem_v3_tip": (
             "เหมือน reference ทุกไบต์ • คอนเทนเนอร์ แท็ก และ trailer ZETA "

@@ -112,7 +112,7 @@ class Settings:
     output_dir: str = ""  # empty = same folder as source
     last_preset: str = "60 FPS"
     custom_timescale: int = 90000
-    strategy: str = "zilem"
+    strategy: str = "zilem-v3"
     appearance: str = "dark"
     overwrite: bool = False
     auto_rename: bool = True
@@ -164,6 +164,9 @@ class Settings:
     # X1T Zilem. The old default is migrated once; any other saved preset is
     # left untouched.
     zilem_default_migrated: bool = False
+    # The picker now offers only X1T 1080p and X1T 720p. Saved selections of a
+    # newly hidden preset are moved to X1T 1080p once.
+    preset_cleanup_migrated: bool = False
 
     # V2 FFmpeg
     check_ffmpeg_on_start: bool = True
@@ -250,6 +253,10 @@ class Settings:
         zilem_needs_migration = raw_zilem_migrated is not True and str(
             raw_zilem_migrated
         ).lower() not in ("1", "true", "yes")
+        raw_preset_migrated = raw.get("preset_cleanup_migrated", False)
+        preset_needs_migration = raw_preset_migrated is not True and str(
+            raw_preset_migrated
+        ).lower() not in ("1", "true", "yes")
         if needs_migration:
             try:
                 old_alpha = float(raw.get("window_alpha", 1.0))
@@ -267,7 +274,7 @@ class Settings:
             return cls()
 
         instance._clamp()
-        if needs_migration or zilem_needs_migration:
+        if needs_migration or zilem_needs_migration or preset_needs_migration:
             instance.save(path)
         return instance
 
@@ -283,6 +290,13 @@ class Settings:
             if self.strategy == "tiktok-ts-remux":
                 self.strategy = "zilem"
             self.zilem_default_migrated = True
+
+        # The picker now offers only X1T 1080p and X1T 720p. Move a saved
+        # selection of a hidden preset to the visible lossless default once.
+        if not self.preset_cleanup_migrated:
+            if self.strategy in ("zilem", "tiktok-ts", "tiktok-ts-1080"):
+                self.strategy = "zilem-v3"
+            self.preset_cleanup_migrated = True
 
         if self.theme_preset not in THEME_PRESETS:
             self.theme_preset = DEFAULT_THEME_PRESET

@@ -334,10 +334,18 @@ UI_PRESETS: dict[str, PatchStrategy] = _PresetDict({
     "tiktok-ts-remux": TikTokTSRemuxStrategy(),
 })
 
-# The X1T/BXD family stays registered for saved settings, queue overrides and
-# CLI compatibility, but it is no longer offered for new selections.
+# Hidden presets stay registered for saved settings, queue overrides and CLI
+# compatibility, but the pickers offer only X1T 1080p and X1T 720p.
 HIDDEN_PRESET_KEYS: frozenset[str] = frozenset(
-    {"bxd-pc", "bxd-mobile", "bxd-hybrid", "bxd-clean"}
+    {
+        "zilem",
+        "bxd-pc",
+        "bxd-mobile",
+        "bxd-hybrid",
+        "bxd-clean",
+        "tiktok-ts",
+        "tiktok-ts-1080",
+    }
 )
 VISIBLE_PRESET_KEYS: tuple[str, ...] = tuple(
     key for key in UI_PRESETS if key not in HIDDEN_PRESET_KEYS

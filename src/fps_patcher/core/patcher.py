@@ -321,7 +321,7 @@ def patch(
     if strategy.name == "tiktok-ts-remux" and before.codec != "h264":
         raise PatchError(
             f"{strategy.label} requires an H.264 source; "
-            "use X1T 1080p Re-encode for a lossy re-encode."
+            "convert the source to H.264 first."
         )
     if is_zilem and before.codec != "h264":
         raise PatchError(

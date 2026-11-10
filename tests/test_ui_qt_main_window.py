@@ -180,7 +180,7 @@ def test_rich_empty_state_has_actions_badges_and_profile_strip(
     assert drop.profile_title.text() == t("active_patch_profile", "en")
     summary = drop.profile_summary.fullText()
     assert "60 FPS" in summary
-    assert "X1T Zilem" in summary
+    assert "X1T 1080p" in summary
     assert t("drop_profile_output_same", "en") in summary
     assert drop.reassure_label.text() == t("drop_reassure", "en")
     window.close()
@@ -305,13 +305,13 @@ def test_override_card_applies_to_controller_item(
 
     inspector.override_switch.setChecked(True)
     inspector.override_fps_edit.setText("90000")
-    inspector.override_preset_combo.setCurrentText("X1T 1080p Re-encode")
+    inspector.override_preset_combo.setCurrentText("X1T 720p")
     inspector.override_apply_btn.click()
 
     item = window.controller.items.get(video)
     assert item is not None
     assert item.timescale == 90000
-    assert item.strategy == "tiktok-ts-1080"
+    assert item.strategy == "tiktok-ts-remux"
     assert inspector.override_state.text() == t("inspector_override_active", "en")
 
     inspector.override_clear_btn.click()
@@ -378,40 +378,28 @@ def test_preset_pickers_hide_x1t_but_keep_saved_legacy(
     window = make_main_window(qtbot, monkeypatch, tmp_path)
     combo = window.inspector.strategy_combo
     assert [combo.itemText(i) for i in range(combo.count())] == [
-        "X1T Zilem",
         "X1T 1080p",
-        "X1T 60fps",
-        "X1T 1080p Re-encode",
         "X1T 720p",
     ]
-    assert combo.currentText() == "X1T Zilem"
-    assert (
-        combo.width()
-        >= combo.fontMetrics().horizontalAdvance("X1T 1080p Re-encode") + 32
-    )
+    assert combo.currentText() == "X1T 1080p"
+    assert combo.width() >= combo.fontMetrics().horizontalAdvance("X1T 1080p") + 32
     window.close()
 
     legacy = make_main_window(qtbot, monkeypatch, tmp_path, strategy="bxd-mobile")
     combo = legacy.inspector.strategy_combo
     assert [combo.itemText(i) for i in range(combo.count())] == [
-        "X1T Zilem",
         "X1T 1080p",
-        "X1T 60fps",
-        "X1T 1080p Re-encode",
         "X1T 720p",
         "X1T For Mobile",
     ]
     assert combo.currentText() == "X1T For Mobile"
 
-    legacy.inspector._strategy_activated(combo.findText("X1T 1080p Re-encode"))
+    legacy.inspector._strategy_activated(combo.findText("X1T 720p"))
     assert [combo.itemText(i) for i in range(combo.count())] == [
-        "X1T Zilem",
         "X1T 1080p",
-        "X1T 60fps",
-        "X1T 1080p Re-encode",
         "X1T 720p",
     ]
-    assert combo.currentText() == "X1T 1080p Re-encode"
+    assert combo.currentText() == "X1T 720p"
     legacy.close()
 
 

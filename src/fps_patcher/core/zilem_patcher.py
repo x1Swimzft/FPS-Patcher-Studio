@@ -607,7 +607,7 @@ def _validate_source(structure: _Structure) -> ZilemSourceInfo:
         found = video_entries[0].type.decode("latin1", errors="replace")
         raise ZilemSourceError(
             f"X1T Zilem requires an H.264 video track; found '{found}' "
-            "(use X1T 1080p Re-encode for HEVC/AV1 sources)"
+            "(convert HEVC/AV1 sources to H.264 first)"
         )
 
     entry = _audio_sample_entry(audio)
