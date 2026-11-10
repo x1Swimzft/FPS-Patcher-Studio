@@ -450,6 +450,27 @@ class SettingsDialog(QDialog):
         self._advanced_sections.append(section)
         return section.body_layout
 
+    def _collapsible(
+        self,
+        grid: QGridLayout,
+        row: int,
+        column: int,
+        key: str,
+        *,
+        column_span: int = 1,
+    ) -> QVBoxLayout:
+        """Collapsible card with a translated title, used for optional groups."""
+        theme = self._theme_manager.theme
+        section = CollapsibleSection(self._tr(key), theme)
+        section.set_reduce_motion(bool(self._draft.reduce_motion))
+        section.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
+        grid.addWidget(
+            section, row, column, 1, column_span, Qt.AlignmentFlag.AlignTop
+        )
+        self._themed_widgets.append(section)
+        self._advanced_sections.append(section)
+        return section.body_layout
+
     # ------------------------------------------------------- shared controls
     def _section(self, layout: QVBoxLayout, key: str) -> QLabel:
         theme = self._theme_manager.theme
@@ -504,17 +525,21 @@ class SettingsDialog(QDialog):
         edit = QLineEdit(value)
         edit.setAccessibleName(label.text())
         label.setBuddy(edit)
-        browse = text_button(
-            self._tr("browse"),
-            theme,
-            lambda: self._choose_dir(edit),
-            variant="secondary",
+        row.addWidget(edit, 1)
+        row.addWidget(
+            text_button(
+                self._tr("browse"),
+                theme,
+                lambda: self._choose_dir(edit),
+                variant="secondary",
+            ),
+            0,
         )
-        layout.addWidget(edit)
-        row.addWidget(browse)
         if reset:
-            row.addWidget(text_button(self._tr("reset"), theme, edit.clear, variant="ghost"))
-        row.addStretch(1)
+            row.addWidget(
+                text_button(self._tr("reset"), theme, edit.clear, variant="ghost"),
+                0,
+            )
         layout.addLayout(row)
         return edit
 
@@ -828,107 +853,77 @@ class SettingsDialog(QDialog):
     # ---------------------------------------------------------------- output
     def _build_output(self) -> None:
         _page, grid = self._new_page("output")
+        grid.setColumnStretch(1, 0)
         draft = self._draft
         theme = self._theme_manager.theme
 
-        paths = self._card(grid, 1, 0, row_span=2, expand=True)
+        body = self._card(grid, 1, 0, column_span=2, expand=True)
+        status = WrapLabel(self._tr("output_container_only"))
+        status.setProperty("role", "caption")
+        status.setWordWrap(True)
+        status.setStyleSheet(f"color: {theme.color('success')};")
+        body.addWidget(status)
+
+        self._section(body, "output_group_destination")
         self._out_dir = self._path_row(
-            paths,
+            body,
             "default_output_dir",
             draft.output_dir,
             hint_key="leave_empty_source",
             reset=True,
         )
-        self._section(paths, "export_platforms_lbl")
-        self._export_checks = {}
-        for profile in PLATFORM_PROFILES.values():
-            if profile.profile_id == "generic":
-                continue
-            check = QCheckBox(t(profile.label_key, draft.language))
-            check.setChecked(profile.profile_id in draft.export_platforms)
-            self._export_checks[profile.profile_id] = check
-            paths.addWidget(check)
-        self._hint(paths, "export_platforms_help")
 
-        workflow = self._card(grid, 1, 1)
-        self._open_done = self._switch(workflow, "open_when_done", draft.open_when_done)
-        self._preserve_mtime = self._switch(
-            workflow, "preserve_mtime", draft.preserve_mtime
-        )
-
-        safety = self._card(grid, 2, 1)
-        safety.addWidget(
-            ConsequenceBadge(self._tr("settings_badge_lossless"), "lossless", theme)
-        )
-        self._hint(safety, "settings_lossless_note")
-
-        advanced = self._advanced(grid, 3, 0, column_span=2)
+        self._section(body, "output_group_naming")
         self._use_template = self._switch(
-            advanced, "use_filename_template", draft.use_filename_template
+            body, "use_filename_template", draft.use_filename_template
         )
-        self._template = self._entry(
-            advanced, "filename_template", draft.filename_template
-        )
-        self._hint(advanced, "template_help")
+        self._template = QLineEdit(draft.filename_template)
+        self._template.setAccessibleName(self._tr("filename_template"))
+        body.addWidget(self._template)
+        self._hint(body, "template_help")
         self._template_preview = WrapLabel()
         self._template_preview.setProperty("role", "caption")
         self._template_preview.setWordWrap(True)
-        advanced.addWidget(self._template_preview)
+        body.addWidget(self._template_preview)
         self._template.textChanged.connect(self._update_template_preview)
         self._use_template.toggled.connect(self._template.setEnabled)
+        self._use_template.toggled.connect(self._template_preview.setVisible)
         self._use_template.toggled.connect(self._update_template_preview)
         self._template.setEnabled(self._use_template.isChecked())
+        self._template_preview.setVisible(self._use_template.isChecked())
         self._update_template_preview()
 
-        advanced.addWidget(
-            ConsequenceBadge(self._tr("settings_badge_lossy"), "warning", theme)
+        self._section(body, "output_group_platforms")
+        self._export_checks = {}
+        platform_row = QHBoxLayout()
+        platform_row.setSpacing(theme.spacing)
+        platform_labels = {
+            "tiktok": "export_platform_tiktok",
+            "instagram": "export_platform_instagram",
+            "youtube": "export_platform_youtube",
+        }
+        for profile in PLATFORM_PROFILES.values():
+            if profile.profile_id == "generic":
+                continue
+            check = QCheckBox(
+                self._tr(platform_labels.get(profile.profile_id, profile.label_key))
+            )
+            check.setChecked(profile.profile_id in draft.export_platforms)
+            self._export_checks[profile.profile_id] = check
+            platform_row.addWidget(check)
+        platform_row.addStretch(1)
+        body.addLayout(platform_row)
+        self._hint(body, "export_platforms_help")
+
+        self._section(body, "output_group_after")
+        self._open_done = self._switch(body, "open_when_done", draft.open_when_done)
+        self._preserve_mtime = self._switch(
+            body, "preserve_mtime", draft.preserve_mtime
         )
-        columns = QHBoxLayout()
-        columns.setSpacing(theme.spacing)
-        left = QVBoxLayout()
-        right = QVBoxLayout()
-        self._normalize_audio = self._switch(
-            left, "auto_normalize_audio", draft.auto_normalize_audio
-        )
-        self._cap_bitrate = self._switch(
-            left, "auto_cap_bitrate", draft.auto_cap_bitrate
-        )
-        self._bitrate_target = self._spin(
-            left,
-            "bitrate_target_lbl",
-            max(
-                BITRATE_TARGET_MBPS_MIN,
-                min(BITRATE_TARGET_MBPS_MAX, draft.bitrate_target_mbps),
-            ),
-            BITRATE_TARGET_MBPS_MIN,
-            BITRATE_TARGET_MBPS_MAX,
-            1,
-            " Mbps",
-        )
-        self._bitrate_target.setEnabled(draft.auto_cap_bitrate)
-        self._cap_bitrate.toggled.connect(self._bitrate_target.setEnabled)
-        self._hint(left, "bitrate_target_hint")
-        self._fix_vfr = self._switch(
-            right, "settings_auto_fix_vfr", draft.auto_fix_vfr
-        )
-        self._fix_codec = self._switch(
-            right, "settings_auto_fix_codec", draft.auto_fix_codec
-        )
-        self._cap_resolution = self._switch(
-            right, "settings_auto_cap_resolution", draft.auto_cap_resolution
-        )
-        self._hint(right, "settings_lossy_hint")
-        columns.addLayout(left, 1)
-        columns.addLayout(right, 1)
-        advanced.addLayout(columns)
 
     def _update_template_preview(self, _value: object = "") -> None:
         if not self._use_template.isChecked():
-            self._template_preview.setText(
-                self._tr(
-                    "template_preview_legacy", preview="sample_clip_ts60000.mp4"
-                )
-            )
+            self._template_preview.clear()
             return
         template = self._template.text().strip() or "{name}_{fps}fps"
         strategy = self._draft.strategy
@@ -1051,7 +1046,53 @@ class SettingsDialog(QDialog):
             )
         )
 
-        advanced = self._advanced(grid, 3, 0, column_span=2)
+        fallbacks = self._collapsible(grid, 3, 0, "reecode_section", column_span=2)
+        self._hint(fallbacks, "reecode_hint")
+        self._fallback_badge = ConsequenceBadge(
+            self._tr("reecode_badge_lossless"), "lossless", theme
+        )
+        fallbacks.addWidget(self._fallback_badge)
+        self._normalize_audio = self._switch(
+            fallbacks, "auto_normalize_audio", draft.auto_normalize_audio
+        )
+        self._cap_bitrate = self._switch(
+            fallbacks, "auto_cap_bitrate", draft.auto_cap_bitrate
+        )
+        self._bitrate_target = self._spin(
+            fallbacks,
+            "bitrate_target_lbl",
+            max(
+                BITRATE_TARGET_MBPS_MIN,
+                min(BITRATE_TARGET_MBPS_MAX, draft.bitrate_target_mbps),
+            ),
+            BITRATE_TARGET_MBPS_MIN,
+            BITRATE_TARGET_MBPS_MAX,
+            1,
+            " Mbps",
+        )
+        self._bitrate_target.setEnabled(draft.auto_cap_bitrate)
+        self._cap_bitrate.toggled.connect(self._bitrate_target.setEnabled)
+        self._hint(fallbacks, "bitrate_target_hint")
+        self._fix_vfr = self._switch(
+            fallbacks, "settings_auto_fix_vfr", draft.auto_fix_vfr
+        )
+        self._fix_codec = self._switch(
+            fallbacks, "settings_auto_fix_codec", draft.auto_fix_codec
+        )
+        self._cap_resolution = self._switch(
+            fallbacks, "settings_auto_cap_resolution", draft.auto_cap_resolution
+        )
+        for switch in (
+            self._normalize_audio,
+            self._cap_bitrate,
+            self._fix_vfr,
+            self._fix_codec,
+            self._cap_resolution,
+        ):
+            switch.toggled.connect(lambda _checked: self._update_fallback_badge())
+        self._update_fallback_badge()
+
+        advanced = self._advanced(grid, 4, 0, column_span=2)
         self._mask_paths = self._switch(
             advanced, "mask_paths_lbl", draft.mask_diagnostic_paths
         )
@@ -1085,6 +1126,25 @@ class SettingsDialog(QDialog):
         self._scrub_metadata = self._switch(
             advanced, "scrub_metadata", draft.scrub_metadata
         )
+
+    def _update_fallback_badge(self) -> None:
+        theme = self._theme_manager.theme
+        switches = (
+            self._normalize_audio,
+            self._cap_bitrate,
+            self._fix_vfr,
+            self._fix_codec,
+            self._cap_resolution,
+        )
+        count = sum(1 for switch in switches if switch.isChecked())
+        if count:
+            self._fallback_badge.set_state(
+                self._tr("reecode_badge_lossy", count=count), "warning", theme
+            )
+        else:
+            self._fallback_badge.set_state(
+                self._tr("reecode_badge_lossless"), "lossless", theme
+            )
 
     @staticmethod
     def _first_fps(items: list[str]) -> str:

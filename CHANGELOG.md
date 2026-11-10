@@ -2,6 +2,17 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
+## [2.2.1] - 2026-11-10
+
+### Changed
+- Settings → Output is now a single column with four groups: Destination, File naming, Platforms and After export. The re-encode fallbacks moved to a collapsed section on General because X1T Zilem ignores them.
+- The static "Lossless by default" card and the duplicate warning copy are gone. The fallback section shows a live "May re-encode (n on)" or "Lossless (all off)" badge.
+- The filename template preview no longer shows the legacy `_ts` filename when the template is off; the redundant field label and long platform labels were shortened.
+
+### Verification
+- 687 tests, 2 skipped; ruff and mypy clean.
+- Output and General pages captured at 920x640; the Output page fits without scrolling.
+
 ## [2.2.0] - 2026-11-10
 
 ### Added

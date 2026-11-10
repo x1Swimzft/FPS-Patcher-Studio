@@ -184,7 +184,7 @@ def test_update_toggle_enabled_without_ffmpeg_network(
     assert dialog._check_updates.isChecked()
     assert not dialog._use_template.isChecked()
     assert not dialog._template.isEnabled()
-    assert "sample_clip_ts60000.mp4" in dialog._template_preview.text()
+    assert dialog._template_preview.text() == ""
 
     template = "{name}_{platform}_{strategy}_{fps}fps"
     dialog._use_template.setChecked(True)

@@ -396,6 +396,15 @@ class ConsequenceBadge(QFrame):
         self.setAccessibleName(text)
         self.set_theme(theme)
 
+    def set_state(self, text: str, kind: str, theme: Theme) -> None:
+        """Replace the badge text and semantic kind in place."""
+        if kind not in self._TOKENS:
+            raise ValueError(f"unknown consequence kind: {kind!r}")
+        self.kind = kind
+        self.label.setText(text)
+        self.setAccessibleName(text)
+        self.set_theme(theme)
+
     def set_theme(self, theme: Theme) -> None:
         color = theme.color(self._TOKENS[self.kind])
         tint = QColor(color)

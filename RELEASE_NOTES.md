@@ -1,5 +1,31 @@
 # Release Notes
 
+## v2.2.1 - 2026-11-10 (Settings cleanup)
+
+Version 2.2.1 cleans up Settings → Output. It is a UI-only change: patching
+behavior, presets and verification are unchanged.
+
+### Changed
+
+- Output is a single column with four groups: Destination, File naming,
+  Platforms and After export.
+- The five re-encode fallbacks moved to a collapsed "Re-encode fallbacks"
+  section on General, with a note that X1T Zilem ignores them and a live badge
+  that reports how many are on.
+- Removed the static "Lossless by default" card and the duplicate warning text.
+- The filename template no longer shows the legacy `_ts` name when it is off;
+  the redundant field label is gone and platform labels are shorter.
+
+### Verification
+
+- 687 tests, 2 skipped; ruff and mypy clean.
+- The Output page fits at the default 920x640 without scrolling.
+
+**The Windows build is unsigned; verify the release SHA-256 before running.**
+
+Auto Update remains enabled by default and will offer this build on the next
+startup.
+
 ## v2.2.0 - 2026-11-10 (X1T Zilem V3)
 
 Version 2.2.0 adds `X1T Zilem V3`, an optional reference-exact variant of the

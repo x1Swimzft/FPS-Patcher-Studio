@@ -161,10 +161,21 @@ STRINGS: dict[str, dict[str, str]] = {
         "template_preview_legacy": "Template off. Legacy name: {preview}",
         "template_help": "Tokens: {name}, {fps}, {timescale}, {date}, {platform}, {strategy}",
         "export_platforms_lbl": "Multi-platform export",
-        "export_platforms_help": (
-            "Select 2 or more platforms to write one file per platform in a single run. "
-            "A per-item profile override disables fan-out for that item."
+        "export_platforms_help": "One file per selected platform.",
+        "export_platform_tiktok": "TikTok",
+        "export_platform_instagram": "Instagram Reels",
+        "export_platform_youtube": "YouTube Shorts",
+        "output_container_only": "Container-only. Nothing on this page re-encodes.",
+        "output_group_destination": "Destination",
+        "output_group_naming": "File naming",
+        "output_group_platforms": "Platforms",
+        "output_group_after": "After export",
+        "reecode_section": "Re-encode fallbacks",
+        "reecode_hint": (
+            "Only X1T 1080p and X1T 60fps use these. X1T Zilem ignores them."
         ),
+        "reecode_badge_lossless": "Lossless (all off)",
+        "reecode_badge_lossy": "May re-encode ({count} on)",
         "open_when_done": "Open output folder when batch completed",
         "preserve_mtime": "Preserve original file modification timestamps",
         "watch_folder_section": "Watch Folder & Explorer",
@@ -203,15 +214,15 @@ STRINGS: dict[str, dict[str, str]] = {
         "backup_original": "Backup original before in-place overwrite (.bak)",
         "stop_on_error": "Stop batch on first error",
         "preflight_section": "Smart Pre-Flight",
-        "auto_normalize_audio": "Auto-convert audio to AAC 48 kHz stereo before patching",
-        "auto_cap_bitrate": "Auto-cap video bitrate for mobile when the source is above the target",
-        "settings_auto_fix_vfr": "Convert variable frame rate (VFR) to constant frame rate (CFR)",
-        "settings_auto_fix_codec": "Fall back to H.264 when the video codec is not accepted",
-        "settings_auto_cap_resolution": "Cap resolution and aspect ratio to the platform target",
+        "auto_normalize_audio": "Convert audio to AAC 48 kHz stereo",
+        "auto_cap_bitrate": "Cap video bitrate",
+        "settings_auto_fix_vfr": "Convert VFR to CFR",
+        "settings_auto_fix_codec": "Fall back to H.264",
+        "settings_auto_cap_resolution": "Cap resolution to the platform target",
         "settings_lossy_hint": (
             "These options re-encode video, are not lossless, and are off by default."
         ),
-        "bitrate_target_lbl": "Target video bitrate when capping (Mbps)",
+        "bitrate_target_lbl": "Target bitrate (Mbps)",
         "bitrate_target_hint": (
             "Sources at or below this bitrate are copied losslessly. "
             "The cap re-encodes video to H.264 at the target rate."
@@ -616,10 +627,21 @@ STRINGS: dict[str, dict[str, str]] = {
             "ตัวแปรที่ใช้ได้: {name}, {fps}, {timescale}, {date}, {platform}, {strategy}"
         ),
         "export_platforms_lbl": "ส่งออกหลายแพลตฟอร์ม",
-        "export_platforms_help": (
-            "เลือก 2 แพลตฟอร์มขึ้นไปเพื่อสร้างไฟล์แยกตามแพลตฟอร์มในการรันครั้งเดียว "
-            "หากกำหนดโปรไฟล์เฉพาะไฟล์ รายการนั้นจะไม่ถูกส่งออกหลายแพลตฟอร์ม"
+        "export_platforms_help": "หนึ่งไฟล์ต่อแพลตฟอร์มที่เลือก",
+        "export_platform_tiktok": "TikTok",
+        "export_platform_instagram": "Instagram Reels",
+        "export_platform_youtube": "YouTube Shorts",
+        "output_container_only": "ปรับเฉพาะคอนเทนเนอร์ หน้านี้ไม่เข้ารหัสใหม่",
+        "output_group_destination": "ปลายทาง",
+        "output_group_naming": "ชื่อไฟล์",
+        "output_group_platforms": "แพลตฟอร์ม",
+        "output_group_after": "หลังส่งออก",
+        "reecode_section": "ตัวเลือกเมื่อต้องเข้ารหัสใหม่",
+        "reecode_hint": (
+            "ใช้เฉพาะ X1T 1080p และ X1T 60fps ส่วน X1T Zilem ไม่ใช้ตัวเลือกเหล่านี้"
         ),
+        "reecode_badge_lossless": "Lossless (ปิดทั้งหมด)",
+        "reecode_badge_lossy": "อาจเข้ารหัสใหม่ ({count} เปิดอยู่)",
         "open_when_done": "เปิดโฟลเดอร์ปลายทางเมื่อเสร็จสิ้นทั้งหมด",
         "preserve_mtime": "คงเวลาแก้ไขไฟล์เดิมไว้ (Preserve Timestamp)",
         "watch_folder_section": "โฟลเดอร์เฝ้าดูและเมนู Explorer",
@@ -658,16 +680,16 @@ STRINGS: dict[str, dict[str, str]] = {
         "backup_original": "สำรองไฟล์เดิมก่อนเขียนทับ (.bak)",
         "stop_on_error": "หยุดการทำงานทันทีหากพบข้อผิดพลาด",
         "preflight_section": "ตรวจและซ่อมไฟล์อัตโนมัติก่อนแพตช์",
-        "auto_normalize_audio": "แปลงเสียงเป็น AAC 48 kHz สเตอริโอให้อัตโนมัติก่อนแพตช์",
-        "auto_cap_bitrate": "จำกัดบิตเรตวิดีโอสำหรับมือถือเมื่อต้นฉบับสูงกว่าเป้าหมาย",
-        "settings_auto_fix_vfr": "แปลงอัตราเฟรมแบบแปรผัน (VFR) เป็นอัตราเฟรมคงที่ (CFR)",
-        "settings_auto_fix_codec": "สลับไปใช้ H.264 เมื่อโคเดกของวิดีโอไม่เป็นที่ยอมรับ",
-        "settings_auto_cap_resolution": "จำกัดความละเอียดและอัตราส่วนภาพให้ตรงกับเป้าหมายของแพลตฟอร์ม",
+        "auto_normalize_audio": "แปลงเสียงเป็น AAC 48 kHz สเตอริโอ",
+        "auto_cap_bitrate": "จำกัดบิตเรตวิดีโอ",
+        "settings_auto_fix_vfr": "แปลง VFR เป็น CFR",
+        "settings_auto_fix_codec": "สลับไปใช้ H.264",
+        "settings_auto_cap_resolution": "จำกัดความละเอียดตามเป้าหมายแพลตฟอร์ม",
         "settings_lossy_hint": (
             "ตัวเลือกเหล่านี้เข้ารหัสวิดีโอใหม่ ไม่รักษาคุณภาพแบบไม่สูญเสีย "
             "และปิดไว้เป็นค่าเริ่มต้น"
         ),
-        "bitrate_target_lbl": "บิตเรตวิดีโอเป้าหมายเมื่อจำกัด (Mbps)",
+        "bitrate_target_lbl": "บิตเรตเป้าหมาย (Mbps)",
         "bitrate_target_hint": (
             "ไฟล์ที่มีบิตเรตเท่าหรือต่ำกว่าเป้าหมายจะถูกคัดลอกแบบไม่สูญเสียคุณภาพ "
             "ส่วนที่เกินจะถูกเข้ารหัสวิดีโอใหม่เป็น H.264 ที่บิตเรตเป้าหมาย"
