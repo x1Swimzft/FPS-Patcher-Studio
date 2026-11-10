@@ -180,7 +180,7 @@ def test_rich_empty_state_has_actions_badges_and_profile_strip(
     assert drop.profile_title.text() == t("active_patch_profile", "en")
     summary = drop.profile_summary.fullText()
     assert "60 FPS" in summary
-    assert "X1T Remux" in summary
+    assert "X1T Zilem" in summary
     assert t("drop_profile_output_same", "en") in summary
     assert drop.reassure_label.text() == t("drop_reassure", "en")
     window.close()
@@ -378,17 +378,19 @@ def test_preset_pickers_hide_x1t_but_keep_saved_legacy(
     window = make_main_window(qtbot, monkeypatch, tmp_path)
     combo = window.inspector.strategy_combo
     assert [combo.itemText(i) for i in range(combo.count())] == [
+        "X1T Zilem",
         "X1T 60fps",
         "X1T 1080p",
         "X1T Remux",
     ]
-    assert combo.currentText() == "X1T Remux"
+    assert combo.currentText() == "X1T Zilem"
     assert combo.width() >= combo.fontMetrics().horizontalAdvance("X1T 1080p") + 32
     window.close()
 
     legacy = make_main_window(qtbot, monkeypatch, tmp_path, strategy="bxd-mobile")
     combo = legacy.inspector.strategy_combo
     assert [combo.itemText(i) for i in range(combo.count())] == [
+        "X1T Zilem",
         "X1T 60fps",
         "X1T 1080p",
         "X1T Remux",
@@ -398,6 +400,7 @@ def test_preset_pickers_hide_x1t_but_keep_saved_legacy(
 
     legacy.inspector._strategy_activated(combo.findText("X1T 1080p"))
     assert [combo.itemText(i) for i in range(combo.count())] == [
+        "X1T Zilem",
         "X1T 60fps",
         "X1T 1080p",
         "X1T Remux",

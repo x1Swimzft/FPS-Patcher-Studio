@@ -2,6 +2,25 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
+## [2.1.0] - 2026-11-10
+
+### Added
+- `X1T Zilem` (`zilem`, alias `x1t-zilem`): a container-only MP4 preset that reproduces the Zilem v1 fingerprint with no video or audio re-encode. It copies the source samples, converts the old `moov` to `free`, appends 17 silent AAC frames, extends and duplicates the audio track, writes a rebuilt `moov` at EOF, and tags the video track `X1T Zilem v1`.
+- Zilem source validation: non-fragmented MP4, one H.264 video track, one AAC-LC 48 kHz stereo audio track, variable-size audio sample tables, and 32-bit chunk offsets. Incompatible files fail before any output is written with a message naming the problem.
+- Zilem verification: exact size and box order, unchanged `ftyp` and source `mdat` payloads, a byte-identical `free` replacement for the old `moov`, exactly 17 silence frames, the expected audio durations, the neutral tag, and no trailing trailer.
+- Golden regression test for the real reference pair via `FPS_ZILEM_SOURCE` and `FPS_ZILEM_REFERENCE`. The fixture is not committed and the test skips when it is absent.
+- `docs/ZILEM_METHOD.md` documents the accepted sources, box-level transform, skipped pipeline stages, verification, reference provenance, and limits.
+
+### Changed
+- `X1T Zilem` is now the default preset for new installs and CLI runs without `--strategy`. `X1T Remux` remains available as a visible preset.
+- First 2.1.0 launch migrates a saved preset only when it is exactly `tiktok-ts-remux`; every other saved choice is preserved. The one-time `zilem_default_migrated` flag prevents later migrations.
+- Zilem output is named `<stem>_zilem.mp4`, skips preflight auto-fixes and the colour/metadata rewrite, and ignores the target FPS setting.
+- Zilem accepts AAC AudioSpecificConfig values whose first 13 bits are AAC-LC/48 kHz/stereo, including ffmpeg's sync-extension tail, while the production duplicate track keeps its fixed alternate sample entry.
+- The website and README now lead with Zilem; `X1T Remux` is the secondary choice.
+
+### Verification
+- ruff and mypy clean; full pytest suite passing, including the Zilem golden test against the real fixture.
+
 ## [2.0.4] - 2026-11-08
 
 ### Added

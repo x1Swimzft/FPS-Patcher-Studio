@@ -1,8 +1,10 @@
 # FPS Patcher Studio — Reverse Engineering Report
 
-**Target:** `E:\Project\fps-patcher-studio`  
-**Version analysed:** `2.0.1` (`pyproject.toml`, `src/fps_patcher/__init__.py`)  
-**Build identity:** unsigned Windows x64 one-folder build; release manifest records commit `abb6d9b6b088c220f31571f04b6c51620bd2daf0`, built `2026-11-04T11:31:32Z` with Python 3.11.18, PyInstaller 6.22.3 and Inno Setup 7.1.1  
+**Target:** `E:\Project\fps-patcher-studio`
+
+**Version analysed:** `2.1.0` (base analysis at `2.0.1`; §9.6 added for the Zilem preset)
+
+**Build identity:** unsigned Windows x64 one-folder build; the 2.0.1 manifest recorded commit `abb6d9b6b088c220f31571f04b6c51620bd2daf0`, built `2026-11-04T11:31:32Z` with Python 3.11.18, PyInstaller 6.22.3 and Inno Setup 7.1.1
 **Method:** full static read of the Python source, build scripts and tests; repository-wide quality-gate runs; controlled media experiment with the bundled FFmpeg; atom-level inspection of every output preset and engine; comparison of hashes, sample tables and edit lists.
 
 This report is analysis only. No application source file was modified.
@@ -24,7 +26,7 @@ There are two families of engines:
    - Add either **ISO-BMFF `free` padding** (Mobile/Hybrid), **trailing ghost audio samples outside `mdat`** (PC), or nothing (Clean).
    - Hybrid additionally extends the last video sample by up to `bxd_max_tail_ms` (default 50 ms).
 
-The default GUI preset is **X1T Remux**. The four X1T presets are still registered for saved settings and the CLI but are hidden from the pickers. The default CLI strategy is whatever is in `settings.json`; new installs start at `tiktok-ts-remux`.
+The default GUI preset is **X1T Zilem** since 2.1.0. The four X1T/BXD presets are still registered for saved settings and the CLI but are hidden from the pickers. The default CLI strategy is whatever is in `settings.json`; new installs start at `zilem`. A saved `tiktok-ts-remux` from 2.0.x is migrated to `zilem` once on first 2.1.0 launch; other saved values are preserved.
 
 Two important truths about the product:
 
@@ -398,6 +400,77 @@ Note the repaired file is **not** byte-identical to the Clean preset: it reconst
 - H4: only stripped `edts`.
 
 However, the constructor always forces `indeterminate_mvhd = True`, so H1, H3 and H4 are **not** single-variable variants: all get `-1` `mvhd`. H2 is built from H3 and inherits that state. The test `test_phase0_isolation_variants_h1_to_h4` currently asserts H1's indeterminate header and never checks H3/H4's `mvhd`, so it blesses the bug. The hypothesis generator should not be treated as scientifically clean until the flag is honoured.
+
+### 9.6 X1T Zilem (2.1.0)
+
+`core/zilem_patcher.py` is a fifth, separate direct engine. It is not a BXD
+variant and never calls FFmpeg. It reproduces the Zilem v1 container
+fingerprint by extending and duplicating the audio track while leaving every
+H.264 and AAC sample payload untouched.
+
+**Accepted input.** `_validate_source()` parses the top-level boxes and the
+`moov` tree, then requires:
+
+- no `moof`/`mvex` (non-fragmented MP4);
+- exactly one video track with an `avc1`/`avc3` sample entry;
+- exactly one audio track with an `mp4a` sample entry, 2 channels, 48,000 Hz,
+  and an AudioSpecificConfig whose first 13 bits are AAC-LC/48 kHz/stereo
+  (a sync-extension tail is tolerated);
+- variable-size `stsz` tables and 32-bit `stco` offsets, with a size guard
+  below 4 GiB.
+
+Anything else raises `ZilemSourceError` before the output file is opened.
+
+**Transform.** `build_zilem()` copies the source byte-for-byte, then:
+
+1. rewrites the old top-level `moov` type to `free` (size and payload are not
+   changed);
+2. appends an 8-byte `mdat` header plus 17 copies of the 6-byte AAC-LC silence
+   frame `21 10 04 60 8c 1c` (110 bytes);
+3. rebuilds the source audio track and a clone:
+   - `stts` +17 samples at 1,024 samples/frame;
+   - `stsz` +17 six-byte samples;
+   - `stsc` +2 chunks (9 and 8 frames);
+   - `stco` +2 offsets into the appended `mdat`;
+   - `sgpd`/`sbgp` roll groups extended to cover the new samples;
+   - `mdhd`, `tkhd`, and `elst` durations advanced by 17,408 audio ticks;
+   - primary `stsd` holds two entries (original + alternate); the clone holds
+     one entry;
+4. adds `udta/meta/ilst/©too` to the video track with the neutral tag
+   `X1T Zilem v1`, keeping existing track metadata and dropping the old
+   movie-level `udta`;
+5. updates `mvhd` duration and `next_track_ID`, then writes the rebuilt `moov`
+   at EOF.
+
+The 1080p reference pair has this layout:
+
+```
+ftyp 32
+free 80,548                    (old moov, type changed)
+mdat 161,394,760               (source video + audio, unchanged)
+mdat 110                       (17 silence frames)
+moov 100,951                   (rebuilt)
+free 71                        (reference trailer; production omits it)
+```
+
+The reference tag
+`TikQuick Quality Method - https://tikquick.online/ - v25 - Orion` is only a
+golden-test input. Production always writes `X1T Zilem v1`. With the reference
+tag supplied, `build_zilem()` matches the reference file byte-for-byte up to
+the 71-byte trailer.
+
+**Pipeline integration.** The `zilem` strategy is `direct = True`, so it needs
+no FFmpeg. `patcher.patch()` skips `make_plan()`, the preflight stage, and the
+colour/metadata rewrite. The target timescale is ignored, and the default
+output name is `<stem>_zilem.mp4`. `verify_zilem_output()` re-checks the size,
+top-level order, `ftyp`, the old-`moov`-as-`free` payload, every source `mdat`
+hash, the silence frames, the two audio tracks, the durations, and the tag.
+The golden test is gated by `FPS_ZILEM_SOURCE` and `FPS_ZILEM_REFERENCE` and
+skips when the real fixture is absent.
+
+**Limits.** Zilem cannot improve codec, resolution, frame rate, or bitrate; it
+does not claim to bypass TikTok transcoding; and it rejects fragmented MP4,
+multi-track inputs, non-H.264 video, and non-AAC-LC/48 kHz/stereo audio.
 
 ---
 

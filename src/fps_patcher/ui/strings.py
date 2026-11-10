@@ -180,6 +180,11 @@ STRINGS: dict[str, dict[str, str]] = {
         "default_target_preset": "Default Target FPS",
         "default_timescale": "Default Timescale",
         "default_strategy": "Default Preset",
+        "default_strategy_hint": (
+            "X1T Zilem is the default: it rewrites the MP4 container only and "
+            "never re-encodes video or audio."
+        ),
+        "zilem_tip": "Container-only • no re-encode • no quality loss",
         "bxd_padding_lbl": "Custom X1T Padding Bytes (0 = Auto, max 512 MB)",
         "bxd_tail_ms_lbl": "X1T Hybrid Tail Extension Ceiling (ms)",
         "mask_paths_lbl": "Mask file paths & username in Diagnostic Logs",
@@ -626,6 +631,11 @@ STRINGS: dict[str, dict[str, str]] = {
         "default_target_preset": "FPS เริ่มต้น",
         "default_timescale": "Timescale เริ่มต้น",
         "default_strategy": "พรีเซ็ตเริ่มต้น (Default Preset)",
+        "default_strategy_hint": (
+            "X1T Zilem เป็นค่าเริ่มต้น: ปรับเฉพาะคอนเทนเนอร์ MP4 "
+            "โดยไม่เข้ารหัสวิดีโอหรือเสียงใหม่"
+        ),
+        "zilem_tip": "ปรับคอนเทนเนอร์เท่านั้น • คุณภาพไม่ลด",
         "bxd_padding_lbl": "ขนาด X1T Padding กำหนดเอง (0 = อัตโนมัติ, สูงสุด 512 MB)",
         "bxd_tail_ms_lbl": "เพดานขยายเฟรมสุดท้าย X1T Hybrid (ms)",
         "mask_paths_lbl": "ซ่อนเส้นทางไฟล์และชื่อผู้ใช้ใน Diagnostic Log",

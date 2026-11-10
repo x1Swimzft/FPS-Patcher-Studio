@@ -112,7 +112,7 @@ class Settings:
     output_dir: str = ""  # empty = same folder as source
     last_preset: str = "60 FPS"
     custom_timescale: int = 90000
-    strategy: str = "tiktok-ts-remux"
+    strategy: str = "zilem"
     appearance: str = "dark"
     overwrite: bool = False
     auto_rename: bool = True
@@ -160,6 +160,9 @@ class Settings:
     bitrate_target_mbps: int = 16
     check_updates_on_start: bool = True
     updates_default_migrated: bool = False
+    # 2.1.0 moved the shipped default from X1T Remux to X1T Zilem. The old
+    # default is migrated once; any other saved preset is left untouched.
+    zilem_default_migrated: bool = False
 
     # V2 FFmpeg
     check_ffmpeg_on_start: bool = True
@@ -242,6 +245,10 @@ class Settings:
             "true",
             "yes",
         )
+        raw_zilem_migrated = raw.get("zilem_default_migrated", False)
+        zilem_needs_migration = raw_zilem_migrated is not True and str(
+            raw_zilem_migrated
+        ).lower() not in ("1", "true", "yes")
         if needs_migration:
             try:
                 old_alpha = float(raw.get("window_alpha", 1.0))
@@ -259,7 +266,7 @@ class Settings:
             return cls()
 
         instance._clamp()
-        if needs_migration:
+        if needs_migration or zilem_needs_migration:
             instance.save(path)
         return instance
 
@@ -269,6 +276,12 @@ class Settings:
         if migrated_from is not None:
             self.migrated_strategy_from = migrated_from
         self.strategy = new_strat
+
+        # 2.1.0 default switch: only the old shipped default is upgraded.
+        if not self.zilem_default_migrated:
+            if self.strategy == "tiktok-ts-remux":
+                self.strategy = "zilem"
+            self.zilem_default_migrated = True
 
         if self.theme_preset not in THEME_PRESETS:
             self.theme_preset = DEFAULT_THEME_PRESET

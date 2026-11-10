@@ -66,8 +66,9 @@ def _ffmpeg_decode_check(ff: FFmpegPaths, target: Path) -> tuple[int, str]:
 
 
 def test_ui_presets_and_strategy_migration(tmp_path: Path) -> None:
-    # UI_PRESETS exposes the four lossless BXD presets plus the two lossy TS ones.
+    # UI_PRESETS exposes Zilem, the four lossless BXD presets and the lossy TS ones.
     assert set(UI_PRESETS.keys()) == {
+        "zilem",
         "bxd-pc",
         "bxd-mobile",
         "bxd-hybrid",
@@ -76,6 +77,8 @@ def test_ui_presets_and_strategy_migration(tmp_path: Path) -> None:
         "tiktok-ts-1080",
         "tiktok-ts-remux",
     }
+    assert UI_PRESETS["zilem"].label == "X1T Zilem"
+    assert UI_PRESETS["x1t-zilem"].label == "X1T Zilem"
     assert UI_PRESETS["bxd-pc"].label in ("X1T For PC", "Bxd For PC")
     assert UI_PRESETS["bxd-mobile"].label in ("X1T For Mobile", "Bxd For Mobile")
     assert UI_PRESETS["x1t-pc"].label == "X1T For PC"
@@ -94,6 +97,8 @@ def test_ui_presets_and_strategy_migration(tmp_path: Path) -> None:
     assert migrate_strategy_name("tiktok-ts") == ("tiktok-ts", None)
     assert migrate_strategy_name("tiktok-ts-1080") == ("tiktok-ts-1080", None)
     assert migrate_strategy_name("tiktok-ts-remux") == ("tiktok-ts-remux", None)
+    assert migrate_strategy_name("zilem") == ("zilem", None)
+    assert migrate_strategy_name("x1t-zilem") == ("zilem", None)
 
     # Settings._clamp migrates legacy strategy and records migrated_strategy_from
     s = Settings(strategy="ffmpeg-copy")

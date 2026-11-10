@@ -89,10 +89,10 @@ def _make_clip(ff: FFmpegPaths, out: Path, fps: str, audio: bool = True) -> Path
         f"testsrc=size=320x240:rate={fps}:duration=2",
     ]
     if audio:
-        cmd += ["-f", "lavfi", "-i", "sine=frequency=440:duration=2"]
+        cmd += ["-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=2"]
     cmd += ["-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p"]
     if audio:
-        cmd += ["-c:a", "aac", "-shortest"]
+        cmd += ["-c:a", "aac", "-ar", "48000", "-ac", "2", "-shortest"]
     cmd.append(str(out))
     subprocess.run(cmd, check=True)
     return out

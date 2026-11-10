@@ -264,7 +264,11 @@ def _cmd_patch(args: argparse.Namespace, settings: Settings) -> int:
     fix_vfr = bool(args.fix_vfr or settings.auto_fix_vfr)
     fix_codec = bool(args.fix_codec or settings.auto_fix_codec)
     cap_resolution = bool(args.cap_resolution or settings.auto_cap_resolution)
-    if fix_vfr or fix_codec or cap_resolution:
+    active_strategy = get_strategy(strategy)
+    skips_preflight = active_strategy.name == "zilem" or active_strategy.name.startswith(
+        "tiktok-ts"
+    )
+    if (fix_vfr or fix_codec or cap_resolution) and not skips_preflight:
         print(
             "[WARN] Lossy video re-encode enabled (VFR/codec/resolution auto-fix). "
             "The video stream will be re-encoded to H.264.",

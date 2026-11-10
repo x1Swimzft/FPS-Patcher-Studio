@@ -264,6 +264,23 @@ class TikTokTSRemuxStrategy:
         ]
 
 
+class ZilemStrategy:
+    """X1T Zilem: container-only MP4 rewrite with no re-encode.
+
+    Keeps the original H.264 samples and AAC-LC 48 kHz stereo audio, extends the
+    audio with silent frames, duplicates the audio track and writes a strict
+    ISO-BMFF ``moov`` at the end of the file. The FFmpeg argument builder is
+    never used: :func:`fps_patcher.core.zilem_patcher.build_zilem` does the work.
+    """
+
+    name = "zilem"
+    label = "X1T Zilem"
+    direct = True
+
+    def build_args(self, req: PatchRequest, info: VideoInfo, out: Path) -> list[str]:
+        raise RuntimeError("X1T Zilem does not use FFmpeg arguments.")
+
+
 class _PresetDict(dict[str, PatchStrategy]):
     """Preset mapping dictionary with transparent x1t-* alias support."""
 
@@ -272,6 +289,7 @@ class _PresetDict(dict[str, PatchStrategy]):
         "x1t-mobile": "bxd-mobile",
         "x1t-hybrid": "bxd-hybrid",
         "x1t-clean": "bxd-clean",
+        "x1t-zilem": "zilem",
     }
 
     def __getitem__(self, key: str) -> PatchStrategy:
@@ -285,6 +303,7 @@ class _PresetDict(dict[str, PatchStrategy]):
 
 
 UI_PRESETS: dict[str, PatchStrategy] = _PresetDict({
+    "zilem": ZilemStrategy(),
     "bxd-pc": BXDPCtrategy(),
     "bxd-mobile": BXDMobileStrategy(),
     "bxd-hybrid": BXDHybridStrategy(),
@@ -311,6 +330,7 @@ def visible_presets() -> list[PatchStrategy]:
     return [UI_PRESETS[key] for key in VISIBLE_PRESET_KEYS]
 
 STRATEGIES: dict[str, PatchStrategy] = {
+    "zilem": UI_PRESETS["zilem"],
     "bxd-pc": UI_PRESETS["bxd-pc"],
     "bxd-mobile": UI_PRESETS["bxd-mobile"],
     "bxd-hybrid": UI_PRESETS["bxd-hybrid"],
@@ -318,6 +338,7 @@ STRATEGIES: dict[str, PatchStrategy] = {
     "tiktok-ts": UI_PRESETS["tiktok-ts"],
     "tiktok-ts-1080": UI_PRESETS["tiktok-ts-1080"],
     "tiktok-ts-remux": UI_PRESETS["tiktok-ts-remux"],
+    "x1t-zilem": UI_PRESETS["zilem"],
     "x1t-pc": UI_PRESETS["bxd-pc"],
     "x1t-mobile": UI_PRESETS["bxd-mobile"],
     "x1t-hybrid": UI_PRESETS["bxd-hybrid"],
@@ -335,6 +356,7 @@ _STRATEGY_ALIASES: dict[str, str] = {
     "timescale+movie": "ffmpeg-copy",
     "bxd-bypass": "bxd-experimental",
     "x1t-bypass": "bxd-experimental",
+    "x1t-zilem": "zilem",
     "x1t-pc": "bxd-pc",
     "x1t-mobile": "bxd-mobile",
     "x1t-hybrid": "bxd-hybrid",
@@ -365,6 +387,7 @@ def migrate_strategy_name(name: str) -> tuple[str, str | None]:
     Returns (resolved_preset_key, original_legacy_key_if_migrated).
     """
     if name in (
+        "zilem",
         "bxd-pc",
         "bxd-mobile",
         "bxd-hybrid",
@@ -374,6 +397,8 @@ def migrate_strategy_name(name: str) -> tuple[str, str | None]:
         "tiktok-ts-remux",
     ):
         return name, None
+    if name == "x1t-zilem":
+        return "zilem", None
     if name in ("x1t-pc", "x1t-mobile", "x1t-hybrid", "x1t-clean"):
         return name.replace("x1t-", "bxd-"), None
     if name in _UI_MIGRATION_MAP:

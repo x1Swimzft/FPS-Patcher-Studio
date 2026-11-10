@@ -231,6 +231,7 @@ class Inspector(QWidget):
         resolved_key, _ = migrate_strategy_name(str(self.settings.strategy))
         resolved_preset = UI_PRESETS.get(resolved_key)
         self._sync_preset_items(self.strategy_combo, resolved_preset)
+        self._update_strategy_tip(resolved_key)
         self.strategy_combo.activated.connect(self._strategy_activated)
         self.strategy_row = self.output_group.add_row(
             t("strategy_lbl", lang), self.strategy_combo
@@ -1238,8 +1239,13 @@ QWidget#Inspector QProgressBar::chunk {{
         self.settings.strategy = key
         self.settings.save_async()
         self._sync_preset_items(self.strategy_combo, UI_PRESETS.get(key))
+        self._update_strategy_tip(key)
         self._update_warn(key)
         self.strategy_changed.emit()
+
+    def _update_strategy_tip(self, strategy_key: str) -> None:
+        tip = t("zilem_tip", self._lang()) if strategy_key == "zilem" else ""
+        self.strategy_combo.setToolTip(tip)
 
     def _update_warn(self, strategy_key: str) -> None:
         self.warn_row.setVisible(strategy_key in PC_PRESET_KEYS)

@@ -229,6 +229,7 @@ def test_patch_tiktok_ts_runs_ts_branches(ff: FFmpegPaths, tmp_path: Path) -> No
 
 def test_x1t_presets_are_hidden_from_pickers() -> None:
     assert VISIBLE_PRESET_KEYS == (
+        "zilem",
         "tiktok-ts",
         "tiktok-ts-1080",
         "tiktok-ts-remux",
@@ -239,8 +240,8 @@ def test_x1t_presets_are_hidden_from_pickers() -> None:
         assert get_strategy(key).name == key
 
 
-def test_new_install_defaults_to_tiktok_ts_remux() -> None:
-    assert Settings().strategy == "tiktok-ts-remux"
+def test_new_install_defaults_to_zilem() -> None:
+    assert Settings().strategy == "zilem"
 
 
 def test_ts_verify_rejects_wrong_1080_size(tmp_path: Path) -> None:

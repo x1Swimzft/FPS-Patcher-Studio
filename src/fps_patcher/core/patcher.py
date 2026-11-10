@@ -46,6 +46,7 @@ from .strategies import get_strategy
 from .v4_patcher import MethodV4DirectPatch
 from .verifier import verify, verify_payload_integrity
 from .win_job import NamedMutex
+from .zilem_patcher import build_zilem, verify_zilem_output
 
 Emit = Callable[[LogEvent | ProgressEvent], None]
 
@@ -66,11 +67,14 @@ def validate_input(path: Path) -> None:
 
 def output_base_for(req: PatchRequest) -> Path:
     """Deterministic output name before collision handling."""
+    is_zilem = req.strategy in ("zilem", "x1t-zilem")
     is_x1t = req.strategy.startswith(("bxd-", "x1t-"))
     is_ts = req.strategy.startswith("tiktok-ts")
-    force_mp4 = is_ts or (is_x1t and req.src.suffix.lower() == ".mov")
+    force_mp4 = is_zilem or is_ts or (is_x1t and req.src.suffix.lower() == ".mov")
     out_ext = ".mp4" if force_mp4 else req.src.suffix
     if not req.filename_template:
+        if is_zilem:
+            return req.out_dir / f"{req.src.stem}_zilem.mp4"
         return req.out_dir / f"{req.src.stem}_ts{req.timescale}{out_ext}"
     # config imports core.models, so import here to keep the module graph acyclic.
     from ..config import render_filename_template
@@ -291,6 +295,7 @@ def patch(
 
     strategy = get_strategy(req.strategy)
     is_ts = strategy.name.startswith("tiktok-ts")
+    is_zilem = strategy.name == "zilem"
     if not strategy.direct and paths is None:
         raise FFmpegNotFoundError(
             f"Strategy '{strategy.label}' requires FFmpeg executable, but FFmpeg is not configured."
@@ -311,6 +316,10 @@ def patch(
     if strategy.name == "tiktok-ts-remux" and before.codec != "h264":
         raise PatchError(
             "X1T Remux requires an H.264 source; use X1T 1080p to re-encode."
+        )
+    if is_zilem and before.codec != "h264":
+        raise PatchError(
+            f"X1T Zilem requires an H.264 source; found '{before.codec}'."
         )
     trigger_mbps = BITRATE_TRIGGER_BPS // 1_000_000
     if before.bit_rate is not None and before.bit_rate > BITRATE_TRIGGER_BPS:
@@ -352,7 +361,7 @@ def patch(
     work_before = before
     plan = (
         None
-        if is_ts
+        if (is_ts or is_zilem)
         else make_plan(
             before,
             normalize_audio=req.auto_normalize_audio,
@@ -464,7 +473,20 @@ def patch(
             )
             color_done = True
 
-        if strategy.name == "v4-forensic":
+        if strategy.name == "zilem":
+            emit(LogEvent(f"Executing {strategy.label}...", "INFO"))
+
+            def zilem_log(msg: str) -> None:
+                emit(LogEvent(msg, "DEBUG"))
+
+            build_zilem(
+                work_src,
+                tmp,
+                cancel_event=cancel_event,
+                on_progress=lambda fraction: emit(ProgressEvent(fraction)),
+                on_log=zilem_log,
+            )
+        elif strategy.name == "v4-forensic":
             emit(LogEvent("Executing Method V4 Forensic Lossless Patch...", "INFO"))
 
             def v4_log(msg: str) -> None:
@@ -564,6 +586,13 @@ def patch(
                 )
             elif is_ts:
                 emit(LogEvent("[COLOR] skipped: not ISO-BMFF", "WARN"))
+            elif is_zilem:
+                emit(
+                    LogEvent(
+                        "[COLOR] skipped: X1T Zilem rewrites the container only",
+                        "WARN",
+                    )
+                )
             else:
                 try:
                     colr = sanitize(
@@ -611,22 +640,33 @@ def patch(
                 norm_strat = strategy.name.replace("x1t-", "bxd-")
                 if norm_strat == "bxd-hybrid" and req.bxd_max_tail_ms > 0:
                     dur_tol = max(0.25, (req.bxd_max_tail_ms / 1000.0) + 0.1)
-                warnings = verify(
-                    work_before, after, req.timescale, duration_tolerance_s=dur_tol
-                )
-                for w in warnings:
-                    emit(LogEvent(w, "WARN"))
-
-                # Output detailed payload integrity log
-                integrity = verify_payload_integrity(work_src, tmp)
-                experimental = any(status == "EXPERIMENTAL" for status in integrity.values())
-                for item, status in integrity.items():
-                    level: LogLevel = (
-                        "OK"
-                        if status == "PASS"
-                        else ("WARN" if status == "EXPERIMENTAL" else "ERROR")
+                if is_zilem:
+                    verify_zilem_output(work_src, tmp)
+                    emit(
+                        LogEvent(
+                            "[VERIFY] Zilem container fingerprint PASS",
+                            "OK",
+                        )
                     )
-                    emit(LogEvent(f"[VERIFY] {item:<18} {status}", level))
+                else:
+                    warnings = verify(
+                        work_before, after, req.timescale, duration_tolerance_s=dur_tol
+                    )
+                    for w in warnings:
+                        emit(LogEvent(w, "WARN"))
+
+                    # Output detailed payload integrity log
+                    integrity = verify_payload_integrity(work_src, tmp)
+                    experimental = any(
+                        status == "EXPERIMENTAL" for status in integrity.values()
+                    )
+                    for item, status in integrity.items():
+                        level: LogLevel = (
+                            "OK"
+                            if status == "PASS"
+                            else ("WARN" if status == "EXPERIMENTAL" else "ERROR")
+                        )
+                        emit(LogEvent(f"[VERIFY] {item:<18} {status}", level))
         else:
             emit(LogEvent("[VERIFY] Skipped: verify_after is disabled.", "WARN"))
 

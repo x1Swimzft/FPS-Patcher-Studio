@@ -1,5 +1,48 @@
 # Release Notes
 
+## v2.1.0 - 2026-11-10 (X1T Zilem)
+
+Version 2.1.0 adds `X1T Zilem`, a container-only MP4 preset that becomes the
+new default. It reproduces the Zilem v1 container fingerprint without touching
+the encoded video or audio, so the patch is lossless by construction.
+
+**The Windows build is unsigned; verify the release SHA-256 before running.**
+
+### Added
+
+- **X1T Zilem (`zilem`)** — accepts a non-fragmented MP4 with one H.264 video
+  track and one AAC-LC 48 kHz stereo audio track. It converts the old `moov` to
+  `free`, appends 17 silent AAC frames, extends the audio track, adds a
+  duplicate audio track that shares the same chunks, writes a rebuilt `moov`
+  at the end of the file, and tags the video track `X1T Zilem v1`.
+- Box-level output verification and a golden test against the real reference
+  pair. The 161 MB fixture is not shipped.
+- `docs/ZILEM_METHOD.md` with the full transform, accepted inputs, and limits.
+
+### Changed
+
+- `X1T Zilem` is now the default for new installs and CLI runs without
+  `--strategy`. `X1T Remux` remains available.
+- A saved preset is migrated to Zilem only when it is exactly
+  `tiktok-ts-remux`; every other saved choice is preserved.
+- Zilem output is `<stem>_zilem.mp4`. It ignores the target FPS and skips
+  preflight auto-fixes plus the colour/metadata rewrite.
+- The README and website now present Zilem first.
+
+### Compatibility
+
+- Zilem rejects fragmented MP4, multiple video/audio tracks, HEVC/AV1/VP9
+  video, non-AAC audio, non-48 kHz or non-stereo audio, and files above the
+  32-bit chunk-offset limit. Use `X1T 1080p` or `X1T 60fps` for a lossy
+  re-encode, or remux the source first.
+- TikTok upload behaviour is not guaranteed. Matching a container fingerprint
+  is not proof that TikTok will skip transcoding.
+
+### Verification
+
+- Full pytest suite, ruff, and mypy clean, plus the golden Zilem comparison on
+  the real reference pair and a Windows release smoke test.
+
 ## v2.0.1 - 2026-11-04 (PC color rewrite hotfix)
 
 Version 2.0.1 fixes a blocking X1T For PC failure when the color tag or

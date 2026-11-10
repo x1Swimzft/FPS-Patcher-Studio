@@ -134,7 +134,7 @@ def test_cli_remediation_flags_reach_request_and_warn_once(
             "--fix-codec",
             "--cap-resolution",
         ],
-        Settings(),
+        Settings(strategy="ffmpeg-copy"),
     )
 
     assert code == 0
@@ -180,13 +180,34 @@ def test_cli_settings_enabled_remediation_warns_and_applies(
 
     code = cli_main(
         ["patch", str(clip)],
-        Settings(auto_cap_resolution=True),
+        Settings(auto_cap_resolution=True, strategy="ffmpeg-copy"),
     )
 
     assert code == 0
     assert len(captured) == 1
     assert captured[0].auto_cap_resolution is True
     assert capsys.readouterr().err.splitlines() == [_LOSSY_WARNING]
+
+
+def test_cli_zilem_suppresses_preflight_warning(
+    ff: FFmpegPaths,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: Any,
+) -> None:
+    clip = tmp_path / "clip.mp4"
+    clip.write_bytes(b"x")
+    captured: list[PatchRequest] = []
+    _bind_cli_fakes(monkeypatch, ff, captured)
+
+    code = cli_main(
+        ["patch", str(clip), "--strategy", "zilem"],
+        Settings(auto_fix_vfr=True, auto_fix_codec=True, auto_cap_resolution=True),
+    )
+
+    assert code == 0
+    assert len(captured) == 1
+    assert capsys.readouterr().err == ""
 
 
 def test_cli_and_quick_patch_imports_stay_qt_free() -> None:

@@ -264,9 +264,15 @@ def test_verify_dynamic_tolerance_default() -> None:
 # ---------- end-to-end ----------
 
 
-# tiktok-ts presets are lossy re-encodes covered by test_tiktok_ts_strategy.py.
+# tiktok-ts presets are lossy re-encodes covered by test_tiktok_ts_strategy.py;
+# Zilem ignores the target timescale and is covered by test_zilem_patcher.py.
 @pytest.mark.parametrize(
-    "strategy", sorted(k for k in STRATEGIES if not k.startswith("tiktok-ts"))
+    "strategy",
+    sorted(
+        k
+        for k in STRATEGIES
+        if not k.startswith("tiktok-ts") and k not in ("zilem", "x1t-zilem")
+    ),
 )
 @pytest.mark.parametrize("timescale", [60000, 120000])
 def test_patch_end_to_end(

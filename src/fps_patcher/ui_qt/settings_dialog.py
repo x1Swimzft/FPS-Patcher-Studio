@@ -1037,6 +1037,7 @@ class SettingsDialog(QDialog):
             current_strategy.label if current_strategy else strategy_labels[0],
             lambda _value: self._update_template_preview(),
         )
+        self._hint(target, "default_strategy_hint")
 
         safety = self._card(grid, 2, 1)
         self._verify = self._switch(safety, "verify_after", draft.verify_after)
