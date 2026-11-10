@@ -510,7 +510,7 @@ def test_zilem_migration_only_touches_the_old_default() -> None:
         assert settings.strategy == saved
         assert settings.zilem_default_migrated is True
 
-    # A later explicit return to X1T Remux is preserved once migration ran.
+    # A later explicit return to X1T 720p is preserved once migration ran.
     explicit = Settings(strategy="tiktok-ts-remux", zilem_default_migrated=True)
     explicit._clamp()
     assert explicit.strategy == "tiktok-ts-remux"

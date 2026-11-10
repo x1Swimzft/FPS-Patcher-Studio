@@ -1,4 +1,4 @@
-# AI Codebase Summary — FPS Patcher Studio (v2.2.2)
+# AI Codebase Summary — FPS Patcher Studio (v2.2.3)
 
 > **Purpose**: Master architecture, codebase map, state lifecycle, and operational guide for autonomous AI agents and engineers working on **FPS Patcher Studio**.
 
@@ -8,13 +8,13 @@
 
 - **Repository**: `fps-patcher-studio`
 - **Root Path**: `E:\Project\fps-patcher-studio`
-- **Current Version**: `2.2.2` (2026-11-10)
+- **Current Version**: `2.2.3` (2026-11-10)
 - **Python Target**: Python 3.11+
 - **Desktop Stack**: PySide6 `6.12.0`, Pillow, PyInstaller one-folder build
 - **Primary Domain**: High-precision ISO-BMFF (MP4/MOV/M4V) container timing patcher. It modifies video timescales, sample duration tables (`stts`), composition offsets (`ctts`), track/movie headers (`mvhd`, `tkhd`, `mdhd`), and edit lists (`edts`/`elst`) losslessly at the binary atom level **without re-encoding video frames** unless the optional bitrate cap is enabled.
 - **User Interface**: Qt is the only UI (`src/fps_patcher/ui_qt/`), with English and Thai localization, light/dark themes, seven theme presets, drag-and-drop, thumbnails, and a bottom activity console.
 - **Headless Surface**: `src/fps_patcher/cli.py` (`--cli patch|probe|score`), plus `--quick-patch` for the Explorer verb.
-- **Release Status**: v2.2.2 is built, tagged and published on GitHub Releases; the build is **unsigned** and uses published SHA-256 checksums for updates.
+- **Release Status**: v2.2.3 is built, tagged and published on GitHub Releases; the build is **unsigned** and uses published SHA-256 checksums for updates.
 
 ---
 
@@ -31,7 +31,7 @@ E:\Project\fps-patcher-studio\
 │   ├── version_info.txt            # Windows PE version metadata
 │   └── fps_patcher.manifest        # DPI/long-path aware application manifest
 ├── src\fps_patcher\
-│   ├── __init__.py                 # __version__ = "2.2.2", APP_NAME
+│   ├── __init__.py                 # __version__ = "2.2.3", APP_NAME
 │   ├── __main__.py                 # Entry dispatch: --cli, --quick-patch, Qt GUI
 │   ├── cli.py                      # Headless CLI: patch | probe | score
 │   ├── config.py                   # Settings persistence and clamping
@@ -93,7 +93,7 @@ E:\Project\fps-patcher-studio\
 │   └── make_icon.py
 ├── docs\                           # Policies, roadmap, signing, handoff checklists
 ├── release\                        # Built installers, zips, checksums, SBOM
-├── pyproject.toml                  # Version 2.2.2, PySide6 pin, tool config
+├── pyproject.toml                  # Version 2.2.3, PySide6 pin, tool config
 ├── uv.lock                         # Locked dependency graph
 ├── README.md
 ├── CHANGELOG.md
@@ -416,7 +416,7 @@ legacy `_ts<timescale>` naming, single-platform runs, lossless atom patching and
 **Compatibility and limits**: all new behavior is opt-in and the re-encoding
 fixes are lossy. Parallel batches may reorder files when `stop_on_error` is off.
 The preflight semaphore and the job-history writes are process-local, so two app
-instances can still encode or write history simultaneously. v2.2.2 is built,
+instances can still encode or write history simultaneously. v2.2.3 is built,
 tagged and published on GitHub Releases with unsigned SHA-256 updates.
 
 ---

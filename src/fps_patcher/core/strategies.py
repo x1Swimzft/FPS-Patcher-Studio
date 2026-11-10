@@ -282,7 +282,7 @@ class ZilemStrategy:
 
 
 class ZilemV3Strategy:
-    """X1T Zilem V3: the reference-exact Zilem container.
+    """X1T 1080p (``zilem-v3``): the reference-exact Zilem container.
 
     Same byte-preserving transform as :class:`ZilemStrategy`, plus the original
     reference tag and the ``ZETA_OPTIMIZED/3`` free-box trailer. It exists for
@@ -295,7 +295,7 @@ class ZilemV3Strategy:
     direct = True
 
     def build_args(self, req: PatchRequest, info: VideoInfo, out: Path) -> list[str]:
-        raise RuntimeError("X1T Zilem V3 does not use FFmpeg arguments.")
+        raise RuntimeError("X1T 1080p does not use FFmpeg arguments.")
 
 
 class _PresetDict(dict[str, PatchStrategy]):

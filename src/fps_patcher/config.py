@@ -160,8 +160,9 @@ class Settings:
     bitrate_target_mbps: int = 16
     check_updates_on_start: bool = True
     updates_default_migrated: bool = False
-    # 2.1.0 moved the shipped default from X1T Remux to X1T Zilem. The old
-    # default is migrated once; any other saved preset is left untouched.
+    # 2.1.0 moved the shipped default from X1T 720p (formerly X1T Remux) to
+    # X1T Zilem. The old default is migrated once; any other saved preset is
+    # left untouched.
     zilem_default_migrated: bool = False
 
     # V2 FFmpeg

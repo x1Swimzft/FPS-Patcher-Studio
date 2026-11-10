@@ -1,5 +1,33 @@
 # Release Notes
 
+## v2.2.3 - 2026-11-10 (Preset names)
+
+Version 2.2.3 changes only the visible preset labels. Internal keys
+(`zilem-v3`, `tiktok-ts-remux`, `tiktok-ts-1080`), aliases, behavior and output
+naming are unchanged.
+
+### Changed
+
+- `zilem-v3` now shows as **X1T 1080p** — the lossless, reference-exact Zilem
+  container. It does not resize the video.
+- `tiktok-ts-remux` now shows as **X1T 720p**.
+- `tiktok-ts-1080` now shows as **X1T 1080p Re-encode** so it no longer collides
+  with the lossless preset above.
+- `zilem` stays **X1T Zilem**; `tiktok-ts` stays **X1T 60fps**.
+- Queue pills use the short forms `X1T 1080p`, `X1T 720p`, `X1T 1080 RE`.
+- Error messages and hints now point at **X1T 1080p Re-encode** for lossy
+  re-encodes, avoiding confusion with the lossless **X1T 1080p**.
+
+### Verification
+
+- 687 tests, 2 skipped; ruff and mypy clean.
+- All visible preset labels are unique; internal keys and aliases unchanged.
+
+**The Windows build is unsigned; verify the release SHA-256 before running.**
+
+Auto Update remains enabled by default and will offer this build on the next
+startup.
+
 ## v2.2.2 - 2026-11-10 (General settings cleanup)
 
 Version 2.2.2 cleans up Settings → General. It is a UI-only change: patching
