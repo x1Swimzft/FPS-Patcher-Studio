@@ -59,7 +59,7 @@ def text_role(label: QLabel, role: str) -> QLabel:
 
 
 def card_caption(text: str) -> QLabel:
-    label = QLabel(text.upper())
+    label = QLabel(text)
     label.setProperty("role", "cardCaption")
     return label
 
@@ -151,7 +151,7 @@ class InsetRow(QWidget):
         super().__init__(parent)
         self._theme = theme
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(theme.inner, 0, theme.inner, 0)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(theme.spacing)
         self.label = QLabel(label)
         self.label.setProperty("role", "caption")
@@ -161,7 +161,7 @@ class InsetRow(QWidget):
         if right is not None:
             layout.addWidget(right, 0, Qt.AlignmentFlag.AlignVCenter)
         # Tall enough for Thai line boxes at the L scale without wasting space.
-        self.setFixedHeight(max(34, theme.fonts.body + 21))
+        self.setFixedHeight(max(40, theme.fonts.body + 26))
         self._line = hairline(theme)
         self._line.setParent(self)
         self._line.setGeometry(0, 31, self.width(), 1)
@@ -181,7 +181,7 @@ class InsetRow(QWidget):
 
 
 class CardGroup(QWidget):
-    """Uppercase caption above a rounded inset card."""
+    """Caption above a flat body; the surrounding inspector is the card."""
 
     def __init__(self, caption: str, theme: Theme, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -213,8 +213,10 @@ class CardGroup(QWidget):
 
     def set_theme(self, theme: Theme) -> None:
         self._theme = theme
-        self.caption.setStyleSheet(f"color: {theme.color('text2')};")
-        self.card.set_theme(theme)
+        self.caption.setStyleSheet(f"color: {theme.color('muted')};")
+        self.card.setStyleSheet(
+            "QFrame#Card { background: transparent; border: none; }"
+        )
         for row in self._rows:
             row.set_theme(theme)
 
@@ -612,8 +614,8 @@ class SegmentedControl(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         rect = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
         radius = theme.control_radius
-        painter.setPen(QPen(QColor(theme.color("border_control")), 1))
-        painter.setBrush(QColor(theme.color("console_bg")))
+        painter.setPen(QPen(QColor(theme.color("border")), 1))
+        painter.setBrush(QColor(theme.color("surface_raised")))
         painter.drawRoundedRect(rect, radius, radius)
 
         width = rect.width() / len(self._items)
@@ -623,20 +625,20 @@ class SegmentedControl(QWidget):
             width - 4,
             rect.height() - 4,
         )
-        painter.setPen(QPen(QColor(theme.color("border")), 1))
-        painter.setBrush(QColor(theme.color("surface_raised")))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(theme.color("surface_hover")))
         painter.drawRoundedRect(thumb, max(2, radius - 2), max(2, radius - 2))
 
         font = QFont(self.font())
         font.setPixelSize(theme.fonts.body)
-        font.setWeight(QFont.Weight.DemiBold)
-        painter.setFont(font)
         for index, item in enumerate(self._items):
             area = QRectF(rect.left() + width * index, rect.top(), width, rect.height())
-            selected = (
-                theme.color("accent") if index == self._index else theme.color("text2")
+            selected = index == self._index
+            font.setWeight(
+                QFont.Weight.DemiBold if selected else QFont.Weight.Medium
             )
-            painter.setPen(QColor(selected))
+            painter.setFont(font)
+            painter.setPen(QColor(theme.color("text" if selected else "text2")))
             painter.drawText(area, Qt.AlignmentFlag.AlignCenter, item)
 
         if self.hasFocus():

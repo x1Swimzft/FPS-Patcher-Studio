@@ -14,8 +14,8 @@ bg `#0a0a0f` · surface `#111118` · raised `#191923` · hover `#23262b` · bord
 text `#ecebf2` · text2 `#c9c8d6` · muted `#9a99ab`
 accent `#c8283f` · accent-hover `#d93450` · accent-light `#ff5a70` · accent-dim `#2a1119` · accent-dim-border `#6b1f30`
 success `#4ade80` · warn `#d6a45f` · danger `#ff8a99`
-inspector `#111118` · console `#0a0a0f` (border `#242432`) · toolbar = bg
-glow (single, painted behind shell content): radial-gradient(720px 460px at 2% -8%, rgba(200,40,63,0.2), transparent 65%)
+inspector = one inset `#111118` card (radius 14, 1px border) · console `#0a0a0f` (border `#242432`) · toolbar/queue gutters transparent over bg so the glow passes through
+glow (single, painted behind shell content): radial-gradient(720px 460px at 2% -8%, rgba(200,40,63,0.15), transparent 65%)
 
 ### Colour — light
 bg `#f5f1f2` · surface `#ffffff` · raised `#f7f2f3` · hover `#eee6e8` · border `#e3d8db`
@@ -28,17 +28,20 @@ Keep all seven preset names (Obsidian, Crimson Gamer, Midnight Violet, Emerald T
 
 ### Shape, density, metrics
 Radii: card 14 · control 10 · input 10 · chips/pills 999 · progress rails pill.
-Window 1040x700 (min 880x600). Toolbar 48. Inspector 300. Console 32 collapsed / 180 expanded. Body 13px (S 12 / L 15), caption 12, badge 11, mono 12 (Cascadia Mono). Button 30, primary 44, segmented 32, entry/combo 30, icon button 28, switch 38x22 with a 16px knob, progress 4.
+Default density Comfortable (outer 6 / inner 10 / spacing 12); Compact stays selectable. Window 1040x700 (min 880x600). Toolbar 48. Inspector 300. Console 32 collapsed / 180 expanded. Body 13px (S 12 / L 15), caption 12, badge 11, mono 12 (Cascadia Mono). Button 30, primary 44, segmented 32, entry/combo 30, icon button 28, switch 38x22 with a 16px knob, progress 4.
 
 ### Components
 - Card: `#111118`, 1px `#242432`, radius 14, no shadow.
-- Buttons: secondary `#191923` + 1px border, radius 10; primary = accent fill, white 600 text, radius 10; ghost = transparent + border.
+- Buttons: secondary = `rgba(255,255,255,0.04)` fill + `rgba(255,255,255,0.12)` border, radius 10; accent-secondary = accent 0.16 fill + accent-light 0.45 border + accent-light text; primary = accent fill, white 600 text, radius 10; ghost = transparent + border.
 - Chips (technical tags): 26-34px pill, 1px border, raised bg; active = accent-dim bg + accent-dim-border ring + accent-light text.
 - Segmented control: track `#191923` + 1px border, radius 10, moving thumb `#23262b`, active label `#ecebf2` 600.
 - Switch: 38x22 pill; off `#23262b`; on accent; 16px knob; 140ms.
 - Progress: 4px pill rail; fill linear-gradient(90deg, `#c8283f`, `#ff5a70`); done = success.
 - Status dot: 6-7px circle + 12px label, success/warn/danger only — never a filled banner for a non-error.
-- Drop card: 1px dashed border, radius 14, muted icon + "Drop MP4, MOV, or M4V here".
+- Drop card: the whole queue area is one `#111118` panel with a 1px dashed border and radius 14; muted 32px icon + "Drop MP4, MOV, or M4V here" + capsule format chips. The Active Patch Profile row sits below the panel, not inside it.
+- Inspector: one bordered card (radius 14, 6px shell inset); group captions are 12/600 muted sentence case; rows are 40px with hairline separators; disabled Start Patch is neutral glass, not crimson.
+- Settings rail: surface card (radius 14); active nav uses accent 0.16 fill + accent-light 0.45 border, `#ecebf2` label and accent-light icon. Appearance page is two independent columns: Theme Preset + UI Scale on the left, Appearance/Layout density + Custom Accent + Glass rows on the right; preset cards use a 40px background/accent preview bar.
+- Segmented control: raised track, `surface_hover` active thumb, active label `#ecebf2` 600, inactive text2 500.
 - Rows: hairline separators, 40-44px rhythm, title 13/500, meta 12 muted.
 
 ### Motion

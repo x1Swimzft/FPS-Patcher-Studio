@@ -9,7 +9,6 @@ from PySide6.QtWidgets import QApplication
 
 from .theme import (
     MONO_FONT_FAMILIES,
-    RADIUS_PILL,
     UI_FONT_FAMILIES,
     Theme,
     load_qt_fonts,
@@ -81,12 +80,13 @@ QWidget#Root {{
     background: {c("bg")};
 }}
 QWidget#Toolbar {{
-    background: {c("toolbar_bg")};
-    border-bottom: 1px solid {c("border")};
+    background: transparent;
+    border: none;
 }}
 QWidget#Inspector {{
-    background: {c("inspector_bg")};
-    border-left: 1px solid {c("border")};
+    background: {c("surface")};
+    border: 1px solid {c("border")};
+    border-radius: {card}px;
 }}
 QWidget#Console {{
     background: {c("console_bg")};
@@ -132,16 +132,26 @@ QLabel[role="value"] {{
     font-weight: 600;
 }}
 QLabel[role="badge"] {{
-    background: {c("accent_dim")};
-    border: 1px solid {c("accent_dim_border")};
-    border-radius: {RADIUS_PILL}px;
-    color: {c("accent_light")};
+    background: {c("surface")};
+    border: 1px solid {c("border")};
+    border-radius: 6px;
+    color: {c("muted")};
     font-size: {badge}px;
     font-weight: 600;
     padding: 1px {outer + 2}px;
 }}
+QLabel[role="appTitle"] {{
+    color: {c("text")};
+    font-size: {body}px;
+    font-weight: 600;
+}}
+QLabel[role="profileTitle"] {{
+    color: {c("text")};
+    font-size: {body}px;
+    font-weight: 500;
+}}
 QLabel[role="cardCaption"] {{
-    color: {c("text2")};
+    color: {c("muted")};
     font-size: {caption}px;
     font-weight: 600;
 }}
@@ -183,9 +193,9 @@ QPushButton[variant="primary"]:pressed {{
     border-color: {c("accent_pressed")};
 }}
 QPushButton[variant="primary"]:disabled {{
-    background: {c("accent_dim")};
-    border-color: {c("accent_dim_border")};
-    color: {c("muted")};
+    background: {glass_fill};
+    border-color: {glass_border};
+    color: rgba(154, 153, 171, 0.7);
 }}
 QPushButton[variant="secondary"] {{
     background: {glass_fill};
@@ -199,6 +209,21 @@ QPushButton[variant="secondary"]:hover {{
 }}
 QPushButton[variant="secondary"]:pressed {{
     background: {glass_hover};
+}}
+QPushButton[variant="accentGlass"] {{
+    background: {accent_glass};
+    border: 1px solid {accent_glass_border};
+    color: {c("accent_light")};
+    font-weight: 500;
+    min-height: {secondary - 2}px;
+    padding: 0 {inner + 2}px;
+}}
+QPushButton[variant="accentGlass"]:hover {{
+    background: {_rgba(c("accent"), 0.24)};
+    border-color: {_rgba(c("accent_light"), 0.6)};
+}}
+QPushButton[variant="accentGlass"]:pressed {{
+    background: {_rgba(c("accent"), 0.3)};
 }}
 QPushButton[variant="secondary"]:disabled, QPushButton[variant="ghost"]:disabled,
 QPushButton[variant="icon"]:disabled {{
@@ -233,6 +258,9 @@ QPushButton[variant="icon"]:hover {{
 }}
 QPushButton[variant="icon"]:pressed {{
     background: {c("surface_raised")};
+}}
+QPushButton[pill="true"] {{
+    border-radius: 999px;
 }}
 QPushButton#SectionHeader {{
     background: transparent;
@@ -539,7 +567,15 @@ QPushButton#SettingsNavPill:hover {{
 QPushButton#SettingsNavPill[active="true"] {{
     background: {accent_glass};
     border: 1px solid {accent_glass_border};
-    color: {c("accent_light")};
+    color: {c("text")};
+}}
+QFrame#SettingsRail {{
+    background: {c("surface")};
+    border: 1px solid {c("border")};
+    border-radius: {card}px;
+}}
+QLineEdit#SettingsSearch {{
+    background: {c("surface_raised")};
 }}
 QFrame#PresetSwatchCard {{
     background: {c("surface")};
@@ -552,7 +588,7 @@ QFrame#PresetSwatchCard:hover {{
 }}
 QFrame#PresetSwatchCard[selected="true"] {{
     background: {c("accent_dim")};
-    border: 2px solid {c("accent")};
+    border: 1px solid {c("accent_light")};
 }}
 QLabel#QueueThumb {{
     background: {c("console_bg")};

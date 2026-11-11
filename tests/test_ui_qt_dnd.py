@@ -193,7 +193,7 @@ def test_profile_strip_follows_preset_strategy_and_output(
     queue_view: QueueView, tmp_path: Path
 ) -> None:
     queue_view.refresh_profile()
-    summary = queue_view.drop_card.profile_summary.fullText()
+    summary = queue_view.profile_summary.fullText()
     assert "60 FPS" in summary
     assert "X1T 1080p" in summary
     assert t("drop_profile_output_same", "en") in summary
@@ -202,11 +202,11 @@ def test_profile_strip_follows_preset_strategy_and_output(
     queue_view.settings.strategy = "bxd-clean"
     queue_view.settings.output_dir = str(tmp_path)
     queue_view.refresh_profile()
-    summary = queue_view.drop_card.profile_summary.fullText()
+    summary = queue_view.profile_summary.fullText()
     assert "120 FPS" in summary
     assert "X1T Clean" in summary
     assert t("drop_profile_output_custom", "en") in summary
-    assert queue_view.drop_card.profile_title.text() == t("active_patch_profile", "en")
+    assert queue_view.profile_title.text() == t("active_patch_profile", "en")
 
 
 @pytest.mark.filterwarnings("ignore::DeprecationWarning")

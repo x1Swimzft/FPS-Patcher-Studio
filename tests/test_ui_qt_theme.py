@@ -108,7 +108,7 @@ def test_make_theme_resolves_mode_density_metrics_and_preset() -> None:
     dark = make_theme(Settings())
     assert dark.mode == "dark"
     assert dark.color("bg") == PRESETS["Crimson Gamer"].bg[1]
-    assert (dark.outer, dark.inner, dark.spacing) == (4, 6, 8)
+    assert (dark.outer, dark.inner, dark.spacing) == (6, 10, 12)
     assert dark.metrics.window_width == 1040
     assert dark.metrics.window_height == 700
     assert dark.metrics.min_width == 880
@@ -128,8 +128,8 @@ def test_make_theme_resolves_mode_density_metrics_and_preset() -> None:
     system = make_theme(Settings(appearance="system"))
     assert system.mode == "dark"
 
-    comfortable = make_theme(Settings(layout_density="Comfortable"))
-    assert (comfortable.outer, comfortable.inner, comfortable.spacing) == (6, 10, 12)
+    compact = make_theme(Settings(layout_density="Compact"))
+    assert (compact.outer, compact.inner, compact.spacing) == (4, 6, 8)
 
     accent = make_theme(Settings(custom_accent="#FF00FF"))
     assert accent.color("accent") == "#ff00ff"
@@ -198,7 +198,7 @@ def test_build_qss_uses_theme_values_and_variant_switches() -> None:
     assert "max-height: 32px;" in qss
     assert "padding: 0px 16px;" in qss
 
-    assert build_qss(make_theme(Settings(layout_density="Comfortable"))) != qss
+    assert build_qss(make_theme(Settings(layout_density="Compact"))) != qss
     assert build_qss(make_theme(Settings(radius_style="Sharp"))) != qss
     assert build_qss(make_theme(Settings(font_size="L"))) != qss
     assert build_qss(make_theme(Settings(theme_preset="Graphite"))) != qss
@@ -275,11 +275,11 @@ def test_settings_round_trip_keeps_layout_density(tmp_path: Path) -> None:
     assert Settings.load(path).layout_density == "Comfortable"
 
     path.write_text(json.dumps({"theme_preset": "Graphite"}), encoding="utf-8")
-    assert Settings.load(path).layout_density == "Compact"
+    assert Settings.load(path).layout_density == "Comfortable"
 
     stale = Settings(layout_density="Cozy")
     stale._clamp()
-    assert stale.layout_density == "Compact"
+    assert stale.layout_density == "Comfortable"
 
 
 def test_body_text_contrast_meets_wcag_aa() -> None:

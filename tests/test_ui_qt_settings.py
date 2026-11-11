@@ -162,10 +162,10 @@ def test_seven_preset_swatches_select_and_preview(qtbot: Any, appdata: Path) -> 
     cards = dialog.findChildren(QFrame, "PresetSwatchCard")
     assert len(cards) == 7
     assert dialog._preset.itemText(0) == "Crimson Gamer"
-    assert next(iter(dialog._preset_cards)) == "Crimson Gamer"
+    assert next(iter(dialog._preset_cards)) == "Obsidian"
     assert set(dialog._preset_cards) == set(dialog._preset.itemText(i) for i in range(7))
     assert sum(card.property("selected") == "true" for card in cards) == 1
-    assert all(len(cast(Any, card).dots) == 3 for card in cards)
+    assert all(cast(Any, card).preview.height() == 40 for card in cards)
 
     graphite = dialog._preset_cards["Graphite"]
     qtbot.mouseClick(graphite, Qt.MouseButton.LeftButton)
@@ -300,7 +300,7 @@ def test_legacy_json_applies_all_keys_and_cancel_restores_theme(
     payload = json.loads(path.read_text(encoding="utf-8"))
     expected_keys = {item.name for item in fields(Settings) if item.init}
     assert set(payload) == expected_keys
-    assert payload["layout_density"] == "Compact"
+    assert payload["layout_density"] == "Comfortable"
     assert payload["theme_preset"] == "Crimson Gamer"
     assert payload["window_alpha"] == 1.0
     assert payload["qt_v090_migrated"] is True

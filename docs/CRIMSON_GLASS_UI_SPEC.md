@@ -325,3 +325,13 @@ These four corrections were found after the first handoff and are already applie
 2. **The icon cache key includes the tint** — `(name, dark, tint or "")` — so a tinted icon cannot be returned to a later untinted caller.
 3. **`inspector.py::_local_qss` no longer duplicates app-QSS rules** (see §5 item 11). Exception: font-size-only rules for inspector labels and buttons remain because `tests/test_ui_qt_typography.py` reads the widget stylesheet directly; they set no colors, borders or backgrounds.
 4. **Both radius assertions were updated**, not only the density/corner test: `test_make_theme_resolves_mode_density_metrics_and_preset` also pinned Normal at `(8, 6)`.
+
+## 15. Fidelity pass against the approved drafts (applied)
+
+The first build matched the tokens but not the approved canvas layout. These changes close that gap; where this section conflicts with §5, this section wins.
+
+- **Queue area**: the whole queue area is one `#111118` panel with a 1px dashed border and radius 14. The empty state sits centered inside it (32px muted icon, 15/500 title, 12px caption, accent-glass Add Files, glass Add Folder, capsule MP4/MOV/M4V chips). The Active Patch Profile row is a sibling below the panel, not a card footer.
+- **Inspector**: one surface card with a 1px border and radius 14, inset by the shell margin. Group cards are flat; captions are 12/600 muted sentence case; rows are 40px; the readiness hint is a raised rounded box; the disabled Start Patch is neutral glass (solid accent only when enabled).
+- **Shell**: toolbar and queue gutters are transparent so the single radial glow (accent at 0.15) shows through; app icon 24px, title 13/600, neutral version badge and neutral FFmpeg status pill. Default density is Comfortable (6/10/12); Compact remains a user choice.
+- **Settings**: the rail is a surface card; the active nav label is `#ecebf2` with an accent-light icon. The Appearance page is two independent columns: Theme Preset (40px background/accent preview cards, draft order) + UI Scale on the left; Appearance/Layout density rows + Custom Accent + Glass rows on the right. No Appearance "Advanced" collapsible.
+- **Segmented control**: raised track, `surface_hover` active thumb, active label `#ecebf2` 600, inactive `text2` 500 (no accent-colored active label).

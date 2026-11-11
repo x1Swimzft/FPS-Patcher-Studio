@@ -11,8 +11,23 @@ from dataclasses import fields
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QPropertyAnimation, QSignalBlocker, QSize, Qt, Signal
-from PySide6.QtGui import QKeyEvent, QMouseEvent
+from PySide6.QtCore import (
+    QPropertyAnimation,
+    QRectF,
+    QSignalBlocker,
+    QSize,
+    Qt,
+    Signal,
+)
+from PySide6.QtGui import (
+    QColor,
+    QKeyEvent,
+    QMouseEvent,
+    QPainter,
+    QPainterPath,
+    QPaintEvent,
+    QPen,
+)
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -68,18 +83,27 @@ from .widgets import (
     SegmentedControl,
     Switch,
     WrapLabel,
+    hairline,
     set_prop,
     text_button,
 )
 
+_PRESET_DISPLAY_ORDER = (
+    "Obsidian",
+    "Crimson Gamer",
+    "Midnight Violet",
+    "Emerald Terminal",
+    "Graphite",
+    "Amber Warm",
+    "Light",
+)
+
 SWATCHES = [
-    "#A5803C",
-    "#4F7391",
-    "#6D55A8",
-    "#2F7A6C",
-    "#A8323E",
-    "#A86E1E",
-    "#5C636B",
+    "#D9646B",
+    "#8FB0C9",
+    "#C8283F",
+    "#6FB3A8",
+    "#B7A0E8",
 ]
 CUSTOM_PRESET = "Custom"
 
@@ -107,8 +131,47 @@ QStackedWidget { background: transparent; }
 """
 
 
+class _PresetPreview(QWidget):
+    """Mini theme preview: preset background with an accent stripe."""
+
+    def __init__(
+        self,
+        tokens: ThemeTokens,
+        preset_name: str,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self._tokens = tokens
+        self._preset_name = preset_name
+        self.setFixedHeight(40)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+
+    def set_colors(self, tokens: ThemeTokens, preset_name: str) -> None:
+        self._tokens = tokens
+        self._preset_name = preset_name
+        self.update()
+
+    def paintEvent(self, _event: QPaintEvent) -> None:
+        index = 0 if self._preset_name == "Light" else 1
+        theme = self._tokens
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        rect = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        path = QPainterPath()
+        path.addRoundedRect(rect, 6, 6)
+        painter.fillPath(path, QColor(theme.bg[index]))
+        painter.setClipPath(path)
+        stripe = QRectF(rect.right() - 16, rect.top(), 16, rect.height())
+        painter.fillRect(stripe, QColor(theme.accent[index]))
+        painter.setClipping(False)
+        painter.setPen(QPen(QColor(theme.border[index]), 1))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRoundedRect(rect, 6, 6)
+        painter.end()
+
+
 class _PresetCard(QFrame):
-    """Clickable visual preset swatch: mini bg/surface/accent dots plus name."""
+    """Clickable theme preset: name above a mini background/accent preview."""
 
     clicked = Signal(str)
 
@@ -128,35 +191,33 @@ class _PresetCard(QFrame):
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 8, 10, 8)
-        layout.setSpacing(6)
-        dots = QHBoxLayout()
-        dots.setContentsMargins(0, 0, 0, 0)
-        dots.setSpacing(4)
-        self.dots: list[QLabel] = []
-        for _index in range(3):
-            dot = QLabel()
-            dot.setFixedSize(12, 12)
-            dots.addWidget(dot)
-            self.dots.append(dot)
-        dots.addStretch(1)
-        layout.addLayout(dots)
-
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(8)
         self.name_label = QLabel(name)
         self.name_label.setProperty("role", "caption")
         self.name_label.setWordWrap(True)
         layout.addWidget(self.name_label)
+        self.preview = _PresetPreview(tokens, name, self)
+        layout.addWidget(self.preview)
+        self._selected = False
+        self._name_text = tokens.text[1]
+        self._name_text2 = tokens.text2[1]
         self.set_colors(tokens, mode)
 
     def set_colors(self, tokens: ThemeTokens, mode: str) -> None:
-        index = 0 if mode == "light" else 1
-        border = tokens.border[index]
-        for dot, pair in zip(
-            self.dots, (tokens.bg, tokens.surface, tokens.accent), strict=True
-        ):
-            dot.setStyleSheet(
-                f"background: {pair[index]}; border: 1px solid {border}; border-radius: 6px;"
-            )
+        index = 0 if self.preset_name == "Light" else 1
+        self._name_text = tokens.text[index]
+        self._name_text2 = tokens.text2[index]
+        self.preview.set_colors(tokens, self.preset_name)
+        self._apply_name_color()
+
+    def set_selected(self, selected: bool) -> None:
+        self._selected = bool(selected)
+        self._apply_name_color()
+
+    def _apply_name_color(self) -> None:
+        color = self._name_text if self._selected else self._name_text2
+        self.name_label.setStyleSheet(f"color: {color};")
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
@@ -258,6 +319,7 @@ class SettingsDialog(QDialog):
         self._root.addLayout(body_row, 1)
         self._root.addWidget(self._build_footer(theme), 0)
         self._select_tab("general")
+        self._nav_buttons["general"].setFocus()
         self._sync_preset_cards()
 
     def _build_rail(self, theme: Theme) -> Card:
@@ -431,18 +493,164 @@ class SettingsDialog(QDialog):
         self._themed_widgets.append(card)
         return layout
 
-    def _card_in(self, layout: QVBoxLayout) -> QVBoxLayout:
+    def _card_in(
+        self,
+        layout: QVBoxLayout,
+        *,
+        pad: int = 14,
+        gap: int = 8,
+    ) -> QVBoxLayout:
         """Add a content-sized card to a column and return its body layout."""
         theme = self._theme_manager.theme
         card = Card(theme)
         card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
         body = QVBoxLayout()
-        body.setContentsMargins(14, 12, 14, 12)
-        body.setSpacing(8)
+        body.setContentsMargins(pad, pad, pad, pad)
+        body.setSpacing(gap)
         card.body.addLayout(body)
         layout.addWidget(card)
         self._themed_widgets.append(card)
         return body
+
+    def _setting_row(
+        self,
+        layout: QVBoxLayout,
+        label: QLabel,
+        control: QWidget,
+        *,
+        divider: bool = True,
+        height: int = 44,
+        pad: int = 16,
+    ) -> None:
+        theme = self._theme_manager.theme
+        row = QWidget()
+        row.setFixedHeight(height)
+        box = QHBoxLayout(row)
+        box.setContentsMargins(pad, 0, pad, 0)
+        box.setSpacing(theme.spacing)
+        box.addWidget(label, 1)
+        box.addWidget(control, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        layout.addWidget(row)
+        if divider:
+            layout.addWidget(hairline(theme))
+
+    def _row_label(self, key: str) -> QLabel:
+        label = QLabel(self._tr(key))
+        label.setProperty("settingsSearch", True)
+        label.setWordWrap(True)
+        return label
+
+    def _row_segmented(
+        self,
+        layout: QVBoxLayout,
+        key: str,
+        items: list[str],
+        current: str,
+        on_change: Callable[[str], None],
+        *,
+        width: int,
+        divider: bool = True,
+    ) -> SegmentedControl:
+        theme = self._theme_manager.theme
+        label = self._row_label(key)
+        control = SegmentedControl(items, theme)
+        control.set_reduce_motion(bool(self._draft.reduce_motion))
+        if current in items:
+            control.set_value(current)
+        control.setFixedWidth(width)
+        control.setAccessibleName(label.text())
+        control.valueChanged.connect(on_change)
+        self._themed_widgets.append(control)
+        self._setting_row(layout, label, control, divider=divider)
+        return control
+
+    def _row_combo(
+        self,
+        layout: QVBoxLayout,
+        key: str,
+        items: list[str],
+        current: str,
+        on_change: Callable[[str], None],
+        *,
+        width: int = 170,
+        divider: bool = True,
+    ) -> QComboBox:
+        label = self._row_label(key)
+        combo = QComboBox()
+        combo.addItems(items)
+        combo.setCurrentText(current if current in items else items[0])
+        combo.setFixedWidth(width)
+        combo.setAccessibleName(label.text())
+        label.setBuddy(combo)
+        combo.currentTextChanged.connect(on_change)
+        self._setting_row(layout, label, combo, divider=divider)
+        return combo
+
+    def _row_spin(
+        self,
+        layout: QVBoxLayout,
+        key: str,
+        value: int,
+        minimum: int,
+        maximum: int,
+        step: int = 1,
+        suffix: str = "",
+        *,
+        width: int = 92,
+        divider: bool = True,
+    ) -> QSpinBox:
+        label = self._row_label(key)
+        spin = QSpinBox()
+        spin.setRange(minimum, maximum)
+        spin.setSingleStep(step)
+        spin.setAccelerated(True)
+        spin.setSuffix(suffix)
+        spin.setValue(value)
+        spin.setFixedWidth(width)
+        spin.setAccessibleName(label.text())
+        label.setBuddy(spin)
+        self._setting_row(layout, label, spin, divider=divider)
+        return spin
+
+    def _row_slider(
+        self,
+        layout: QVBoxLayout,
+        key: str,
+        value: int,
+        minimum: int,
+        maximum: int,
+        *,
+        width: int = 170,
+        divider: bool = True,
+    ) -> QSlider:
+        label = self._row_label(key)
+        slider = QSlider(Qt.Orientation.Horizontal)
+        slider.setRange(minimum, maximum)
+        slider.setValue(value)
+        slider.setFixedWidth(width)
+        slider.setAccessibleName(label.text())
+        label.setBuddy(slider)
+        self._setting_row(layout, label, slider, divider=divider)
+        return slider
+
+    def _row_switch(
+        self,
+        layout: QVBoxLayout,
+        key: str,
+        checked: bool,
+        *,
+        divider: bool = True,
+    ) -> Switch:
+        theme = self._theme_manager.theme
+        label = self._row_label(key)
+        switch = Switch(theme)
+        switch.set_reduce_motion(bool(self._draft.reduce_motion))
+        switch.setChecked(checked)
+        switch.setAccessibleName(label.text())
+        switch.setToolTip(label.text())
+        self._themed_widgets.append(switch)
+        self._setting_row(layout, label, switch, divider=divider)
+        return switch
 
     def _advanced(
         self,
@@ -672,7 +880,24 @@ class SettingsDialog(QDialog):
         draft = self._draft
         theme = self._theme_manager.theme
 
-        preset = self._card(grid, 1, 0)
+        left_col = QVBoxLayout()
+        left_col.setContentsMargins(0, 0, 0, 0)
+        left_col.setSpacing(GRID_GAP)
+        right_col = QVBoxLayout()
+        right_col.setContentsMargins(0, 0, 0, 0)
+        right_col.setSpacing(GRID_GAP)
+        left_host = QWidget()
+        left_host.setLayout(left_col)
+        right_host = QWidget()
+        right_host.setLayout(right_col)
+        for host in (left_host, right_host):
+            host.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+            )
+        grid.addWidget(left_host, 1, 0, Qt.AlignmentFlag.AlignTop)
+        grid.addWidget(right_host, 1, 1, Qt.AlignmentFlag.AlignTop)
+
+        preset = self._card_in(left_col, pad=16, gap=12)
         self._field_label(preset, "theme_preset")
         self._hint(preset, "settings_helper_preset")
         self._preset = QComboBox()
@@ -692,22 +917,45 @@ class SettingsDialog(QDialog):
         swatch_grid.setColumnStretch(0, 1)
         swatch_grid.setColumnStretch(1, 1)
         mode = "light" if draft.appearance == "light" else "dark"
-        for index, name in enumerate(THEME_PRESETS):
+        for index, name in enumerate(_PRESET_DISPLAY_ORDER):
             card = _PresetCard(name, PRESETS[name], mode)
             card.clicked.connect(self._choose_preset)
             swatch_grid.addWidget(card, index // 2, index % 2)
             self._preset_cards[name] = card
         preset.addLayout(swatch_grid)
 
-        custom = self._card(grid, 1, 1, expand=True)
+        ui_card = self._card_in(left_col, pad=0, gap=0)
+        self._ui_scale = self._row_spin(
+            ui_card, "ui_scale", draft.ui_scale, 50, 200, 5, "%"
+        )
+        self._radius = self._row_segmented(
+            ui_card,
+            "radius_style",
+            RADIUS_STYLES,
+            draft.radius_style,
+            lambda value: self._set_and_preview("radius_style", value),
+            width=204,
+        )
+        self._font_size = self._row_combo(
+            ui_card,
+            "font_size",
+            FONT_SIZES,
+            draft.font_size,
+            self._on_font_size,
+            width=140,
+            divider=False,
+        )
+
+        mode_card = self._card_in(right_col, pad=0, gap=0)
         self._appearance_labels = [self._tr("mode_dark"), self._tr("mode_light")]
         current_mode = self._appearance_labels[1 if draft.appearance == "light" else 0]
-        self._appearance = self._segmented(
-            custom,
-            "appearance_mode",
+        self._appearance = self._row_segmented(
+            mode_card,
+            "tab_appearance",
             self._appearance_labels,
             current_mode,
             self._on_appearance,
+            width=156,
         )
 
         self._density_labels = [
@@ -719,30 +967,29 @@ class SettingsDialog(QDialog):
             if draft.layout_density == "Comfortable"
             else self._density_labels[0]
         )
-        self._density = self._segmented(
-            custom,
+        self._density = self._row_segmented(
+            mode_card,
             "layout_density",
             self._density_labels,
             current_density,
             self._on_density,
+            width=206,
+            divider=False,
         )
-        self._hint(custom, "settings_helper_density")
 
-        advanced = self._advanced(grid, 2, 0, column_span=2)
-        self._field_label(advanced, "custom_accent")
+        custom = self._card_in(right_col, pad=16, gap=10)
+        self._field_label(custom, "custom_accent")
+        self._hint(custom, "settings_helper_accent")
+        accent_row = QHBoxLayout()
+        accent_row.setSpacing(10)
         self._accent = QLineEdit(draft.custom_accent)
         self._accent.setPlaceholderText("#RRGGBB")
         self._accent.setAccessibleName(self._tr("custom_accent"))
+        self._accent.setFixedWidth(120)
         self._accent.textChanged.connect(self._on_accent)
-        advanced.addWidget(self._accent)
-        self._hint(advanced, "settings_helper_accent")
-
-        swatch_label = QLabel(self._tr("accent_swatches"))
-        swatch_label.setProperty("role", "caption")
-        swatch_label.setProperty("settingsSearch", True)
-        advanced.addWidget(swatch_label)
+        accent_row.addWidget(self._accent)
         swatch_row = QHBoxLayout()
-        swatch_row.setSpacing(theme.outer)
+        swatch_row.setSpacing(8)
         for color in SWATCHES:
             button = QPushButton()
             button.setProperty("variant", "icon")
@@ -755,49 +1002,30 @@ class SettingsDialog(QDialog):
             self._swatches.append((button, color))
             swatch_row.addWidget(button)
         swatch_row.addStretch(1)
-        advanced.addLayout(swatch_row)
+        accent_row.addLayout(swatch_row, 1)
+        custom.addLayout(accent_row)
 
-        self._ui_scale = self._spin(
-            advanced, "ui_scale", draft.ui_scale, 50, 200, 5, "%"
-        )
-        self._hint(advanced, "settings_helper_scale")
-
-        columns = QHBoxLayout()
-        columns.setSpacing(theme.spacing)
-        left = QVBoxLayout()
-        right = QVBoxLayout()
-        self._glass = self._switch(left, "glass_effect", draft.glass)
-        self._backdrop = self._combo(
-            left,
+        glass_card = self._card_in(right_col, pad=0, gap=0)
+        self._glass = self._row_switch(glass_card, "glass_effect", draft.glass)
+        self._backdrop = self._row_combo(
+            glass_card,
             "glass_mode",
             BACKDROP_MODES,
             draft.glass_mode,
             lambda value: setattr(self._draft, "glass_mode", value),
         )
-        self._tint = self._slider(left, "tint_strength", draft.tint_strength, 0, 100)
-        self._alpha = self._slider(
-            left, "window_alpha", round(draft.window_alpha * 100), 85, 100
+        self._tint = self._row_slider(
+            glass_card, "tint_strength", draft.tint_strength, 0, 100
+        )
+        self._alpha = self._row_slider(
+            glass_card, "window_alpha", round(draft.window_alpha * 100), 85, 100
         )
         self._alpha.valueChanged.connect(
             lambda value: self.setWindowOpacity(max(0.85, min(1.0, value / 100.0)))
         )
-        self._font_size = self._combo(
-            right, "font_size", FONT_SIZES, draft.font_size, self._on_font_size
+        self._reduce_motion = self._row_switch(
+            glass_card, "reduce_motion", draft.reduce_motion, divider=False
         )
-        self._radius = self._segmented(
-            right,
-            "radius_style",
-            RADIUS_STYLES,
-            draft.radius_style,
-            lambda value: self._set_and_preview("radius_style", value),
-        )
-        self._reduce_motion = self._switch(right, "reduce_motion", draft.reduce_motion)
-        self._hint(right, "settings_helper_motion")
-        left.addStretch(1)
-        right.addStretch(1)
-        columns.addLayout(left, 1)
-        columns.addLayout(right, 1)
-        advanced.addLayout(columns)
 
     def _choose_preset(self, name: str) -> None:
         if name != self._preset.currentText():
@@ -811,8 +1039,10 @@ class SettingsDialog(QDialog):
         theme = self._theme_manager.theme
         current = self._preset.currentText()
         for name, card in self._preset_cards.items():
-            set_prop(card, "selected", "true" if name == current else "false")
+            selected = name == current
+            set_prop(card, "selected", "true" if selected else "false")
             card.set_colors(PRESETS[name], theme.mode)
+            card.set_selected(selected)
 
     def _on_preset(self, value: str) -> None:
         self._draft.theme_preset = value

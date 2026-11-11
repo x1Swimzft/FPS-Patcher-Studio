@@ -138,7 +138,7 @@ class Settings:
     ui_scale: int = 100
     font_size: str = "M"
     radius_style: str = "Normal"
-    layout_density: str = "Compact"
+    layout_density: str = "Comfortable"
     reduce_motion: bool = False
     qt_v090_migrated: bool = True
 
@@ -307,7 +307,7 @@ class Settings:
         if self.radius_style not in RADIUS_STYLES:
             self.radius_style = "Normal"
         if self.layout_density not in LAYOUT_DENSITIES:
-            self.layout_density = "Compact"
+            self.layout_density = "Comfortable"
         if self.notify_done not in NOTIFY_MODES:
             self.notify_done = "none"
         if self.language not in LANGUAGES:

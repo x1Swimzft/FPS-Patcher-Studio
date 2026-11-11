@@ -177,12 +177,12 @@ def test_rich_empty_state_has_actions_badges_and_profile_strip(
         t("format_mov", "en"),
         t("format_m4v", "en"),
     ]
-    assert drop.profile_title.text() == t("active_patch_profile", "en")
-    summary = drop.profile_summary.fullText()
+    assert window.queue_view.profile_title.text() == t("active_patch_profile", "en")
+    summary = window.queue_view.profile_summary.fullText()
     assert "60 FPS" in summary
     assert "X1T 1080p" in summary
     assert t("drop_profile_output_same", "en") in summary
-    assert drop.reassure_label.text() == t("drop_reassure", "en")
+    assert window.queue_view.reassure_label.text() == t("drop_reassure", "en")
     window.close()
 
 
@@ -363,7 +363,7 @@ def test_settings_apply_refreshes_profile_strip(
 
     window._on_settings_applied(window.settings)
 
-    summary = window.queue_view.drop_card.profile_summary.fullText()
+    summary = window.queue_view.profile_summary.fullText()
     assert "120 FPS" in summary
     assert "X1T Clean" in summary
     assert t("drop_profile_output_custom", "en") in summary

@@ -109,8 +109,8 @@ def test_inset_row_grows_with_the_font_scale(qtbot: Any) -> None:
     qtbot.addWidget(medium)
     qtbot.addWidget(large)
 
-    assert medium.height() == 34
-    assert large.height() == 36
+    assert medium.height() == 40
+    assert large.height() == 41
 
 
 def test_switch_is_forty_by_twenty_two(qtbot: Any) -> None:

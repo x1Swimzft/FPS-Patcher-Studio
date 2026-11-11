@@ -132,6 +132,7 @@ class Inspector(QWidget):
         self._label_to_strategy = {s.label: s.name for s in UI_PRESETS.values()}
 
         self.setObjectName("Inspector")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
         self._build()
         # Internal subscription is idempotent because set_theme only re-styles.
@@ -171,7 +172,7 @@ class Inspector(QWidget):
         self.target_group = CardGroup(t("target_fps", lang), theme)
         target_content = QWidget()
         target_layout = QVBoxLayout(target_content)
-        target_layout.setContentsMargins(theme.inner, theme.inner, theme.inner, theme.inner)
+        target_layout.setContentsMargins(0, 0, 0, 0)
         target_layout.setSpacing(theme.outer)
         self._target_layout = target_layout
 
@@ -215,6 +216,7 @@ class Inspector(QWidget):
         )
 
         self.bitrate_field = QLabel("—")
+        self.bitrate_field.setObjectName("BitrateValue")
         self.bitrate_field.setProperty("role", "value")
         self.bitrate_field.setAlignment(
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
@@ -239,7 +241,7 @@ class Inspector(QWidget):
 
         self.profile_block = QWidget()
         profile_layout = QVBoxLayout(self.profile_block)
-        profile_layout.setContentsMargins(theme.inner, theme.outer, theme.inner, theme.outer)
+        profile_layout.setContentsMargins(0, theme.outer, 0, 0)
         profile_layout.setSpacing(theme.outer)
         self._profile_layout = profile_layout
         self.profile_label = QLabel(t("platform_profile_lbl", lang))
@@ -255,7 +257,7 @@ class Inspector(QWidget):
 
         self.warn_row = QWidget()
         warn_layout = QVBoxLayout(self.warn_row)
-        warn_layout.setContentsMargins(theme.inner, 0, theme.inner, theme.inner)
+        warn_layout.setContentsMargins(0, 0, 0, 0)
         self.warn_frame = QFrame()
         self.warn_frame.setObjectName("WarnCallout")
         frame_layout = QVBoxLayout(self.warn_frame)
@@ -468,6 +470,13 @@ class Inspector(QWidget):
         self.output_group.set_theme(theme)
         self.progress_group.set_theme(theme)
         self.readiness_card.set_theme(theme)
+        self.readiness_card.setStyleSheet(
+            "QFrame#Card {"
+            f"background: {theme.color('surface_raised')};"
+            "border: none;"
+            f"border-radius: {theme.radii.control}px;"
+            "}"
+        )
         self.override_group.set_theme(theme)
         self.segments.set_theme(theme)
         self.override_switch.set_theme(theme)
@@ -484,18 +493,14 @@ class Inspector(QWidget):
     def _apply_metrics(self, theme: Theme) -> None:
         """Density can change at runtime; keep every nested margin in sync."""
         self._body_layout.setContentsMargins(
-            theme.outer, theme.outer, theme.outer, theme.outer
-        )
-        self._body_layout.setSpacing(theme.spacing)
-        self._target_layout.setContentsMargins(
             theme.inner, theme.inner, theme.inner, theme.inner
         )
+        self._body_layout.setSpacing(theme.spacing)
+        self._target_layout.setContentsMargins(0, 0, 0, 0)
         self._target_layout.setSpacing(theme.outer)
-        self._profile_layout.setContentsMargins(
-            theme.inner, theme.outer, theme.inner, theme.outer
-        )
+        self._profile_layout.setContentsMargins(0, theme.outer, 0, 0)
         self._profile_layout.setSpacing(theme.outer)
-        self._warn_layout.setContentsMargins(theme.inner, 0, theme.inner, theme.inner)
+        self._warn_layout.setContentsMargins(0, 0, 0, 0)
         self._warn_frame_layout.setContentsMargins(
             theme.inner, theme.outer, theme.inner, theme.outer
         )
@@ -507,16 +512,14 @@ class Inspector(QWidget):
             theme.inner, theme.inner, theme.inner, theme.inner
         )
         self._progress_layout.setSpacing(theme.outer)
-        self._override_layout.setContentsMargins(
-            theme.inner, theme.inner, theme.inner, theme.inner
-        )
+        self._override_layout.setContentsMargins(0, 0, 0, 0)
         self._override_layout.setSpacing(theme.outer)
         self._override_form_layout.setSpacing(theme.outer)
         self.override_fps_edit.setFixedHeight(theme.entry_height)
         self.override_preset_combo.setFixedHeight(theme.combo_height)
         self.override_profile_combo.setFixedHeight(theme.combo_height)
         self._footer_layout.setContentsMargins(
-            theme.outer, theme.spacing, theme.outer, theme.outer
+            theme.inner + 2, theme.inner + 2, theme.inner + 2, theme.inner + 2
         )
         self._footer_layout.setSpacing(theme.spacing)
 
@@ -529,7 +532,7 @@ class Inspector(QWidget):
         spacing = theme.spacing
         return f"""
 QWidget#InspectorFooter {{
-    background: {c("inspector_bg")};
+    background: transparent;
     border-top: 1px solid {c("border")};
 }}
 QScrollArea, QWidget#InspectorBody {{
@@ -546,6 +549,9 @@ QWidget#Inspector QLabel[role="caption"],
 QWidget#Inspector QLabel[role="muted"],
 QWidget#Inspector QLabel[role="cardCaption"] {{
     font-size: {caption}px;
+}}
+QLabel#BitrateValue {{
+    color: {c("muted")};
 }}
 QWidget#Inspector QPushButton {{
     font-size: {body}px;
@@ -576,8 +582,8 @@ QFrame#WarnCallout QLabel {{
 
     def _retranslate(self) -> None:
         lang = self._lang()
-        self.target_group.caption.setText(t("target_fps", lang).upper())
-        self.output_group.caption.setText(t("output_lbl", lang).upper())
+        self.target_group.caption.setText(t("target_fps", lang))
+        self.output_group.caption.setText(t("output_lbl", lang))
         self.timescale_row.label.setText(t("timescale_lbl", lang))
         self.bitrate_row.label.setText(t("bitrate_lbl", lang))
         self.bitrate_field.setAccessibleName(t("bitrate_lbl", lang))
@@ -600,7 +606,7 @@ QFrame#WarnCallout QLabel {{
             else t("start_patch", lang)
         )
         self.cancel_btn.setText(t("cancel_btn", lang))
-        self.override_group.caption.setText(t("inspector_override_title", lang).upper())
+        self.override_group.caption.setText(t("inspector_override_title", lang))
         self.override_empty.setText(t("inspector_override_no_selection", lang))
         self.override_enable_label.setText(t("inspector_override_enable", lang))
         self.override_switch.setAccessibleName(t("inspector_override_enable", lang))

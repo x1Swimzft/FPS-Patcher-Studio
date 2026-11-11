@@ -79,7 +79,6 @@ from .qss import apply_theme
 from .queue_view import QueueView
 from .settings_dialog import SettingsDialog
 from .theme import (
-    RADIUS_PILL,
     Theme,
     ThemeManager,
     apply_backdrop,
@@ -119,7 +118,7 @@ class _GlowRoot(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         colour = QColor(self._accent)
-        colour.setAlpha(51)
+        colour.setAlpha(38)
         gradient = QRadialGradient(
             QPointF(self.width() * 0.02, -self.height() * 0.08), 720
         )
@@ -260,17 +259,17 @@ class MainWindow(QMainWindow):
         if not icon_pixmap.isNull():
             self.app_icon.setPixmap(
                 icon_pixmap.scaled(
-                    28,
-                    28,
+                    24,
+                    24,
                     Qt.AspectRatioMode.KeepAspectRatio,
                     Qt.TransformationMode.SmoothTransformation,
                 )
             )
-        self.app_icon.setFixedSize(28, 28)
+        self.app_icon.setFixedSize(24, 24)
         layout.addWidget(self.app_icon, 0, Qt.AlignmentFlag.AlignVCenter)
 
         self.title_label = QLabel(t("app_title", lang))
-        self.title_label.setProperty("role", "title")
+        self.title_label.setProperty("role", "appTitle")
         layout.addWidget(self.title_label, 0, Qt.AlignmentFlag.AlignVCenter)
 
         self.version_badge = QLabel(f"v{__version__}")
@@ -281,7 +280,7 @@ class MainWindow(QMainWindow):
         self.ffmpeg_button = QPushButton()
         self.ffmpeg_button.setProperty("variant", "secondary")
         self.ffmpeg_button.setProperty("motionSkip", True)
-        self.ffmpeg_button.setFixedHeight(theme.button_height)
+        self.ffmpeg_button.setFixedHeight(26)
         self.ffmpeg_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.ffmpeg_button.clicked.connect(self._show_ffmpeg_menu)
         layout.addWidget(self.ffmpeg_button, 0, Qt.AlignmentFlag.AlignVCenter)
@@ -475,22 +474,22 @@ class MainWindow(QMainWindow):
         if state == "ready":
             text = t("ffmpeg_ok", lang)
             color = theme.color("text")
-            background = theme.color("accent_dim")
-            border = theme.color("success")
+            background = theme.color("surface")
+            border = theme.color("border")
         elif state == "missing":
             text = t("ffmpeg_not_found", lang)
             color = theme.color("text")
-            background = theme.color("surface_raised")
+            background = theme.color("surface")
             border = theme.color("danger")
         elif state == "downloading":
             text = detail or t("ffmpeg_downloading", lang, percent=0)
             color = theme.color("text2")
-            background = theme.color("surface_raised")
+            background = theme.color("surface")
             border = theme.color("border")
         else:
             text = t("checking_ffmpeg", lang)
             color = theme.color("text2")
-            background = theme.color("surface_raised")
+            background = theme.color("surface")
             border = theme.color("border")
 
         self.ffmpeg_button.setText(text)
@@ -501,7 +500,7 @@ class MainWindow(QMainWindow):
             f"background: {background};"
             f"color: {color};"
             f"border: 1px solid {border};"
-            f"border-radius: {RADIUS_PILL}px;"
+            "border-radius: 999px;"
             f"padding: 0 {theme.inner}px;"
             f"font-size: {theme.fonts.caption}px;"
             "}"
