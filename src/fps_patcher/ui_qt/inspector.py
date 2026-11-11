@@ -526,19 +526,8 @@ class Inspector(QWidget):
         caption = theme.fonts.caption
         control = theme.radii.control
         inner = theme.inner
-        outer = theme.outer
         spacing = theme.spacing
-        entry = theme.entry_height
-        combo = theme.combo_height
-        primary = theme.primary_height
-        secondary = theme.secondary_height
-        button = theme.button_height
-        bar_radius = theme.progress_height // 2
         return f"""
-QWidget#Inspector {{
-    background: {c("inspector_bg")};
-    border-left: 1px solid {c("border")};
-}}
 QWidget#InspectorFooter {{
     background: {c("inspector_bg")};
     border-top: 1px solid {c("border")};
@@ -548,130 +537,31 @@ QScrollArea, QWidget#InspectorBody {{
     border: none;
 }}
 QWidget#Inspector QLabel {{
-    background: transparent;
-    color: {c("text")};
     font-size: {body}px;
 }}
 QWidget#Inspector QLabel[role="title"] {{
     font-size: {body + 2}px;
-    font-weight: 600;
 }}
-QWidget#Inspector QLabel[role="caption"] {{
-    color: {c("text2")};
-    font-size: {caption}px;
-}}
-QWidget#Inspector QLabel[role="muted"] {{
-    color: {c("muted")};
-    font-size: {caption}px;
-}}
+QWidget#Inspector QLabel[role="caption"],
+QWidget#Inspector QLabel[role="muted"],
 QWidget#Inspector QLabel[role="cardCaption"] {{
-    color: {c("text2")};
     font-size: {caption}px;
-    font-weight: 600;
 }}
-QWidget#Inspector QLineEdit, QWidget#Inspector QComboBox {{
-    background: {c("console_bg")};
-    border: 1px solid {c("border_control")};
-    border-radius: {control}px;
-    color: {c("text")};
+QWidget#Inspector QPushButton {{
     font-size: {body}px;
-    padding: 0 {inner}px;
-}}
-QWidget#Inspector QLineEdit {{
-    min-height: {entry - 2}px;
-}}
-QWidget#Inspector QComboBox {{
-    min-height: {combo - 2}px;
-    padding-right: {inner + spacing}px;
 }}
 QWidget#Inspector QLineEdit:read-only {{
     background: {c("surface_raised")};
     color: {c("text2")};
 }}
-QWidget#Inspector QLineEdit:hover, QWidget#Inspector QComboBox:hover {{
-    border-color: {c("border_focus")};
-}}
-QWidget#Inspector QLineEdit:focus, QWidget#Inspector QComboBox:focus {{
-    border: 2px solid {c("border_focus")};
-    min-height: {entry - 4}px;
-}}
-QWidget#Inspector QPushButton:focus {{
-    min-height: {button - 4}px;
-}}
-QWidget#Inspector QPushButton[variant="primary"]:focus {{
-    min-height: {primary - 4}px;
-}}
-QWidget#Inspector QPushButton[variant="secondary"]:focus {{
-    min-height: {secondary - 4}px;
+QWidget#Inspector QComboBox {{
+    padding-right: {inner + spacing}px;
 }}
 QWidget#Inspector QComboBox::drop-down {{
     border: none;
     border-left: 1px solid {c("border")};
     width: {spacing}px;
     margin: 1px;
-}}
-QWidget#Inspector QComboBox QAbstractItemView {{
-    background: {c("surface_raised")};
-    border: 1px solid {c("border")};
-    color: {c("text")};
-    selection-background-color: {c("accent_dim")};
-    selection-color: {c("text")};
-    padding: {outer}px;
-}}
-QWidget#Inspector QPushButton {{
-    background: transparent;
-    border: 1px solid {c("border_control")};
-    border-radius: {control}px;
-    color: {c("text")};
-    font-size: {body}px;
-    min-height: {button - 2}px;
-    padding: 0 {inner}px;
-}}
-QWidget#Inspector QPushButton:hover {{
-    background: {c("surface_hover")};
-    border-color: {c("border_focus")};
-}}
-QWidget#Inspector QPushButton:disabled {{
-    background: transparent;
-    border-color: {c("border")};
-    color: {c("muted")};
-}}
-QWidget#Inspector QPushButton[variant="primary"] {{
-    background: {c("accent")};
-    border: 1px solid {c("accent")};
-    color: {c("on_accent")};
-    font-weight: 600;
-    min-height: {primary - 2}px;
-}}
-QWidget#Inspector QPushButton[variant="primary"]:hover {{
-    background: {c("accent_hover")};
-    border-color: {c("accent_hover")};
-}}
-QWidget#Inspector QPushButton[variant="primary"]:disabled {{
-    background: {c("accent_dim")};
-    border-color: {c("accent_dim_border")};
-    color: {c("muted")};
-}}
-QWidget#Inspector QPushButton[variant="secondary"] {{
-    background: transparent;
-    min-height: {secondary - 2}px;
-}}
-QWidget#Inspector QPushButton[variant="secondary"]:hover {{
-    background: {c("surface_hover")};
-}}
-QWidget#Inspector QPushButton[variant="secondary"]:disabled {{
-    background: transparent;
-    border-color: transparent;
-    color: {c("muted")};
-}}
-QWidget#Inspector QPushButton[variant="icon"] {{
-    background: transparent;
-    border: 1px solid transparent;
-    padding: 0;
-}}
-QWidget#Inspector QPushButton[variant="icon"]:hover {{
-    background: {c("surface_hover")};
-    border-color: {c("border")};
 }}
 QFrame#WarnCallout {{
     background: {c("surface_raised")};
@@ -681,17 +571,6 @@ QFrame#WarnCallout {{
 QFrame#WarnCallout QLabel {{
     color: {c("warn")};
     font-size: {caption}px;
-}}
-QWidget#Inspector QProgressBar {{
-    background: {c("border")};
-    border: none;
-    border-radius: {bar_radius}px;
-    max-height: {theme.progress_height}px;
-    min-height: {theme.progress_height}px;
-}}
-QWidget#Inspector QProgressBar::chunk {{
-    background: {c("accent")};
-    border-radius: {bar_radius}px;
 }}
 """
 

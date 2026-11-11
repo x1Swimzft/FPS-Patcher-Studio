@@ -45,6 +45,15 @@ def test_every_used_icon_has_light_and_dark_32px_assets(qapp: Any) -> None:
                 assert image.getchannel("A").getbbox() is not None, path.name
 
 
+def test_tinted_icon_does_not_poison_cache(qapp: Any) -> None:
+    plain = get_icon("settings", True)
+    tinted = get_icon("settings", True, tint="#FF5A70")
+    plain_again = get_icon("settings", True)
+    assert not tinted.isNull()
+    assert tinted.pixmap(32, 32).toImage() != plain.pixmap(32, 32).toImage()
+    assert plain_again.pixmap(32, 32).toImage() == plain.pixmap(32, 32).toImage()
+
+
 def test_get_icon_returns_qt_icon_or_null(qapp: Any) -> None:
     for name in sorted(_ui_qt_icon_names() | EXTRA_ICONS):
         for dark in (False, True):

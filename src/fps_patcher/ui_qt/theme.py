@@ -99,8 +99,8 @@ class ThemeTokens:
 
 # Neutral surfaces are shared by every preset so a theme changes the accent,
 # not the structure. Every pair is (light, dark).
-_LIGHT_BG = "#F4F1EB"
-_DARK_BG = "#0E0F11"
+_LIGHT_BG = "#F5F1F2"
+_DARK_BG = "#0A0A0F"
 
 
 def _preset(
@@ -109,51 +109,57 @@ def _preset(
     accent: tuple[str, str],
     accent_hover: tuple[str, str],
     accent_pressed: tuple[str, str],
+    accent_light: tuple[str, str] | None = None,
+    accent_dim: tuple[str, str] | None = None,
+    accent_dim_border: tuple[str, str] | None = None,
 ) -> ThemeTokens:
     return ThemeTokens(
         name=name,
         bg=(_LIGHT_BG, _DARK_BG),
-        surface=("#FBFAF7", "#15171A"),
-        surface_raised=("#FFFFFF", "#1C1F23"),
-        surface_hover=("#EFEAE0", "#23262B"),
+        surface=("#FFFFFF", "#111118"),
+        surface_raised=("#F7F2F3", "#191923"),
+        surface_hover=("#EEE6E8", "#23262B"),
         surface_drop_hover=(
             _mix(accent[0], _LIGHT_BG, 0.12),
             _mix(accent[1], _DARK_BG, 0.12),
         ),
-        border=("#DCD6CA", "#26292E"),
-        border_hover=("#9A9385", "#6E6A62"),
+        border=("#E3D8DB", "#242432"),
+        border_hover=("#C9BFC2", "#3A3A46"),
         border_focus=accent,
-        text=("#1A1A18", "#ECEAE6"),
-        text2=("#55524C", "#B3AFA7"),
-        muted=("#6E6A62", "#8C8981"),
+        text=("#1C1417", "#ECEBF2"),
+        text2=("#463A3E", "#C9C8D6"),
+        muted=("#6D5D62", "#9A99AB"),
         accent=accent,
         accent_hover=accent_hover,
         accent_pressed=accent_pressed,
-        accent_light=(
-            _mix(accent[0], _LIGHT_BG, 0.18),
-            _mix(accent[1], _DARK_BG, 0.18),
-        ),
+        accent_light=accent_light
+        or (_mix(accent[0], "#111111", 0.55), _mix(accent[1], "#FFFFFF", 0.55)),
         accent_glow=(
             _mix(accent[0], _LIGHT_BG, 0.35),
             _mix(accent[1], _DARK_BG, 0.35),
         ),
-        success=("#2F6B49", "#86AE91"),
+        success=("#15803D", "#4ADE80"),
         warn=("#8A5A14", "#D6A45F"),
-        danger=("#A33A34", "#D07A73"),
-        console_bg=("#F0ECE4", "#0A0B0C"),
-        console_border=("#DCD6CA", "#26292E"),
+        danger=("#B91C1C", "#FF8A99"),
+        console_bg=("#EFE9EA", "#0A0A0F"),
+        console_border=("#E3D8DB", "#242432"),
         toolbar_bg=(_LIGHT_BG, _DARK_BG),
-        inspector_bg=("#F7F4EE", "#121417"),
-        border_control=("#9A9385", "#6E6A62"),
+        inspector_bg=("#FAF7F8", "#111118"),
+        border_control=("#E3D8DB", "#242432"),
+        accent_dim=accent_dim or ("", ""),
+        accent_dim_border=accent_dim_border or ("", ""),
     )
 
 
 PRESETS: dict[str, ThemeTokens] = {
     "Crimson Gamer": _preset(
         "Crimson Gamer",
-        accent=("#9B2F3A", "#D9646B"),
-        accent_hover=("#84262F", "#E27D83"),
-        accent_pressed=("#6E1E26", "#B94A52"),
+        accent=("#C8283F", "#C8283F"),
+        accent_hover=("#A81F33", "#D93450"),
+        accent_pressed=("#8F1A2B", "#B32337"),
+        accent_light=("#A81F33", "#FF5A70"),
+        accent_dim=("#FBE9EC", "#2A1119"),
+        accent_dim_border=("#E7B3BD", "#6B1F30"),
     ),
     "Graphite": _preset(
         "Graphite",
@@ -243,8 +249,8 @@ class Radii:
 
 CORNER_RADII: dict[str, Radii] = {
     "Sharp": Radii(card=4, control=4),
-    "Normal": Radii(card=8, control=6),
-    "Round": Radii(card=12, control=8),
+    "Normal": Radii(card=14, control=10),
+    "Round": Radii(card=18, control=12),
 }
 
 # Chips are technical tags now; no 999px pills anywhere in the shell.
@@ -356,11 +362,14 @@ def make_theme(settings: Settings) -> Theme:
     tokens = PRESETS.get(settings.theme_preset, PRESETS[DEFAULT_THEME_PRESET])
     accent = _custom_accent(getattr(settings, "custom_accent", ""))
     if accent:
+        light_text = _mix(accent, "#111111", 0.60)
+        dark_text = _mix(accent, "#FFFFFF", 0.60)
         tokens = replace(
             tokens,
             accent=(accent, accent),
             accent_hover=(accent, accent),
             accent_pressed=(accent, accent),
+            accent_light=(light_text, dark_text),
             accent_dim=("", ""),
             accent_dim_border=("", ""),
             on_accent=("", ""),

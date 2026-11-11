@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "targets": {
+    "main-window": {
+      "targetKind": "existing-ui",
+      "projectId": "76e26c44-b3e3-40a7-bd30-f9e63cd96a19",
+      "activeDraftId": "96bef631-d73f-49e5-b180-6df311539fae",
+      "designSystemPath": ".superdesign/design-system.md",
+      "referenceIds": [
+        "879f9b67-cd4e-4f33-8a2b-474831d30fde",
+        "9020e4a8-cac2-4ea9-9031-bc3c3845fc76",
+        "brand-app-icon"
+      ],
+      "brandAssets": {
+        "logo": {
+          "assetKey": "brand-app-icon",
+          "url": "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/76e26c44-b3e3-40a7-bd30-f9e63cd96a19/brand-assets/brand-app-icon/app_icon.png",
+          "sourcePath": "src/fps_patcher/ui/assets/app_icon.png"
+        }
+      },
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "src/fps_patcher/ui_qt/theme.py",
+        "src/fps_patcher/ui_qt/main_window.py:95:302",
+        "src/fps_patcher/ui_qt/inspector.py:146:454",
+        "src/fps_patcher/ui_qt/queue_view.py:1306:1416",
+        "src/fps_patcher/ui_qt/console.py:105:179"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "cba98bc27f44d867d5bf5ff2e939d0a20c26d78528bf8b6ae3592cfc9e3e3950",
+        "src/fps_patcher/ui_qt/theme.py": "935ce4f35c15b3c415a06b786749d4b37678c440c0e205f105b7191a8b4f2627",
+        "src/fps_patcher/ui_qt/main_window.py": "67fa8bc1b6748f6d3e651dc91cdb28dbb638e582964f429db599044457b7900a",
+        "src/fps_patcher/ui_qt/inspector.py": "f8533cbe324f8ca2a1a53fd47c18612796d0302fbb2a8bb515a80b8ff64d1ef6",
+        "src/fps_patcher/ui_qt/queue_view.py": "3edf49f39c6f9a983ba3d47a089b8d57328cadd68f3fdfa5725fd4a2d1e9209b",
+        "src/fps_patcher/ui_qt/console.py": "5bc9b1d5c85c70a4860f75c7cb20d05e1f3c689a96fbc639c448816a25b53cce"
+      },
+      "drafts": {
+        "96bef631-d73f-49e5-b180-6df311539fae": {
+          "title": "Main window — Crimson Glass (v1)",
+          "visualDirection": "Crimson Glass applied to the Qt main window (dark, UD reference), empty queue state, translucent controls",
+          "currentVersion": 4
+        }
+      },
+      "updatedAt": "2026-11-11T16:47:27+07:00"
+    },
+    "settings": {
+      "targetKind": "existing-ui",
+      "projectId": "76e26c44-b3e3-40a7-bd30-f9e63cd96a19",
+      "activeDraftId": "aace7489-8f34-438d-8229-520e4a39a91b",
+      "designSystemPath": ".superdesign/design-system.md",
+      "referenceIds": [
+        "879f9b67-cd4e-4f33-8a2b-474831d30fde",
+        "09f306c2-5417-441a-ae0f-7940228e1af7"
+      ],
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "src/fps_patcher/ui_qt/theme.py",
+        "src/fps_patcher/ui_qt/settings_dialog.py:234:360",
+        "src/fps_patcher/ui_qt/settings_dialog.py:670:866"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "cba98bc27f44d867d5bf5ff2e939d0a20c26d78528bf8b6ae3592cfc9e3e3950",
+        "src/fps_patcher/ui_qt/theme.py": "935ce4f35c15b3c415a06b786749d4b37678c440c0e205f105b7191a8b4f2627",
+        "src/fps_patcher/ui_qt/settings_dialog.py": "c052b07463c454d6acbd64ee1419f2c76f5fcb31da8d14f3433547d18ff54d7c"
+      },
+      "drafts": {
+        "aace7489-8f34-438d-8229-520e4a39a91b": {
+          "title": "Settings — Crimson Glass (v1)",
+          "visualDirection": "Crimson Glass Settings dialog, Appearance tab, translucent controls, 920x640",
+          "currentVersion": 4
+        }
+      },
+      "updatedAt": "2026-11-11T16:47:27+07:00"
+    }
+  }
+}

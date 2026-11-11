@@ -20,9 +20,20 @@ def _families(families: tuple[str, ...]) -> str:
     return ", ".join(f'"{name}"' for name in families)
 
 
+def _rgba(color: str, alpha: float) -> str:
+    q = QColor(color)
+    return f"rgba({q.red()}, {q.green()}, {q.blue()}, {alpha:g})"
+
+
 def build_qss(theme: Theme) -> str:
     """Build the application style sheet purely from theme tokens/metrics."""
     c = theme.color
+    glass_fill = "rgba(255,255,255,0.04)" if theme.is_dark else "rgba(0,0,0,0.03)"
+    glass_border = "rgba(255,255,255,0.12)" if theme.is_dark else "rgba(0,0,0,0.10)"
+    glass_hover = "rgba(255,255,255,0.08)" if theme.is_dark else "rgba(0,0,0,0.06)"
+    glass_hover_border = "rgba(255,255,255,0.18)" if theme.is_dark else "rgba(0,0,0,0.16)"
+    accent_glass = _rgba(c("accent"), 0.16)
+    accent_glass_border = _rgba(c("accent_light"), 0.45)
     ui = _families(UI_FONT_FAMILIES)
     mono = _families(MONO_FONT_FAMILIES)
 
@@ -124,7 +135,7 @@ QLabel[role="badge"] {{
     background: {c("accent_dim")};
     border: 1px solid {c("accent_dim_border")};
     border-radius: {RADIUS_PILL}px;
-    color: {c("accent")};
+    color: {c("accent_light")};
     font-size: {badge}px;
     font-weight: 600;
     padding: 1px {outer + 2}px;
@@ -135,8 +146,8 @@ QLabel[role="cardCaption"] {{
     font-weight: 600;
 }}
 QPushButton {{
-    background: transparent;
-    border: 1px solid {c("border_control")};
+    background: {glass_fill};
+    border: 1px solid {glass_border};
     border-radius: {control}px;
     color: {c("text")};
     font-size: {body}px;
@@ -144,11 +155,11 @@ QPushButton {{
     padding: 0 {inner + 2}px;
 }}
 QPushButton:hover {{
-    background: {c("surface_hover")};
-    border-color: {c("border_focus")};
+    background: {glass_hover};
+    border-color: {glass_hover_border};
 }}
 QPushButton:pressed {{
-    background: {c("surface_raised")};
+    background: {glass_hover};
 }}
 QPushButton:disabled {{
     background: transparent;
@@ -177,17 +188,17 @@ QPushButton[variant="primary"]:disabled {{
     color: {c("muted")};
 }}
 QPushButton[variant="secondary"] {{
-    background: transparent;
-    border: 1px solid {c("border_control")};
+    background: {glass_fill};
+    border: 1px solid {glass_border};
     color: {c("text")};
     min-height: {secondary - 2}px;
 }}
 QPushButton[variant="secondary"]:hover {{
-    background: {c("surface_hover")};
-    border-color: {c("border_focus")};
+    background: {glass_hover};
+    border-color: {glass_hover_border};
 }}
 QPushButton[variant="secondary"]:pressed {{
-    background: {c("surface_raised")};
+    background: {glass_hover};
 }}
 QPushButton[variant="secondary"]:disabled, QPushButton[variant="ghost"]:disabled,
 QPushButton[variant="icon"]:disabled {{
@@ -242,7 +253,7 @@ QPushButton#SectionHeader[expanded="true"] {{
 }}
 QLineEdit, QSpinBox {{
     background: {c("console_bg")};
-    border: 1px solid {c("border_control")};
+    border: 1px solid {glass_border};
     border-radius: {control}px;
     color: {c("text")};
     min-height: {entry - 2}px;
@@ -258,7 +269,7 @@ QLineEdit:disabled, QSpinBox:disabled {{
 }}
 QComboBox {{
     background: {c("console_bg")};
-    border: 1px solid {c("border_control")};
+    border: 1px solid {glass_border};
     border-radius: {control}px;
     color: {c("text")};
     min-height: {combo - 2}px;
@@ -318,7 +329,8 @@ QProgressBar {{
     min-height: {theme.progress_height}px;
 }}
 QProgressBar::chunk {{
-    background: {c("accent")};
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 {c("accent")}, stop:1 {c("accent_light")});
     border-radius: {theme.progress_height // 2}px;
 }}
 QScrollBar:vertical {{
@@ -479,16 +491,16 @@ QPushButton#SettingsFooterButton, QPushButton#SettingsPrimaryButton {{
     font-size: {body}px;
 }}
 QPushButton#SettingsFooterButton {{
-    background: transparent;
-    border-color: {c("border_control")};
+    background: {glass_fill};
+    border-color: {glass_border};
     color: {c("text")};
 }}
 QPushButton#SettingsFooterButton:hover {{
-    background: {c("surface_hover")};
-    border-color: {c("border_focus")};
+    background: {glass_hover};
+    border-color: {glass_hover_border};
 }}
 QPushButton#SettingsFooterButton:pressed {{
-    background: {c("surface_raised")};
+    background: {glass_hover};
 }}
 QPushButton#SettingsPrimaryButton {{
     background: {c("accent")};
@@ -525,9 +537,9 @@ QPushButton#SettingsNavPill:hover {{
     color: {c("text")};
 }}
 QPushButton#SettingsNavPill[active="true"] {{
-    background: {c("accent_dim")};
-    border-left: 2px solid {c("accent")};
-    color: {c("accent")};
+    background: {accent_glass};
+    border: 1px solid {accent_glass_border};
+    color: {c("accent_light")};
 }}
 QFrame#PresetSwatchCard {{
     background: {c("surface")};

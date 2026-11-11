@@ -1494,6 +1494,17 @@ class SettingsDialog(QDialog):
         self._last_tab = key
         for page_key, button, _page in self._pages:
             set_prop(button, "active", "true" if page_key == key else "false")
+        self._sync_nav_icons(self._theme_manager.theme)
+
+    def _sync_nav_icons(self, theme: Theme) -> None:
+        active = self._current_tab_key()
+        tint = theme.color("accent_light")
+        for key, button in self._nav_buttons.items():
+            if key == active:
+                icon = get_icon(_NAV_ICONS[key], theme.is_dark, tint)
+            else:
+                icon = get_icon(_NAV_ICONS[key], theme.is_dark)
+            button.setIcon(icon)
 
     def _refresh_theme(self, theme: Theme) -> None:
         self.setStyleSheet(build_qss(theme) + _SCROLL_QSS)
@@ -1502,8 +1513,6 @@ class SettingsDialog(QDialog):
                 widget.set_theme(theme)
         for button, color in self._swatches:
             self._style_swatch(button, color)
-        for key, button in self._nav_buttons.items():
-            button.setIcon(get_icon(_NAV_ICONS[key], theme.is_dark))
         self._sync_preset_cards()
         self._root.setContentsMargins(0, 0, 0, 0)
         self._root.setSpacing(0)

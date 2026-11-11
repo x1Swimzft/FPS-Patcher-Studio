@@ -13,12 +13,21 @@ from dataclasses import fields
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QPoint, QSettings, Qt, QTimer
-from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut, QShowEvent
+from PySide6.QtCore import QPoint, QPointF, QSettings, Qt, QTimer
+from PySide6.QtGui import (
+    QCloseEvent,
+    QColor,
+    QKeySequence,
+    QPainter,
+    QPaintEvent,
+    QPixmap,
+    QRadialGradient,
+    QShortcut,
+    QShowEvent,
+)
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
-    QFrame,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -90,6 +99,33 @@ _WATCH_DRAIN_MS = 500
 def _video_filter() -> str:
     patterns = " ".join(f"*{ext}" for ext in sorted(SUPPORTED_EXTENSIONS))
     return f"Videos ({patterns});;All files (*)"
+
+
+class _GlowRoot(QWidget):
+    """Root widget that paints the single glass glow behind the shell content."""
+
+    def __init__(self, accent: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._accent = QColor(accent)
+        self.setObjectName("Root")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+
+    def set_accent(self, accent: str) -> None:
+        self._accent = QColor(accent)
+        self.update()
+
+    def paintEvent(self, event: QPaintEvent) -> None:
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        colour = QColor(self._accent)
+        colour.setAlpha(51)
+        gradient = QRadialGradient(
+            QPointF(self.width() * 0.02, -self.height() * 0.08), 720
+        )
+        gradient.setColorAt(0.0, colour)
+        gradient.setColorAt(0.65, QColor(0, 0, 0, 0))
+        painter.fillRect(self.rect(), gradient)
 
 
 class MainWindow(QMainWindow):
@@ -174,8 +210,8 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------------------------ shell
     def _build_shell(self) -> None:
-        root = QWidget()
-        root.setObjectName("Root")
+        root = _GlowRoot(self.theme.color("accent"))
+        self._root = root
         self.setCentralWidget(root)
 
         outer = QVBoxLayout(root)
@@ -215,13 +251,23 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(theme.inner, 0, theme.inner, 0)
         layout.setSpacing(theme.spacing)
 
-        self.brand_bar = QFrame(toolbar)
-        self.brand_bar.setObjectName("BrandBar")
-        self.brand_bar.setFixedSize(3, 18)
-        self.brand_bar.setStyleSheet(
-            f"background: {theme.color('accent')}; border-radius: 1px;"
+        self.app_icon = QLabel(toolbar)
+        self.app_icon.setObjectName("AppIcon")
+        icon_path = (
+            Path(__file__).resolve().parent.parent / "ui" / "assets" / "app_icon.png"
         )
-        layout.addWidget(self.brand_bar, 0, Qt.AlignmentFlag.AlignVCenter)
+        icon_pixmap = QPixmap(str(icon_path))
+        if not icon_pixmap.isNull():
+            self.app_icon.setPixmap(
+                icon_pixmap.scaled(
+                    28,
+                    28,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+            )
+        self.app_icon.setFixedSize(28, 28)
+        layout.addWidget(self.app_icon, 0, Qt.AlignmentFlag.AlignVCenter)
 
         self.title_label = QLabel(t("app_title", lang))
         self.title_label.setProperty("role", "title")
@@ -386,9 +432,7 @@ class MainWindow(QMainWindow):
             get_icon("sun" if theme.is_dark else "moon", theme.is_dark)
         )
         self.settings_button.setIcon(get_icon("settings", theme.is_dark))
-        self.brand_bar.setStyleSheet(
-            f"background: {theme.color('accent')}; border-radius: 1px;"
-        )
+        self._root.set_accent(theme.color("accent"))
         self._set_ffmpeg_state(self._ff_state, self._ff_detail)
         self._update_title_bar()
         self._apply_window_opacity()
