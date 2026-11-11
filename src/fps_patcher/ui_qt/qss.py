@@ -361,6 +361,34 @@ QProgressBar::chunk {{
         stop:0 {c("accent")}, stop:1 {c("accent_light")});
     border-radius: {theme.progress_height // 2}px;
 }}
+QSlider::groove:horizontal {{
+    height: 4px;
+    background: {c("surface_hover")};
+    border-radius: 2px;
+}}
+QSlider::sub-page:horizontal {{
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 {c("accent")}, stop:1 {c("accent_light")});
+    border-radius: 2px;
+}}
+QSlider::add-page:horizontal {{
+    background: {c("surface_hover")};
+    border-radius: 2px;
+}}
+QSlider::handle:horizontal {{
+    width: 14px;
+    height: 14px;
+    margin: -5px 0;
+    border-radius: 7px;
+    background: #FFFFFF;
+    border: 1px solid {c("border")};
+}}
+QSlider::handle:horizontal:hover {{
+    border-color: {c("accent_light")};
+}}
+QSlider::handle:horizontal:disabled {{
+    background: {c("muted")};
+}}
 QScrollBar:vertical {{
     background: transparent;
     border: none;

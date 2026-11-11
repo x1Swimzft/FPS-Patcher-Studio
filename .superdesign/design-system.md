@@ -37,6 +37,7 @@ Default density Comfortable (outer 6 / inner 10 / spacing 12); Compact stays sel
 - Segmented control: track `#191923` + 1px border, radius 10, moving thumb `#23262b`, active label `#ecebf2` 600.
 - Switch: 38x22 pill; off `#23262b`; on accent; 16px knob; 140ms.
 - Progress: 4px pill rail; fill linear-gradient(90deg, `#c8283f`, `#ff5a70`); done = success.
+- Slider: 4px track, accent→accent-light fill, 14px white knob with a hairline border; hover ring accent-light.
 - Status dot: 6-7px circle + 12px label, success/warn/danger only — never a filled banner for a non-error.
 - Drop card: the whole queue area is one `#111118` panel with a 1px dashed border and radius 14; muted 32px icon + "Drop MP4, MOV, or M4V here" + capsule format chips. The Active Patch Profile row sits below the panel, not inside it.
 - Inspector: one bordered card (radius 14, 6px shell inset); group captions are 12/600 muted sentence case; rows are 40px with hairline separators; disabled Start Patch is neutral glass, not crimson.

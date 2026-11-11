@@ -335,3 +335,5 @@ The first build matched the tokens but not the approved canvas layout. These cha
 - **Shell**: toolbar and queue gutters are transparent so the single radial glow (accent at 0.15) shows through; app icon 24px, title 13/600, neutral version badge and neutral FFmpeg status pill. Default density is Comfortable (6/10/12); Compact remains a user choice.
 - **Settings**: the rail is a surface card; the active nav label is `#ecebf2` with an accent-light icon. The Appearance page is two independent columns: Theme Preset (40px background/accent preview cards, draft order) + UI Scale on the left; Appearance/Layout density rows + Custom Accent + Glass rows on the right. No Appearance "Advanced" collapsible.
 - **Segmented control**: raised track, `surface_hover` active thumb, active label `#ecebf2` 600, inactive `text2` 500 (no accent-colored active label).
+
+- **QSlider**: styled in app QSS (4px track, accent→accent-light fill, 14px white knob). Without it Windows draws the native green accent on a real machine even when offscreen captures look crimson.
