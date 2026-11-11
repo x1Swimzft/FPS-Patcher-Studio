@@ -1275,8 +1275,11 @@ class SettingsDialog(QDialog):
         version.setWordWrap(True)
         about.addWidget(version)
         self._hint(about, "about_desc")
-        actions = QHBoxLayout()
-        actions.setSpacing(theme.outer)
+        actions = QGridLayout()
+        actions.setHorizontalSpacing(theme.outer)
+        actions.setVerticalSpacing(theme.outer)
+        actions.setColumnStretch(0, 1)
+        actions.setColumnStretch(1, 1)
         copy = text_button(self._tr("copy_diagnostics"), theme, self._copy_diagnostics)
         export = text_button(self._tr("export_settings"), theme, self._export_settings)
         import_btn = text_button(
@@ -1284,7 +1287,10 @@ class SettingsDialog(QDialog):
         )
         for button in (copy, export, import_btn):
             button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-            actions.addWidget(button)
+        # Wrap the long Thai labels instead of forcing the dialog wider than its viewport.
+        actions.addWidget(copy, 0, 0, 1, 2)
+        actions.addWidget(export, 1, 0)
+        actions.addWidget(import_btn, 1, 1)
         about.addLayout(actions)
         self._hint(about, "restart_hint")
 

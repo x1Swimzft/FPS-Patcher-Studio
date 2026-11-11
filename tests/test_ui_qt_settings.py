@@ -15,12 +15,15 @@ from PySide6.QtCore import Qt  # noqa: E402
 from PySide6.QtWidgets import (  # noqa: E402
     QApplication,
     QFrame,
+    QGridLayout,
     QMessageBox,
+    QPushButton,
     QWidget,
 )
 
 from fps_patcher import config  # noqa: E402
 from fps_patcher.config import Settings  # noqa: E402
+from fps_patcher.ui.strings import t  # noqa: E402
 from fps_patcher.ui_qt.settings_dialog import SettingsDialog  # noqa: E402
 from fps_patcher.ui_qt.theme import ThemeManager  # noqa: E402
 
@@ -44,6 +47,39 @@ def _show(dialog: SettingsDialog) -> None:
     assert layout is not None
     layout.activate()
     QApplication.processEvents()
+
+def _find_grid(layout: Any, target: QWidget) -> QGridLayout | None:
+    for index in range(layout.count()):
+        item = layout.itemAt(index)
+        sub = item.layout()
+        if isinstance(sub, QGridLayout) and sub.indexOf(target) >= 0:
+            return sub
+        if sub is not None:
+            found = _find_grid(sub, target)
+            if found is not None:
+                return found
+    return None
+
+
+def test_system_actions_wrap_to_two_rows(qtbot: Any, appdata: Path) -> None:
+    dialog = _dialog(qtbot, Settings(reduce_motion=True))
+    copy = next(
+        button
+        for button in dialog.findChildren(QPushButton)
+        if button.text() == t("copy_diagnostics", "en")
+    )
+    assert copy.parentWidget() is not None
+    grid = _find_grid(copy.parentWidget().layout(), copy)
+    assert grid is not None
+
+    copy_pos = grid.getItemPosition(grid.indexOf(copy))
+    assert copy_pos[0] == 0 and copy_pos[3] == 2
+    for key in ("export_settings", "import_settings"):
+        button = next(
+            b for b in dialog.findChildren(QPushButton) if b.text() == t(key, "en")
+        )
+        position = grid.getItemPosition(grid.indexOf(button))
+        assert position[0] == 1
 
 
 def test_dialog_size_and_footer_alignment(qtbot: Any, appdata: Path) -> None:
