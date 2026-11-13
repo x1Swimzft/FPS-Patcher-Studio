@@ -243,7 +243,7 @@ Use `tint=theme.color("accent_light")` for the **active** Settings rail icon. Ad
 - `Card` (`QFrame#Card`) is token-driven; no change.
 - Queue rows, drop card and console are token-driven; verify empty/populated/patching states after the palette change.
 - Settings dialog: no structural change required; the Appearance page already contains Theme Preset, Appearance, Layout density, Custom Accent, Glass (effect/mode/tint/alpha), Reduce motion, UI Scale, Corner style and Font size. Verify all are visible by scrolling at 920×640.
-- Toolbar: after removing `BrandBar`, the lockup is app icon + "FPS Patcher Studio" + version pill.
+- Toolbar: actions only. The native Windows title bar carries the app icon, title and version; do not duplicate them in the toolbar.
 
 ## 9. Tests to update — `tests/test_ui_qt_theme.py` only (intentional changes)
 

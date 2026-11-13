@@ -20,7 +20,6 @@ from PySide6.QtGui import (
     QKeySequence,
     QPainter,
     QPaintEvent,
-    QPixmap,
     QRadialGradient,
     QShortcut,
     QShowEvent,
@@ -29,7 +28,6 @@ from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
     QHBoxLayout,
-    QLabel,
     QMainWindow,
     QMenu,
     QMessageBox,
@@ -165,7 +163,7 @@ class MainWindow(QMainWindow):
         if isinstance(app, QApplication):
             apply_theme(app, self.theme)
 
-        self.setWindowTitle(APP_NAME)
+        self.setWindowTitle(f"{APP_NAME} — v{__version__}")
         self.setMinimumSize(self.theme.min_width, self.theme.min_height)
         self.resize(self.theme.window_width, self.theme.window_height)
         if settings.always_on_top:
@@ -250,31 +248,6 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(theme.inner, 0, theme.inner, 0)
         layout.setSpacing(theme.spacing)
 
-        self.app_icon = QLabel(toolbar)
-        self.app_icon.setObjectName("AppIcon")
-        icon_path = (
-            Path(__file__).resolve().parent.parent / "ui" / "assets" / "app_icon.png"
-        )
-        icon_pixmap = QPixmap(str(icon_path))
-        if not icon_pixmap.isNull():
-            self.app_icon.setPixmap(
-                icon_pixmap.scaled(
-                    24,
-                    24,
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation,
-                )
-            )
-        self.app_icon.setFixedSize(24, 24)
-        layout.addWidget(self.app_icon, 0, Qt.AlignmentFlag.AlignVCenter)
-
-        self.title_label = QLabel(t("app_title", lang))
-        self.title_label.setProperty("role", "appTitle")
-        layout.addWidget(self.title_label, 0, Qt.AlignmentFlag.AlignVCenter)
-
-        self.version_badge = QLabel(f"v{__version__}")
-        self.version_badge.setProperty("role", "badge")
-        layout.addWidget(self.version_badge, 0, Qt.AlignmentFlag.AlignVCenter)
         layout.addStretch(1)
 
         self.ffmpeg_button = QPushButton()
@@ -1142,7 +1115,7 @@ class MainWindow(QMainWindow):
 
     def _retranslate(self) -> None:
         lang = self.settings.language
-        self.title_label.setText(t("app_title", lang))
+        self.setWindowTitle(f"{t('app_title', lang)} — v{__version__}")
         self.forensic_button.setText(t("forensic_btn", lang))
         self.forensic_button.setAccessibleName(t("forensic_btn", lang))
         self.history_button.setText(t("history_btn", lang))
