@@ -1,5 +1,38 @@
 # Release Notes
 
+## v2.4.0 - 2026-11-13 (Crimson Glass)
+
+Version 2.4.0 is a visual re-skin of the Qt interface. Behaviour, copy meaning,
+patching and output rules are unchanged.
+
+### Changed
+
+- New **Crimson Glass** palette: near-black neutrals, one crimson accent, a
+  light theme that matches it, and all seven presets retained.
+- Secondary buttons, inputs and footer actions are translucent; primary actions
+  remain solid crimson. Cards use 14 px corners and controls 10 px.
+- One soft crimson glow is painted from the top-left and follows the active
+  accent, including custom accents.
+- Progress bars use a crimson-to-light-crimson gradient.
+- The toolbar shows the app icon, title and version; the old 3 px accent bar is
+  removed.
+- The Settings Appearance tab has live preset preview cards and clearer helper
+  text, and the active rail icon is tinted with the accent.
+- New installs default to **Comfortable** spacing. Existing saved settings keep
+  their current density.
+- Fixed the Settings action row at 125% scale in Thai.
+
+### Verification
+
+- 689 tests, 2 skipped; ruff and mypy clean.
+- Screenshot matrix: 57/57 at 100% and 56/56 at 125%, covering seven presets,
+  light/dark and English/Thai.
+
+**The Windows build is unsigned; verify the release SHA-256 before running.**
+
+Auto Update remains enabled by default and will offer this build on the next
+startup.
+
 ## v2.3.0 - 2026-11-10 (Two-preset picker)
 
 Version 2.3.0 narrows the visible preset picker to two choices and makes the

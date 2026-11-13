@@ -2,6 +2,22 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
+## [2.4.0] - 2026-11-13
+
+### Changed
+- **Crimson Glass** visual direction: near-black neutral palette, one crimson accent family, translucent glass controls, 14 px cards / 10 px controls, and a single soft top-left glow painted by the shell.
+- The toolbar lockup is now the app icon, title and version pill; the 3 px accent bar is gone.
+- Secondary buttons and inputs use translucent fills and borders; primary CTAs stay solid crimson. Progress bars use a crimson-to-light-crimson gradient.
+- The Settings Appearance tab was rebuilt to match the approved drafts, including live preset preview cards and tightened helper text.
+- The active Settings rail icon is tinted with the active accent.
+- New installs default to **Comfortable** layout density. Saved settings keep their existing value.
+- Fixed the Settings action row at 125% scale in Thai.
+
+### Verification
+- 689 tests, 2 skipped; ruff and mypy clean.
+- 57/57 captures at 100% and 56/56 at 125% scale across seven presets, light/dark and English/Thai.
+- Accepted by visual review; the build remains unsigned.
+
 ## [2.3.0] - 2026-11-10
 
 ### Changed

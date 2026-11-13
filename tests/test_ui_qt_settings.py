@@ -68,17 +68,22 @@ def test_system_actions_wrap_to_two_rows(qtbot: Any, appdata: Path) -> None:
         for button in dialog.findChildren(QPushButton)
         if button.text() == t("copy_diagnostics", "en")
     )
-    assert copy.parentWidget() is not None
-    grid = _find_grid(copy.parentWidget().layout(), copy)
+    parent = copy.parentWidget()
+    assert parent is not None
+    grid = _find_grid(parent.layout(), copy)
     assert grid is not None
 
-    copy_pos = grid.getItemPosition(grid.indexOf(copy))
+    copy_pos = cast(
+        tuple[int, int, int, int], grid.getItemPosition(grid.indexOf(copy))
+    )
     assert copy_pos[0] == 0 and copy_pos[3] == 2
     for key in ("export_settings", "import_settings"):
         button = next(
             b for b in dialog.findChildren(QPushButton) if b.text() == t(key, "en")
         )
-        position = grid.getItemPosition(grid.indexOf(button))
+        position = cast(
+            tuple[int, int, int, int], grid.getItemPosition(grid.indexOf(button))
+        )
         assert position[0] == 1
 
 
