@@ -24,7 +24,7 @@ patching and output rules are unchanged.
 
 ### Verification
 
-- 689 tests, 2 skipped; ruff and mypy clean.
+- 690 tests, 2 skipped; ruff and mypy clean.
 - Screenshot matrix: 57/57 at 100% and 56/56 at 125%, covering seven presets,
   light/dark and English/Thai.
 

@@ -14,7 +14,7 @@ All notable changes to FPS Patcher Studio are documented in this file.
 - Fixed the Settings action row at 125% scale in Thai.
 
 ### Verification
-- 689 tests, 2 skipped; ruff and mypy clean.
+- 690 tests, 2 skipped; ruff and mypy clean.
 - 57/57 captures at 100% and 56/56 at 125% scale across seven presets, light/dark and English/Thai.
 - Accepted by visual review; the build remains unsigned.
 
