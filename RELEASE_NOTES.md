@@ -1,5 +1,25 @@
 # Release Notes
 
+## v2.4.1 - 2026-11-13 (Single title bar)
+
+Version 2.4.1 fixes the duplicated app title in the main window.
+
+### Fixed
+
+- The native Windows title bar now shows the app icon, name and version.
+- The toolbar no longer repeats the icon, title or version; it contains only
+  actions.
+
+### Verification
+
+- 690 tests, 2 skipped; ruff and mypy clean.
+- 57/57 captures at 100% and 56/56 at 125%.
+
+**The Windows build is unsigned; verify the release SHA-256 before running.**
+
+Auto Update remains enabled by default and will offer this build on the next
+startup.
+
 ## v2.4.0 - 2026-11-13 (Crimson Glass)
 
 Version 2.4.0 is a visual re-skin of the Qt interface. Behaviour, copy meaning,

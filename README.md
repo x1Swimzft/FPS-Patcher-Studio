@@ -37,14 +37,14 @@ TikTok upload behaviour is not guaranteed. Matching a container fingerprint does
 
 Current builds default to `X1T 1080p`, and a saved `zilem`, `tiktok-ts` or `tiktok-ts-1080` selection is migrated to it once. The picker now offers only `X1T 1080p` and `X1T 720p`.
 
-If you are still on **2.0.1–2.0.3**, install 2.4.0 manually once. Those builds hard-disable the startup update toggle unless network downloads are enabled with an environment override, and they require an Authenticode-signed installer; the current build is unsigned and uses the SHA-256 policy added in 2.0.4. From 2.0.4 onward, startup update checks are enabled by default and unsigned installers are accepted after the release SHA-256 matches.
+If you are still on **2.0.1–2.0.3**, install 2.4.1 manually once. Those builds hard-disable the startup update toggle unless network downloads are enabled with an environment override, and they require an Authenticode-signed installer; the current build is unsigned and uses the SHA-256 policy added in 2.0.4. From 2.0.4 onward, startup update checks are enabled by default and unsigned installers are accepted after the release SHA-256 matches.
 
 ## Install
 
 Windows 10/11 x64. Pick one:
 
-- **Installer:** `FPSPatcherStudio-v2.4.0-Setup.exe`
-- **Portable:** `FPSPatcherStudio-v2.4.0-win64.zip` — extract the whole folder, then run `FPSPatcherStudio.exe`
+- **Installer:** `FPSPatcherStudio-v2.4.1-Setup.exe`
+- **Portable:** `FPSPatcherStudio-v2.4.1-win64.zip` — extract the whole folder, then run `FPSPatcherStudio.exe`
 
 The builds are **unsigned**, so Windows SmartScreen may warn. Verify the SHA-256 against the release checksum before running.
 

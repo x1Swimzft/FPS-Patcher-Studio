@@ -2,6 +2,15 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
+## [2.4.1] - 2026-11-13
+
+### Fixed
+- The app title is shown once. The native Windows title bar now carries the app icon, name and version; the duplicate icon/title/version lockup was removed from the toolbar.
+
+### Verification
+- 690 tests, 2 skipped; ruff and mypy clean.
+- 57/57 captures at 100% and 56/56 at 125%.
+
 ## [2.4.0] - 2026-11-13
 
 ### Changed
