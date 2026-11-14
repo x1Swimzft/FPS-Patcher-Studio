@@ -1133,6 +1133,8 @@ QFrame#WarnCallout QLabel {{
             tip = t("zilem_tip", self._lang())
         elif strategy_key == "zilem-v3":
             tip = t("zilem_v3_tip", self._lang())
+        elif strategy_key == "zilem-mobile":
+            tip = t("zilem_mobile_tip", self._lang())
         else:
             tip = ""
         self.strategy_combo.setToolTip(tip)

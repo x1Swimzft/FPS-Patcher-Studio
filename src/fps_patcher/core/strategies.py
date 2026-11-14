@@ -298,6 +298,23 @@ class ZilemV3Strategy:
         raise RuntimeError("X1T 1080p does not use FFmpeg arguments.")
 
 
+class ZilemMobileStrategy:
+    """X1T 1080p Mobile (``zilem-mobile``): single-audio-track reference build.
+
+    Reproduces the other reference container: the source is copied unchanged,
+    the movie-level ``udta`` is dropped, the last four AAC samples point at a
+    four-sample filler chunk in a small ``mdat``, and the rebuilt ``moov`` is
+    written at the end of the file without a duplicate audio track.
+    """
+
+    name = "zilem-mobile"
+    label = "X1T 1080p Mobile"
+    direct = True
+
+    def build_args(self, req: PatchRequest, info: VideoInfo, out: Path) -> list[str]:
+        raise RuntimeError("X1T 1080p Mobile does not use FFmpeg arguments.")
+
+
 class _PresetDict(dict[str, PatchStrategy]):
     """Preset mapping dictionary with transparent x1t-* alias support."""
 
@@ -308,6 +325,7 @@ class _PresetDict(dict[str, PatchStrategy]):
         "x1t-clean": "bxd-clean",
         "x1t-zilem": "zilem",
         "x1t-zilem-v3": "zilem-v3",
+        "x1t-zilem-mobile": "zilem-mobile",
     }
 
     def __getitem__(self, key: str) -> PatchStrategy:
@@ -323,6 +341,7 @@ class _PresetDict(dict[str, PatchStrategy]):
 UI_PRESETS: dict[str, PatchStrategy] = _PresetDict({
     "zilem": ZilemStrategy(),
     "zilem-v3": ZilemV3Strategy(),
+    "zilem-mobile": ZilemMobileStrategy(),
     "bxd-pc": BXDPCtrategy(),
     "bxd-mobile": BXDMobileStrategy(),
     "bxd-hybrid": BXDHybridStrategy(),
@@ -335,7 +354,8 @@ UI_PRESETS: dict[str, PatchStrategy] = _PresetDict({
 })
 
 # Hidden presets stay registered for saved settings, queue overrides and CLI
-# compatibility, but the pickers offer only X1T 1080p and X1T 720p.
+# compatibility, but the pickers offer only X1T 1080p, X1T 1080p Mobile and
+# X1T 720p.
 HIDDEN_PRESET_KEYS: frozenset[str] = frozenset(
     {
         "zilem",
@@ -359,6 +379,7 @@ def visible_presets() -> list[PatchStrategy]:
 STRATEGIES: dict[str, PatchStrategy] = {
     "zilem": UI_PRESETS["zilem"],
     "zilem-v3": UI_PRESETS["zilem-v3"],
+    "zilem-mobile": UI_PRESETS["zilem-mobile"],
     "bxd-pc": UI_PRESETS["bxd-pc"],
     "bxd-mobile": UI_PRESETS["bxd-mobile"],
     "bxd-hybrid": UI_PRESETS["bxd-hybrid"],
@@ -368,6 +389,7 @@ STRATEGIES: dict[str, PatchStrategy] = {
     "tiktok-ts-remux": UI_PRESETS["tiktok-ts-remux"],
     "x1t-zilem": UI_PRESETS["zilem"],
     "x1t-zilem-v3": UI_PRESETS["zilem-v3"],
+    "x1t-zilem-mobile": UI_PRESETS["zilem-mobile"],
     "x1t-pc": UI_PRESETS["bxd-pc"],
     "x1t-mobile": UI_PRESETS["bxd-mobile"],
     "x1t-hybrid": UI_PRESETS["bxd-hybrid"],
@@ -387,6 +409,7 @@ _STRATEGY_ALIASES: dict[str, str] = {
     "x1t-bypass": "bxd-experimental",
     "x1t-zilem": "zilem",
     "x1t-zilem-v3": "zilem-v3",
+    "x1t-zilem-mobile": "zilem-mobile",
     "x1t-pc": "bxd-pc",
     "x1t-mobile": "bxd-mobile",
     "x1t-hybrid": "bxd-hybrid",
@@ -419,6 +442,7 @@ def migrate_strategy_name(name: str) -> tuple[str, str | None]:
     if name in (
         "zilem",
         "zilem-v3",
+        "zilem-mobile",
         "bxd-pc",
         "bxd-mobile",
         "bxd-hybrid",
@@ -428,7 +452,7 @@ def migrate_strategy_name(name: str) -> tuple[str, str | None]:
         "tiktok-ts-remux",
     ):
         return name, None
-    if name in ("x1t-zilem", "x1t-zilem-v3"):
+    if name in ("x1t-zilem", "x1t-zilem-v3", "x1t-zilem-mobile"):
         return name.removeprefix("x1t-"), None
     if name in ("x1t-pc", "x1t-mobile", "x1t-hybrid", "x1t-clean"):
         return name.replace("x1t-", "bxd-"), None

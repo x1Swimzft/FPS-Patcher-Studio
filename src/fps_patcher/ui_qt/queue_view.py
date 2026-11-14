@@ -98,6 +98,7 @@ _ACTION_SIZE = 28.0
 _PRESET_SHORT_LABELS = {
     "zilem": "X1T Zilem",
     "zilem-v3": "X1T 1080p",
+    "zilem-mobile": "X1T 1080p Mob",
     "tiktok-ts": "X1T 60",
     "tiktok-ts-1080": "X1T 1080 RE",
     "tiktok-ts-remux": "X1T 720p",

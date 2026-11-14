@@ -379,6 +379,7 @@ def test_preset_pickers_hide_x1t_but_keep_saved_legacy(
     combo = window.inspector.strategy_combo
     assert [combo.itemText(i) for i in range(combo.count())] == [
         "X1T 1080p",
+        "X1T 1080p Mobile",
         "X1T 720p",
     ]
     assert combo.currentText() == "X1T 1080p"
@@ -389,6 +390,7 @@ def test_preset_pickers_hide_x1t_but_keep_saved_legacy(
     combo = legacy.inspector.strategy_combo
     assert [combo.itemText(i) for i in range(combo.count())] == [
         "X1T 1080p",
+        "X1T 1080p Mobile",
         "X1T 720p",
         "X1T For Mobile",
     ]
@@ -397,6 +399,7 @@ def test_preset_pickers_hide_x1t_but_keep_saved_legacy(
     legacy.inspector._strategy_activated(combo.findText("X1T 720p"))
     assert [combo.itemText(i) for i in range(combo.count())] == [
         "X1T 1080p",
+        "X1T 1080p Mobile",
         "X1T 720p",
     ]
     assert combo.currentText() == "X1T 720p"

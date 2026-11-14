@@ -70,6 +70,7 @@ def test_ui_presets_and_strategy_migration(tmp_path: Path) -> None:
     assert set(UI_PRESETS.keys()) == {
         "zilem",
         "zilem-v3",
+        "zilem-mobile",
         "bxd-pc",
         "bxd-mobile",
         "bxd-hybrid",
@@ -82,6 +83,8 @@ def test_ui_presets_and_strategy_migration(tmp_path: Path) -> None:
     assert UI_PRESETS["x1t-zilem"].label == "X1T Zilem"
     assert UI_PRESETS["zilem-v3"].label == "X1T 1080p"
     assert UI_PRESETS["x1t-zilem-v3"].label == "X1T 1080p"
+    assert UI_PRESETS["zilem-mobile"].label == "X1T 1080p Mobile"
+    assert UI_PRESETS["x1t-zilem-mobile"].label == "X1T 1080p Mobile"
     assert UI_PRESETS["bxd-pc"].label in ("X1T For PC", "Bxd For PC")
     assert UI_PRESETS["bxd-mobile"].label in ("X1T For Mobile", "Bxd For Mobile")
     assert UI_PRESETS["x1t-pc"].label == "X1T For PC"
@@ -104,6 +107,8 @@ def test_ui_presets_and_strategy_migration(tmp_path: Path) -> None:
     assert migrate_strategy_name("x1t-zilem") == ("zilem", None)
     assert migrate_strategy_name("zilem-v3") == ("zilem-v3", None)
     assert migrate_strategy_name("x1t-zilem-v3") == ("zilem-v3", None)
+    assert migrate_strategy_name("zilem-mobile") == ("zilem-mobile", None)
+    assert migrate_strategy_name("x1t-zilem-mobile") == ("zilem-mobile", None)
 
     # Settings._clamp migrates legacy strategy and records migrated_strategy_from
     s = Settings(strategy="ffmpeg-copy")

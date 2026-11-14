@@ -51,6 +51,7 @@ from .zilem_patcher import (
     REFERENCE_TAG,
     build_zilem,
     verify_zilem_output,
+    verify_zilem_tail_output,
 )
 
 Emit = Callable[[LogEvent | ProgressEvent], None]
@@ -72,7 +73,14 @@ def validate_input(path: Path) -> None:
 
 def output_base_for(req: PatchRequest) -> Path:
     """Deterministic output name before collision handling."""
-    is_zilem = req.strategy in ("zilem", "zilem-v3", "x1t-zilem", "x1t-zilem-v3")
+    is_zilem = req.strategy in (
+        "zilem",
+        "zilem-v3",
+        "zilem-mobile",
+        "x1t-zilem",
+        "x1t-zilem-v3",
+        "x1t-zilem-mobile",
+    )
     is_x1t = req.strategy.startswith(("bxd-", "x1t-"))
     is_ts = req.strategy.startswith("tiktok-ts")
     force_mp4 = is_zilem or is_ts or (is_x1t and req.src.suffix.lower() == ".mov")
@@ -487,14 +495,15 @@ def patch(
             def zilem_log(msg: str) -> None:
                 emit(LogEvent(msg, "DEBUG"))
 
-            is_zilem_v3 = strategy.name == "zilem-v3"
-            if is_zilem_v3:
-                zilem_tag = REFERENCE_TAG
+            is_zilem_tail = strategy.name == "zilem-mobile"
+            is_zilem_ref = strategy.name in ("zilem-v3", "zilem-mobile")
+            zilem_tag = REFERENCE_TAG if is_zilem_ref else PRODUCTION_TAG
             stats = build_zilem(
                 work_src,
                 tmp,
                 tag=zilem_tag,
-                trailer_name=final.name if is_zilem_v3 else None,
+                variant="tail" if is_zilem_tail else "v1",
+                trailer_name=final.name if is_zilem_ref else None,
                 cancel_event=cancel_event,
                 on_progress=lambda fraction: emit(ProgressEvent(fraction)),
                 on_log=zilem_log,
@@ -655,9 +664,14 @@ def patch(
                 if norm_strat == "bxd-hybrid" and req.bxd_max_tail_ms > 0:
                     dur_tol = max(0.25, (req.bxd_max_tail_ms / 1000.0) + 0.1)
                 if is_zilem:
-                    verify_zilem_output(
-                        work_src, tmp, tag=zilem_tag, trailer=zilem_trailer
-                    )
+                    if is_zilem_tail:
+                        verify_zilem_tail_output(
+                            work_src, tmp, tag=zilem_tag, trailer=zilem_trailer
+                        )
+                    else:
+                        verify_zilem_output(
+                            work_src, tmp, tag=zilem_tag, trailer=zilem_trailer
+                        )
                     emit(
                         LogEvent(
                             "[VERIFY] Zilem container fingerprint PASS",

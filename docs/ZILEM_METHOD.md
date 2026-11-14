@@ -111,6 +111,71 @@ identical to `X1T Zilem`. Because the tag and trailer are part of the
 fingerprint, the verifier checks the exact tag text and the exact trailer bytes,
 and requires `moov` at `source size + 110` rather than as the last box.
 
+## X1T 1080p Mobile (reference-exact single-audio-track Zilem)
+
+`X1T 1080p Mobile` (`zilem-mobile`, alias `x1t-zilem-mobile`) reproduces a
+second, incompatible reference build of the same method: one video track, **one**
+audio track, no movie-level metadata, and a small filler `mdat` before the
+rebuilt `moov`. It is not a variant of `X1T 1080p`; the two outputs differ in
+size, audio track count and sample map.
+
+The reference pair used for verification:
+
+| item | value |
+| --- | --- |
+| source | `Deppart Prototype 1.mp4`, 258,100,994 bytes |
+| reference | `Deppart Prototype 1_zilem.mp4`, 258,181,333 bytes |
+
+Output layout:
+
+| offset | box | size |
+| --- | --- | --- |
+| 0 | `ftyp` (isom/iso2/avc1/mp41) | 32 |
+| 32 | `free` (the old `moov`, type bytes rewritten) | 80,132 |
+| 80,164 | `free` (the source's own padding box) | 8 |
+| 80,172 | `mdat` (source media, payload byte-identical) | 258,020,822 |
+| 258,100,994 | `mdat` filler: four 15-byte samples | 68 |
+| 258,101,062 | rebuilt `moov` | 80,192 |
+| 258,181,254 | `free` `ZETA_OPTIMIZED/3 <stamp> <filename>` | 79 |
+
+The filler sample is a fixed 15-byte constant of that build:
+`a0 98 00 40 01 28 00 64 00 00 03 50 00 00 38` (`TAIL_FRAME` in
+`src/fps_patcher/core/zilem_patcher.py`).
+
+Every leaf box is byte-identical to the source except these four changes:
+
+1. `moov/udta` is removed (the source's movie-level `©too`).
+2. The video track gains a 150-byte `udta/meta/ilst/©too` holding the reference
+   tag; every other video byte is unchanged.
+3. Audio `stsz` keeps its sample count and its leading sample sizes, but the last
+   four sizes become `15, 15, 15, 15`.
+4. Audio `stsc` and `stco` gain one chunk at the end: `stsc` becomes
+   `(1,24,1), (192,20,1), (193,4,1)` and `stco` appends the offset
+   `source size + 8`, the payload of the filler `mdat`.
+
+`mvhd`, the audio `tkhd`/`mdhd` durations, `stsd`, `stts`, `sgpd` and `sbgp` are
+copied untouched, so the movie duration and the media duration are unchanged.
+The audio track is **not** duplicated and no silence is appended.
+
+The four original AAC frames that the replaced `stsz` entries used to describe
+(about 85 ms) are dropped from the sample map and stay in the source `mdat` as
+unreferenced bytes. That is a property of the method and is reproduced, not
+fixed: a player decodes the four filler samples instead, which is inaudible at
+the end of the track.
+
+**Matching this container byte-for-byte does not prove that TikTok or any other
+service skips transcoding.** Only the container transform is reproducible
+offline; server-side behaviour is unverifiable and not claimed.
+
+Output naming, source validation, preflight skips and the output filename in the
+trailer are the same as `X1T 1080p`. `verify_zilem_tail_output()` is the
+matching verifier: it requires one video and one audio track, no movie-level
+`udta`, the exact filler `mdat`, unchanged `mvhd`/audio timing payloads, the
+rebuilt chunk map and the exact trailer bytes.
+
+Set `FPS_ZILEM_MOBILE_SOURCE` / `FPS_ZILEM_MOBILE_REFERENCE` to the pair above
+to run the byte-exact golden test.
+
 ## Verification
 
 `verify_zilem_output()` checks the produced file against the source before the

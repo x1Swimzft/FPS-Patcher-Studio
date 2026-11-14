@@ -15,6 +15,7 @@ from typing import Any
 import pytest
 
 from fps_patcher.config import Settings
+from fps_patcher.core import zilem_patcher as zp
 from fps_patcher.core.errors import VerifyError
 from fps_patcher.core.ffmpeg_locator import FFmpegPaths
 from fps_patcher.core.models import LogEvent, PatchRequest
@@ -28,12 +29,15 @@ from fps_patcher.core.strategies import (
 from fps_patcher.core.zilem_patcher import (
     REFERENCE_TAG,
     SILENCE_FRAME,
+    TAIL_FRAME,
+    TAIL_REPLACED_SAMPLES,
     ZILEM_TAG,
     ZilemSourceError,
     build_zeta_trailer,
     build_zilem,
     inspect_zilem_source,
     verify_zilem_output,
+    verify_zilem_tail_output,
 )
 
 _REFERENCE_TAG = "TikQuick Quality Method - https://tikquick.online/ - v25 - Orion"
@@ -175,7 +179,7 @@ def test_build_and_verify_round_trip(
     assert stats.output_size == len(data)
     assert stats.audio_samples_after == stats.audio_samples_before + 17
     assert stats.audio_chunks_after == stats.audio_chunks_before + 2
-    assert stats.new_track_id >= 3
+    assert stats.new_track_id is not None and stats.new_track_id >= 3
     assert stats.tag == ZILEM_TAG
     source_top = _top_level_boxes(source_bytes)
     source_moov = next(
@@ -484,10 +488,12 @@ def test_verify_rejects_changed_old_moov_payload(
 
 def test_visible_presets_are_only_1080p_and_720p() -> None:
     assert Settings().strategy == "zilem-v3"
-    assert VISIBLE_PRESET_KEYS == ("zilem-v3", "tiktok-ts-remux")
+    assert VISIBLE_PRESET_KEYS == ("zilem-v3", "zilem-mobile", "tiktok-ts-remux")
     assert get_strategy("zilem-v3").label == "X1T 1080p"
+    assert get_strategy("zilem-mobile").label == "X1T 1080p Mobile"
     assert get_strategy("tiktok-ts-remux").label == "X1T 720p"
     assert get_strategy("x1t-zilem-v3").name == "zilem-v3"
+    assert get_strategy("x1t-zilem-mobile").name == "zilem-mobile"
     assert all(
         preset.label.startswith("X1T")
         for preset in (UI_PRESETS[key] for key in VISIBLE_PRESET_KEYS)
@@ -624,3 +630,126 @@ def test_patch_runs_zilem_v3_and_trailer_uses_final_name(
     verify_zilem_output(
         zilem_source, result.output, tag=REFERENCE_TAG, trailer=trailer
     )
+
+
+def _bytes_at(path: Path, offset: int, size: int) -> bytes:
+    with path.open("rb") as handle:
+        handle.seek(offset)
+        return handle.read(size)
+
+
+def test_zilem_mobile_layout(zilem_source: Path, tmp_path: Path) -> None:
+    out = tmp_path / "out.mp4"
+    stats = build_zilem(zilem_source, out, tag=REFERENCE_TAG, variant="tail")
+
+    data = out.read_bytes()
+    source_size = zilem_source.stat().st_size
+    assert stats.output_size == len(data)
+    assert stats.new_track_id is None
+    assert stats.audio_samples_after == stats.audio_samples_before
+    assert stats.trailer == b""
+
+    top = _top_level_boxes(data)
+    assert top[0][2] == b"ftyp"
+    assert top[-1][2] == b"moov"
+    assert top[-1][0] == source_size + 68
+    assert top[-1][0] + top[-1][1] == len(data)
+    filler = [box for box in top if box[0] == source_size]
+    assert len(filler) == 1
+    offset, size, atom_type = filler[0]
+    assert atom_type == b"mdat"
+    assert size == 68
+    assert data[offset + 8 : offset + size] == TAIL_FRAME * TAIL_REPLACED_SAMPLES
+
+    target = zp._read_structure(out)
+    assert len(zp._video_traks(target.moov)) == 1
+    assert len(zp._audio_traks(target.moov)) == 1
+    assert target.moov.find(b"udta") is None
+    audio_stbl = zp._audio_traks(target.moov)[0].require(b"mdia").require(b"minf").require(b"stbl")
+    stsz = audio_stbl.require(b"stsz")
+    assert stsz.data[-TAIL_REPLACED_SAMPLES * 4 :] == (
+        struct.pack(">I", len(TAIL_FRAME)) * TAIL_REPLACED_SAMPLES
+    )
+    stco = audio_stbl.require(b"stco")
+    assert struct.unpack_from(">I", stco.data, len(stco.data) - 4)[0] == source_size + 8
+
+
+def test_zilem_mobile_verifier_accepts_and_rejects(zilem_source: Path, tmp_path: Path) -> None:
+    when = datetime(2026, 11, 14, 5, 31, 35, 106000, tzinfo=UTC)
+    out = tmp_path / "clip_zilem.mp4"
+    build_zilem(
+        zilem_source,
+        out,
+        tag=REFERENCE_TAG,
+        variant="tail",
+        trailer_name="clip_zilem.mp4",
+        trailer_time=when,
+    )
+    trailer = build_zeta_trailer("clip_zilem.mp4", when)
+    verify_zilem_tail_output(zilem_source, out, tag=REFERENCE_TAG, trailer=trailer)
+
+    source_size = zilem_source.stat().st_size
+    clean = out.read_bytes()
+
+    corrupted = bytearray(clean)
+    corrupted[source_size + 8 + 3] ^= 0xFF
+    out.write_bytes(corrupted)
+    with pytest.raises(VerifyError, match="filler mdat"):
+        verify_zilem_tail_output(zilem_source, out, tag=REFERENCE_TAG, trailer=trailer)
+
+    out.write_bytes(clean[:-1])
+    with pytest.raises(VerifyError, match="output size|trailing bytes|well-formed"):
+        verify_zilem_tail_output(zilem_source, out, tag=REFERENCE_TAG, trailer=trailer)
+
+    out.write_bytes(clean)
+    with pytest.raises(VerifyError, match="output size|two audio tracks"):
+        verify_zilem_output(zilem_source, out, tag=REFERENCE_TAG, trailer=trailer)
+
+
+def test_zilem_mobile_keeps_timing(zilem_source: Path, tmp_path: Path) -> None:
+    out = tmp_path / "out.mp4"
+    build_zilem(zilem_source, out, tag=REFERENCE_TAG, variant="tail")
+
+    source = zp._read_structure(zilem_source)
+    target = zp._read_structure(out)
+    source_audio = zp._audio_traks(source.moov)[0]
+    target_audio = zp._audio_traks(target.moov)[0]
+    for path in ((b"tkhd",), (b"edts",), (b"mdia", b"mdhd")):
+        assert zp._box_payload_present(target_audio, *path) == (
+            zp._box_payload_present(source_audio, *path)
+        )
+    assert target.moov.require(b"mvhd").data == source.moov.require(b"mvhd").data
+
+
+def test_golden_mobile_fixture_matches_reference(tmp_path: Path) -> None:
+    source = os.environ.get("FPS_ZILEM_MOBILE_SOURCE")
+    reference = os.environ.get("FPS_ZILEM_MOBILE_REFERENCE")
+    if not source or not reference:
+        pytest.skip(
+            "set FPS_ZILEM_MOBILE_SOURCE and FPS_ZILEM_MOBILE_REFERENCE for the golden test"
+        )
+    source_path = Path(source)
+    reference_path = Path(reference)
+    if not source_path.is_file() or not reference_path.is_file():
+        pytest.skip("golden X1T 1080p Mobile fixture files are missing")
+
+    expected = reference_path.read_bytes()
+    offset, size, atom_type = _top_level_boxes(expected)[-1]
+    assert atom_type == b"free"
+    trailer = expected[offset : offset + size]
+    prefix, stamp, name = trailer[8:].decode("utf-8").split(" ", 2)
+    assert prefix == "ZETA_OPTIMIZED/3"
+    when = datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=UTC)
+
+    out = tmp_path / name
+    stats = build_zilem(
+        source_path,
+        out,
+        tag=REFERENCE_TAG,
+        variant="tail",
+        trailer_name=name,
+        trailer_time=when,
+    )
+    verify_zilem_tail_output(source_path, out, tag=REFERENCE_TAG, trailer=trailer)
+    assert stats.trailer == trailer
+    assert out.read_bytes() == expected

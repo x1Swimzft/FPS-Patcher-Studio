@@ -197,6 +197,9 @@ STRINGS: dict[str, dict[str, str]] = {
             "Reference-exact • same container, tag and ZETA trailer as the "
             "original method"
         ),
+        "zilem_mobile_tip": (
+            "Reference-exact mobile build • one audio track, no re-encode"
+        ),
         "bxd_padding_lbl": "Custom X1T Padding Bytes (0 = Auto, max 512 MB)",
         "bxd_tail_ms_lbl": "X1T Hybrid Tail Extension Ceiling (ms)",
         "mask_paths_lbl": "Mask file paths & username in Diagnostic Logs",
@@ -668,6 +671,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "zilem_v3_tip": (
             "เหมือน reference ทุกไบต์ • คอนเทนเนอร์ แท็ก และ trailer ZETA "
             "แบบเดียวกับวิธีต้นฉบับ"
+        ),
+        "zilem_mobile_tip": (
+            "เหมือน reference สำหรับมือถือ • เสียงแทร็กเดียว ไม่เข้ารหัสใหม่"
         ),
         "bxd_padding_lbl": "ขนาด X1T Padding กำหนดเอง (0 = อัตโนมัติ, สูงสุด 512 MB)",
         "bxd_tail_ms_lbl": "เพดานขยายเฟรมสุดท้าย X1T Hybrid (ms)",

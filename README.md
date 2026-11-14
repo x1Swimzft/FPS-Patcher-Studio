@@ -3,8 +3,9 @@
 A Windows desktop app and headless CLI for patching video container timing and producing container-only MP4s or TikTok-ready MPEG-TS presets.
 
 - **X1T 1080p is the default.** It uses the Zilem container-only method: the H.264 video and AAC audio samples are copied unchanged, so there is no re-encode and no quality loss.
-- **X1T 720p is the second preset.** It copies an existing H.264 video bitstream and re-encodes only the audio into MPEG-TS.
-- **The picker shows only those two.** The lossy TS presets and the neutral Zilem preset remain available from the CLI and saved settings.
+- **X1T 1080p Mobile is the second preset.** It produces the single-audio-track reference container: same tag and trailer, no duplicate audio track.
+- **X1T 720p is the third preset.** It copies an existing H.264 video bitstream and re-encodes only the audio into MPEG-TS.
+- **The picker shows those three.** The lossy TS presets and the neutral Zilem preset remain available from the CLI and saved settings.
 - **Auto-update is on by default.** The app checks GitHub Releases on startup and asks before downloading.
 - **No telemetry. No media uploads.** Files stay on your PC.
 
@@ -15,9 +16,12 @@ A Windows desktop app and headless CLI for patching video container timing and p
 | Preset | Use for | Video | Audio | Container |
 | --- | --- | --- | --- | --- |
 | **X1T 1080p** (default) | A non-fragmented H.264 MP4 with AAC-LC 48 kHz stereo | **Copied unchanged** | **Copied unchanged**, plus the reference tag, silent tail, duplicate audio and `ZETA_OPTIMIZED/3` trailer | MP4, `moov` at EOF |
+| **X1T 1080p Mobile** | The same source, when the reference mobile container is wanted | **Copied unchanged** | **Copied unchanged**, one audio track, four tail samples replaced, reference tag and `ZETA_OPTIMIZED/3` trailer | MP4, `moov` at EOF |
 | **X1T 720p** | An already-H.264 source | **Copied unchanged** | AAC 128k, 48 kHz stereo | MPEG-TS, `.mp4` extension |
 
 The default `X1T 1080p` (`zilem-v3`) uses the Zilem container-only transform and writes the original reference tag (`TikQuick Quality Method - https://tikquick.online/ - v25 - Orion`) plus a `ZETA_OPTIMIZED/3 <timestamp> <filename>` free-box trailer after `moov`. The source must be a non-fragmented MP4 with one H.264 video track and one AAC-LC 48 kHz stereo audio track. It writes `<stem>_zilem.mp4`, appends 17 silent AAC frames, duplicates the audio track, and moves the rebuilt `moov` to the end of the file. If a source carries the indeterminate `mvhd` duration `-1` from an older PC patcher, Zilem replaces it with a finite duration so mobile players and upload services can seek and validate the result. See [docs/ZILEM_METHOD.md](docs/ZILEM_METHOD.md) for the full box-by-box description and limits.
+
+`X1T 1080p Mobile` (`zilem-mobile`, alias `x1t-zilem-mobile`) writes the other reference container: a single audio track, the movie-level `udta` removed, the last four AAC sample sizes replaced by a 60-byte filler chunk in a small `mdat`, and the same reference tag and `ZETA_OPTIMIZED/3` trailer. The movie and audio durations are unchanged, and the four replaced AAC frames stay unreferenced bytes in the media box. See [docs/ZILEM_METHOD.md](docs/ZILEM_METHOD.md) for the byte-level transform.
 
 The trailer timestamp is the build time in UTC, so two builds of the same source differ only in that timestamp and the output filename.
 
@@ -35,7 +39,7 @@ TikTok upload behaviour is not guaranteed. Matching a container fingerprint does
 
 `X1T Zilem` replaced `X1T 720p` (formerly `X1T Remux`) as the shipped default in 2.1.0. On the first 2.1.0 launch only, a saved `settings.json` value of exactly `tiktok-ts-remux` was migrated to `zilem`.
 
-Current builds default to `X1T 1080p`, and a saved `zilem`, `tiktok-ts` or `tiktok-ts-1080` selection is migrated to it once. The picker now offers only `X1T 1080p` and `X1T 720p`.
+Current builds default to `X1T 1080p`, and a saved `zilem`, `tiktok-ts` or `tiktok-ts-1080` selection is migrated to it once. The picker now offers `X1T 1080p`, `X1T 1080p Mobile` and `X1T 720p`.
 
 If you are still on **2.0.1–2.0.3**, install 2.4.1 manually once. Those builds hard-disable the startup update toggle unless network downloads are enabled with an environment override, and they require an Authenticode-signed installer; the current build is unsigned and uses the SHA-256 policy added in 2.0.4. From 2.0.4 onward, startup update checks are enabled by default and unsigned installers are accepted after the release SHA-256 matches.
 
@@ -89,7 +93,7 @@ fps-patcher-studio --cli history
 fps-patcher-studio --cli undo --last
 ```
 
-`--preset` accepts `60` or `120` (or `--timescale` for a custom value). `--overwrite` replaces an existing output; the default is to add a ` (n)` suffix. A replaced output is backed up as `.bak` when backups are enabled. `--strategy` accepts `zilem` / `x1t-zilem`, `zilem-v3` / `x1t-zilem-v3`, `tiktok-ts`, `tiktok-ts-1080`, `tiktok-ts-remux`, and the legacy X1T keys.
+`--preset` accepts `60` or `120` (or `--timescale` for a custom value). `--overwrite` replaces an existing output; the default is to add a ` (n)` suffix. A replaced output is backed up as `.bak` when backups are enabled. `--strategy` accepts `zilem` / `x1t-zilem`, `zilem-v3` / `x1t-zilem-v3`, `zilem-mobile` / `x1t-zilem-mobile`, `tiktok-ts`, `tiktok-ts-1080`, `tiktok-ts-remux`, and the legacy X1T keys.
 
 Preflight switches such as `--normalize-audio`, `--cap-bitrate`, and `--fix-vfr` are skipped for Zilem and the TS presets. `--tag-bt709` and `--scrub-metadata` are skipped for Zilem and TS with a `[COLOR] skipped` log.
 

@@ -48,6 +48,14 @@ AUDIO_FRAME_SAMPLES = 1024
 NEW_TRACK_DESCRIPTION = b"\x11\x80\x04\xc0\x40\x00\x20\x00"
 REQUIRED_AAC_ASC = b"\x11\x90"  # AAC-LC, 48 kHz, stereo core config
 _MDAT2_SIZE = 8 + len(SILENCE_FRAME) * APPENDED_SAMPLES
+
+# The single-audio-track reference build (``zilem-mobile``) drops the last four
+# AAC samples from the sample map and points one new chunk at four 15-byte
+# filler samples instead. The filler bytes are a fixed constant of that build.
+TAIL_FRAME = bytes.fromhex("a09800400128006400000350000038")
+TAIL_REPLACED_SAMPLES = 4
+_TAIL_MDAT_SIZE = 8 + len(TAIL_FRAME) * TAIL_REPLACED_SAMPLES
+
 _COPY_CHUNK = 1024 * 1024
 _MAX_STCO_OFFSET = 0xFFFFFFFF
 
@@ -158,7 +166,7 @@ class ZilemStats:
     audio_samples_after: int
     audio_chunks_before: int
     audio_chunks_after: int
-    new_track_id: int
+    new_track_id: int | None
     movie_duration: int
     tag: str
     trailer: bytes = b""
@@ -934,6 +942,112 @@ def _audio_sample_count(trak: _Atom) -> int:
     return _u32(stsz.data, 8)
 
 
+def _stsc_runs(stbl: _Atom) -> list[tuple[int, int, int]]:
+    """The raw ``(first_chunk, samples_per_chunk, description)`` runs."""
+    stsc = stbl.require(b"stsc")
+    count = _u32(stsc.data, 4)
+    runs: list[tuple[int, int, int]] = []
+    position = 8
+    for _ in range(count):
+        if position + 12 > len(stsc.data):
+            raise ZilemSourceError("stsc table is truncated")
+        runs.append(struct.unpack_from(">III", stsc.data, position))
+        position += 12
+    if not runs:
+        raise ZilemSourceError("audio stsc table is empty")
+    return runs
+
+
+def _chunk_widths(runs: list[tuple[int, int, int]], chunk_count: int) -> list[tuple[int, int]]:
+    """Expand ``stsc`` runs into ``(samples, description)`` per chunk."""
+    widths: list[tuple[int, int]] = []
+    for index, (first_chunk, samples, description) in enumerate(runs):
+        last_chunk = runs[index + 1][0] - 1 if index + 1 < len(runs) else chunk_count
+        if first_chunk != len(widths) + 1 or last_chunk > chunk_count:
+            raise ZilemSourceError("audio stsc table does not describe the chunk offsets")
+        widths.extend([(samples, description)] * (last_chunk - first_chunk + 1))
+    if len(widths) != chunk_count:
+        raise ZilemSourceError("audio stsc table does not cover every chunk")
+    return widths
+
+
+def _trim_chunk_widths(widths: list[tuple[int, int]], removed: int) -> list[tuple[int, int]]:
+    """Drop *removed* samples from the chunk tail, deleting emptied chunks."""
+    trimmed = list(widths)
+    remaining = removed
+    while remaining > 0:
+        if not trimmed:
+            raise ZilemSourceError(f"audio track has fewer than {removed} samples")
+        samples, description = trimmed[-1]
+        take = min(samples, remaining)
+        remaining -= take
+        if samples == take:
+            trimmed.pop()
+        else:
+            trimmed[-1] = (samples - take, description)
+    return trimmed
+
+
+def _coalesce_chunk_widths(widths: list[tuple[int, int]]) -> list[tuple[int, int, int]]:
+    runs: list[tuple[int, int, int]] = []
+    for index, (samples, description) in enumerate(widths):
+        if runs and runs[-1][1] == samples and runs[-1][2] == description:
+            continue
+        runs.append((index + 1, samples, description))
+    if not runs:
+        raise ZilemSourceError("audio track has no chunks")
+    return runs
+
+
+def _rebuild_audio_track_tail(source: _Atom, *, new_offset: int) -> tuple[_Atom, int]:
+    """Replace the last four audio samples with filler, keeping one track.
+
+    The reference build keeps the original sample count and chunk offsets, but
+    points the tail samples at a new chunk holding :data:`TAIL_FRAME`. The four
+    original AAC frames become unreferenced bytes in the source ``mdat``.
+    """
+    trak = copy.deepcopy(source)
+    stbl = trak.require(b"mdia").require(b"minf").require(b"stbl")
+
+    stsz = stbl.require(b"stsz")
+    version_flags = stsz.data[:4]
+    sample_size, count = struct.unpack_from(">II", stsz.data, 4)
+    if count < TAIL_REPLACED_SAMPLES:
+        raise ZilemSourceError(f"audio track has fewer than {TAIL_REPLACED_SAMPLES} samples")
+    stsz.data = (
+        version_flags
+        + struct.pack(">II", sample_size, count)
+        + stsz.data[12 : 12 + (count - TAIL_REPLACED_SAMPLES) * 4]
+        + struct.pack(">I", len(TAIL_FRAME)) * TAIL_REPLACED_SAMPLES
+    )
+
+    stco = stbl.require(b"stco")
+    chunk_count = _u32(stco.data, 4)
+    if len(stco.data) < 8 + chunk_count * 4:
+        raise ZilemSourceError("stco table is truncated")
+    widths = _chunk_widths(_stsc_runs(stbl), chunk_count)
+    description = widths[-1][1]
+    trimmed = _trim_chunk_widths(widths, TAIL_REPLACED_SAMPLES)
+    trimmed.append((TAIL_REPLACED_SAMPLES, description))
+
+    runs = _coalesce_chunk_widths(trimmed)
+    stsc = stbl.require(b"stsc")
+    stsc.data = (
+        stsc.data[:4]
+        + struct.pack(">I", len(runs))
+        + b"".join(struct.pack(">III", *run) for run in runs)
+    )
+
+    kept = len(trimmed) - 1
+    stco.data = (
+        stco.data[:4]
+        + struct.pack(">I", kept + 1)
+        + stco.data[8 : 8 + kept * 4]
+        + struct.pack(">I", new_offset)
+    )
+    return trak, kept + 1
+
+
 def _new_moov(
     structure: _Structure,
     info: ZilemSourceInfo,
@@ -1024,6 +1138,34 @@ def _new_moov(
     return moov, movie_duration, new_track_id
 
 
+def _new_moov_tail(
+    structure: _Structure,
+    tag: str,
+    source_size: int,
+) -> tuple[_Atom, int]:
+    """Movie header for the single-audio-track reference build."""
+    moov = copy.deepcopy(structure.moov)
+    children = moov.children or []
+    traks = [child for child in children if child.type == b"trak"]
+    videos = [trak for trak in traks if _handler_type(trak) == b"vide"]
+    audios = [trak for trak in traks if _handler_type(trak) == b"soun"]
+    if len(videos) != 1 or len(audios) != 1:
+        raise ZilemSourceError("X1T 1080p Mobile needs exactly one video and one audio track")
+    video = videos[0]
+    audio = audios[0]
+    new_audio, chunks_after = _rebuild_audio_track_tail(audio, new_offset=source_size + 8)
+    _apply_video_tag(video, tag)
+
+    rebuilt: list[_Atom] = []
+    for child in children:
+        if child.type == b"udta":
+            # Movie-level metadata is dropped, matching the reference build.
+            continue
+        rebuilt.append(new_audio if child is audio else child)
+    moov.children = rebuilt
+    return moov, chunks_after
+
+
 def _hash_range(mapped: mmap.mmap, start: int, size: int) -> str:
     digest = hashlib.sha256()
     view = memoryview(mapped)
@@ -1060,6 +1202,7 @@ def build_zilem(
     out: Path,
     *,
     tag: str = PRODUCTION_TAG,
+    variant: str = "v1",
     trailer_name: str | None = None,
     trailer_time: datetime | None = None,
     cancel_event: threading.Event | None = None,
@@ -1073,23 +1216,32 @@ def build_zilem(
     at :data:`PRODUCTION_TAG` in the application. Passing ``trailer_name``
     appends the reference method's ``ZETA_OPTIMIZED/3`` free box after the
     rebuilt ``moov``.
+
+    ``variant`` selects the container transform: ``"v1"`` duplicates the audio
+    track and appends 17 silent frames; ``"tail"`` keeps one audio track and
+    replaces the last four samples with filler (the reference-exact mobile
+    build).
     """
+    if variant not in ("v1", "tail"):
+        raise ValueError(f"unknown Zilem variant {variant!r}")
     if src.resolve() == out.resolve():
         raise ZilemSourceError("output path equals source; refusing to overwrite")
     structure = _read_structure(src)
     info = _validate_source(structure)
     if structure.size + 8 + 54 > _MAX_STCO_OFFSET:
-        raise ZilemSourceError(
-            "source is too large for the 32-bit chunk offsets used by X1T Zilem"
-        )
-    moov, movie_duration, new_track_id = _new_moov(
-        structure, info, tag, structure.size
-    )
+        raise ZilemSourceError("source is too large for the 32-bit chunk offsets used by X1T Zilem")
+    if variant == "tail":
+        moov, chunks_after = _new_moov_tail(structure, tag, structure.size)
+        movie_duration = _mvhd_info(moov.require(b"mvhd"))[1]
+        new_track_id: int | None = None
+        mdat2 = struct.pack(">I4s", _TAIL_MDAT_SIZE, b"mdat") + (TAIL_FRAME * TAIL_REPLACED_SAMPLES)
+    else:
+        moov, movie_duration, new_track_id = _new_moov(structure, info, tag, structure.size)
+        chunks_after = info.audio_chunks + 2
+        mdat2 = struct.pack(">I4s", _MDAT2_SIZE, b"mdat") + (SILENCE_FRAME * APPENDED_SAMPLES)
     moov_bytes = moov.to_bytes()
-    trailer = (
-        build_zeta_trailer(trailer_name, trailer_time) if trailer_name else b""
-    )
-    output_size = structure.size + _MDAT2_SIZE + len(moov_bytes) + len(trailer)
+    trailer = build_zeta_trailer(trailer_name, trailer_time) if trailer_name else b""
+    output_size = structure.size + len(mdat2) + len(moov_bytes) + len(trailer)
 
     def progress(fraction: float) -> None:
         if on_progress is not None:
@@ -1108,17 +1260,12 @@ def build_zilem(
                 copied += len(chunk)
                 progress(0.90 * copied / structure.size)
             if copied != structure.size:
-                raise ZilemSourceError(
-                    "source changed or was truncated while copying"
-                )
+                raise ZilemSourceError("source changed or was truncated while copying")
             # The old movie header becomes a free box so players ignore it.
             writer.seek(structure.moov_offset + 4)
             writer.write(b"free")
             writer.seek(0, os.SEEK_END)
-            writer.write(
-                struct.pack(">I4s", _MDAT2_SIZE, b"mdat")
-                + SILENCE_FRAME * APPENDED_SAMPLES
-            )
+            writer.write(mdat2)
             writer.write(moov_bytes)
             if trailer:
                 writer.write(trailer)
@@ -1128,20 +1275,29 @@ def build_zilem(
     progress(1.0)
     if on_log is not None:
         suffix = f", trailer {len(trailer)} bytes" if trailer else ""
-        on_log(
-            f"[ZILEM] {info.video_samples} video samples copied, "
-            f"{info.audio_samples} -> {info.audio_samples + APPENDED_SAMPLES} "
-            f"audio samples, tag '{tag}'{suffix}"
-        )
+        if variant == "tail":
+            on_log(
+                f"[ZILEM] {info.video_samples} video samples copied, "
+                f"{TAIL_REPLACED_SAMPLES} audio tail samples replaced, "
+                f"tag '{tag}'{suffix}"
+            )
+        else:
+            on_log(
+                f"[ZILEM] {info.video_samples} video samples copied, "
+                f"{info.audio_samples} -> {info.audio_samples + APPENDED_SAMPLES} "
+                f"audio samples, tag '{tag}'{suffix}"
+            )
     return ZilemStats(
         source_size=structure.size,
         output_size=output_size,
         moov_size=len(moov_bytes),
         video_samples=info.video_samples,
         audio_samples_before=info.audio_samples,
-        audio_samples_after=info.audio_samples + APPENDED_SAMPLES,
+        audio_samples_after=(
+            info.audio_samples if variant == "tail" else info.audio_samples + APPENDED_SAMPLES
+        ),
         audio_chunks_before=info.audio_chunks,
-        audio_chunks_after=info.audio_chunks + 2,
+        audio_chunks_after=chunks_after,
         new_track_id=new_track_id,
         movie_duration=movie_duration,
         tag=tag,
@@ -1395,3 +1551,188 @@ def verify_zilem_output(
         )
     if _is_indeterminate_movie_duration(output_mvhd, movie_duration):
         raise VerifyError("output movie duration is indeterminate")
+
+
+def _box_payload_present(node: _Atom, *path: bytes) -> bytes | None:
+    """Payload of a nested box, or ``None`` when any level is missing."""
+    for atom_type in path:
+        child = node.find(atom_type)
+        if child is None:
+            return None
+        node = child
+    return node.data
+
+
+def _without_udta(trak: _Atom) -> bytes:
+    clone = copy.deepcopy(trak)
+    clone.children = [child for child in (clone.children or []) if child.type != b"udta"]
+    return clone.to_bytes()
+
+
+def verify_zilem_tail_output(
+    src: Path,
+    out: Path,
+    *,
+    tag: str = REFERENCE_TAG,
+    trailer: bytes | None = None,
+) -> None:
+    """Raise :class:`VerifyError` unless *out* is a valid single-track build.
+
+    This is the verifier for the ``variant="tail"`` transform: one video track,
+    one audio track, no movie-level ``udta`` and the four-sample filler chunk.
+    """
+    source_structure = _read_structure(src)
+    source_info = _validate_source(source_structure)
+    try:
+        target = _read_structure(out)
+    except ZilemSourceError as exc:
+        raise VerifyError(f"output is not a well-formed MP4: {exc}") from exc
+    expected_trailer = trailer or b""
+    expected_size = (
+        source_structure.size + _TAIL_MDAT_SIZE + target.moov_size + len(expected_trailer)
+    )
+    if target.size != expected_size:
+        raise VerifyError(
+            f"output size {target.size} != source + filler mdat + moov + trailer ({expected_size})"
+        )
+    moov_start = source_structure.size + _TAIL_MDAT_SIZE
+    moov_end = moov_start + target.moov_size
+    if target.moov_offset != moov_start:
+        raise VerifyError("rebuilt moov is not at the expected offset")
+    if moov_end + len(expected_trailer) != target.size:
+        raise VerifyError("trailing bytes after the final moov box")
+    if expected_trailer:
+        trailer_box = target.top[-1]
+        if (
+            trailer_box[3] != b"free"
+            or trailer_box[0] != moov_end
+            or trailer_box[1] != len(expected_trailer)
+        ):
+            raise VerifyError("reference trailer box is missing or malformed")
+        with out.open("rb") as handle:
+            handle.seek(moov_end)
+            if handle.read(len(expected_trailer)) != expected_trailer:
+                raise VerifyError("reference trailer content mismatch")
+    elif target.top[-1][3] != b"moov":
+        raise VerifyError("output does not end with a moov box (unexpected trailer)")
+
+    ftyp = next((item for item in source_structure.top if item[3] == b"ftyp"), None)
+    old_free = next(
+        (
+            item
+            for item in target.top
+            if item[0] == source_structure.moov_offset and item[1] == source_structure.moov_size
+        ),
+        None,
+    )
+    if old_free is None or old_free[3] != b"free":
+        raise VerifyError("old moov box was not converted to free")
+
+    with (
+        src.open("rb") as source_handle,
+        out.open("rb") as target_handle,
+        mmap.mmap(source_handle.fileno(), 0, access=mmap.ACCESS_READ) as s,
+        mmap.mmap(target_handle.fileno(), 0, access=mmap.ACCESS_READ) as t,
+    ):
+        if ftyp is not None:
+            offset, size = ftyp[0], ftyp[1]
+            if s[offset : offset + size] != t[offset : offset + size]:
+                raise VerifyError("ftyp box changed")
+
+        s_payload = s[
+            source_structure.moov_offset + 8 : source_structure.moov_offset
+            + source_structure.moov_size
+        ]
+        t_payload = t[
+            source_structure.moov_offset + 8 : source_structure.moov_offset
+            + source_structure.moov_size
+        ]
+        if s_payload != t_payload:
+            raise VerifyError("old moov payload changed while converting to free")
+
+        for offset, size, _, atom_type in source_structure.top:
+            if atom_type != b"mdat":
+                continue
+            if _hash_range(s, offset, size) != _hash_range(t, offset, size):
+                raise VerifyError(f"media data changed in mdat at offset {offset}")
+
+        filler = t[source_structure.size : source_structure.size + _TAIL_MDAT_SIZE]
+        if filler[:8] != struct.pack(">I4s", _TAIL_MDAT_SIZE, b"mdat"):
+            raise VerifyError("filler mdat box has an invalid header")
+        if filler[8:] != TAIL_FRAME * TAIL_REPLACED_SAMPLES:
+            raise VerifyError("filler mdat payload is not intact")
+
+    output_moov = target.moov
+    if output_moov.find(b"udta") is not None:
+        raise VerifyError("movie-level udta was not removed")
+    video_traks = _video_traks(output_moov)
+    audio_traks = _audio_traks(output_moov)
+    if len(video_traks) != 1:
+        raise VerifyError(f"expected one video track in output, found {len(video_traks)}")
+    if len(audio_traks) != 1:
+        raise VerifyError(f"expected one audio track in output, found {len(audio_traks)}")
+    video = video_traks[0]
+    audio = audio_traks[0]
+    source_video = _video_traks(source_structure.moov)[0]
+    source_audio = _audio_traks(source_structure.moov)[0]
+
+    if _serialized_stbl(video) != _serialized_stbl(source_video):
+        raise VerifyError("video sample tables changed")
+    if _without_udta(video) != _without_udta(source_video):
+        raise VerifyError("video track changed outside its udta box")
+    found_tag = _tag_text_in_video(video)
+    if found_tag != tag:
+        raise VerifyError(f"video tag mismatch: expected {tag!r}, found {found_tag!r}")
+
+    stbl = audio.require(b"mdia").require(b"minf").require(b"stbl")
+    source_stbl = source_audio.require(b"mdia").require(b"minf").require(b"stbl")
+    stsz = stbl.require(b"stsz")
+    _, count = struct.unpack_from(">II", stsz.data, 4)
+    if count != source_info.audio_samples:
+        raise VerifyError(f"audio sample count {count} != source {source_info.audio_samples}")
+    tail = stsz.data[-TAIL_REPLACED_SAMPLES * 4 :]
+    if tail != struct.pack(">I", len(TAIL_FRAME)) * TAIL_REPLACED_SAMPLES:
+        raise VerifyError("audio tail sample sizes are not the filler size")
+    source_stsz = source_stbl.require(b"stsz")
+    head = 12 + (count - TAIL_REPLACED_SAMPLES) * 4
+    if stsz.data[:head] != source_stsz.data[:head]:
+        raise VerifyError("audio sample sizes changed before the tail")
+
+    source_stco = source_stbl.require(b"stco")
+    source_chunks = _u32(source_stco.data, 4)
+    source_widths = _chunk_widths(_stsc_runs(source_stbl), source_chunks)
+    expected_widths = _trim_chunk_widths(source_widths, TAIL_REPLACED_SAMPLES)
+    expected_widths.append((TAIL_REPLACED_SAMPLES, source_widths[-1][1]))
+    stco = stbl.require(b"stco")
+    chunk_count = _u32(stco.data, 4)
+    if chunk_count != len(expected_widths):
+        raise VerifyError(f"audio chunk count {chunk_count} != {len(expected_widths)}")
+    if _chunk_widths(_stsc_runs(stbl), chunk_count) != expected_widths:
+        raise VerifyError("audio chunk map does not match the reference tail layout")
+    if len(stco.data) < 8 + chunk_count * 4:
+        raise VerifyError("stco table is truncated")
+    offsets = struct.unpack_from(f">{chunk_count}I", stco.data, 8)
+    source_offsets = struct.unpack_from(f">{source_chunks}I", source_stco.data, 8)
+    if offsets[:-1] != source_offsets[: chunk_count - 1]:
+        raise VerifyError("audio chunk offsets changed before the tail")
+    expected_offset = source_structure.size + 8
+    if offsets[-1] != expected_offset:
+        raise VerifyError(f"filler chunk offset {offsets[-1]} != {expected_offset}")
+
+    for path in (
+        (b"tkhd",),
+        (b"edts",),
+        (b"mdia", b"mdhd"),
+        (b"mdia", b"minf", b"stbl", b"stsd"),
+        (b"mdia", b"minf", b"stbl", b"stts"),
+        (b"mdia", b"minf", b"stbl", b"sgpd"),
+        (b"mdia", b"minf", b"stbl", b"sbgp"),
+    ):
+        if _box_payload_present(audio, *path) != _box_payload_present(source_audio, *path):
+            name = path[-1].decode("latin1")
+            raise VerifyError(f"audio '{name}' payload changed")
+
+    if _box_payload_present(output_moov, b"mvhd") != _box_payload_present(
+        source_structure.moov, b"mvhd"
+    ):
+        raise VerifyError("movie header changed")
