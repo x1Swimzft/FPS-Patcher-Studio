@@ -9,7 +9,7 @@ A Windows desktop app and headless CLI for patching video container timing and p
 - **Auto-update is on by default.** The app checks GitHub Releases on startup and asks before downloading.
 - **No telemetry. No media uploads.** Files stay on your PC.
 
-[Download v2.3.0](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases/tag/v2.3.0) · [Website](https://x1t-web.vercel.app/) · [Release notes](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases) · [Zilem method](docs/ZILEM_METHOD.md) · [Privacy](docs/PRIVACY.md)
+[Download v2.5.0](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases/tag/v2.5.0) · [Website](https://x1t-web.vercel.app/) · [Release notes](https://github.com/x1Swimzft/FPS-Patcher-Studio/releases) · [Zilem method](docs/ZILEM_METHOD.md) · [Privacy](docs/PRIVACY.md)
 
 ## Presets
 
@@ -29,7 +29,7 @@ The target FPS setting is ignored by the Zilem presets. Preflight fixes and the 
 
 `X1T 720p` preserves the source H.264 bitstream, including its encoder SEI and bitrate, so a matching source reproduces the reference video MD5 exactly. Re-encoding cannot match that bitstream by design.
 
-Both visible presets require an H.264 source. For AV1/HEVC, convert the source to H.264 first; the hidden lossy TS presets remain available through the CLI.
+All three visible presets require an H.264 source. For AV1/HEVC, convert the source to H.264 first; the hidden lossy TS presets remain available through the CLI.
 
 The hidden presets (`zilem`, `tiktok-ts`, `tiktok-ts-1080`, and the legacy `bxd-pc`, `bxd-mobile`, `bxd-hybrid`, `bxd-clean`) remain available to saved settings, queue overrides and the CLI, but are not offered in the pickers. `tiktok-ts` and `tiktok-ts-1080` require Windows Media Foundation (`h264_mf`).
 
@@ -58,13 +58,13 @@ FFmpeg and FFprobe are bundled in the release. FFmpeg auto-download is disabled 
 
 1. Launch `FPSPatcherStudio.exe` (or `uv run fps-patcher-studio` from source).
 2. Drop `.mp4`, `.mov`, or `.m4v` files on the window, or use **Add Files**.
-3. Leave the preset on **X1T 1080p** for a compatible MP4, or pick **X1T 720p**.
+3. Leave the preset on **X1T 1080p** for a compatible MP4, pick **X1T 1080p Mobile** for the single-audio-track reference container, or pick **X1T 720p**.
 4. Press **Start Patch**.
 5. Set the output folder in **Settings → Output** if you do not want files beside the source.
 
 The queue supports per-item overrides for preset, timescale, and platform profile. The Inspector shows source/output bitrate and readiness checks. The Watch Folder processes new files as they appear.
 
-Both visible presets require an H.264 source. For AV1/HEVC, convert the source to H.264 first, or use the hidden lossy TS presets from the CLI. The target FPS only affects the `_ts<timescale>` filename for the TS presets; the TS stream itself is always 60 fps, and Zilem ignores it entirely.
+The visible presets require an H.264 source. For AV1/HEVC, convert the source to H.264 first, or use the hidden lossy TS presets from the CLI. The target FPS only affects the `_ts<timescale>` filename for the TS presets; the TS stream itself is always 60 fps, and Zilem ignores it entirely.
 
 ## CLI
 
@@ -114,11 +114,20 @@ For the Zilem presets:
 - output size and top-level box order;
 - `ftyp` unchanged, old `moov` converted to a byte-identical `free` box;
 - every source `mdat` payload hash unchanged;
-- the appended `mdat` contains exactly 17 silence frames;
+- the expected tag: the reference tag for `X1T 1080p` and `X1T 1080p Mobile`, or `X1T Zilem v1` for the hidden `zilem`;
+- for `X1T 1080p` and `X1T 1080p Mobile`, the final `ZETA_OPTIMIZED/3` free box must match the output name and build time; the hidden `zilem` has no trailer.
+
+`X1T 1080p` additionally produces:
+
+- an appended `mdat` with exactly 17 silence frames;
 - two audio tracks with the expected extended durations;
-- a finite movie duration (`mvhd` is never left at `-1`);
-- the expected tag: the reference tag for the default `X1T 1080p`, or `X1T Zilem v1` for the hidden `zilem`;
-- for `X1T 1080p`, the final `ZETA_OPTIMIZED/3` free box must match the output name and build time; the hidden `zilem` has no trailer.
+- a finite movie duration (`mvhd` is never left at `-1`).
+
+`X1T 1080p Mobile` additionally produces:
+
+- a 68-byte filler `mdat` holding four 15-byte samples, referenced by the last `stco` entry at `source size + 8`;
+- exactly one video and one audio track, no movie-level `udta`;
+- audio `stsz`/`stsc`/`stco` with the four-sample tail chunk, while `mvhd`, `tkhd`, `mdhd`, `stsd`, `stts`, `sgpd` and `sbgp` stay byte-identical to the source, so durations do not change.
 
 For other MP4/MOV output:
 

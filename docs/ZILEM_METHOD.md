@@ -173,8 +173,6 @@ matching verifier: it requires one video and one audio track, no movie-level
 `udta`, the exact filler `mdat`, unchanged `mvhd`/audio timing payloads, the
 rebuilt chunk map and the exact trailer bytes.
 
-Set `FPS_ZILEM_MOBILE_SOURCE` / `FPS_ZILEM_MOBILE_REFERENCE` to the pair above
-to run the byte-exact golden test.
 
 ## Verification
 
@@ -188,9 +186,12 @@ temporary output is promoted:
   payload;
 - every source `mdat` payload hash is unchanged;
 - the appended `mdat` contains exactly the 17 expected silence frames;
-- the rebuilt movie has two audio tracks, the expected durations, and the
-  expected tag;
+- the rebuilt movie has two audio tracks (the original extended track plus the
+  chunk-sharing duplicate), the expected durations, and the expected tag;
 - the movie duration is finite and matches the longest video/audio track.
+
+`verify_zilem_tail_output()` is the verifier for `X1T 1080p Mobile`; it is
+listed in that preset's section above.
 
 A failure raises `VerifyError`; the partial output is removed and the source is
 never modified.
@@ -224,10 +225,18 @@ $env:FPS_ZILEM_V3_REFERENCE = "E:\path\to\reference.mp4"
 uv run pytest tests/test_zilem_patcher.py::test_golden_v3_fixture_matches_reference -q
 ```
 
-Both tests skip when their variables are unset or the files are missing. The v1
-test compares the patcher output with the reference minus its trailer. The V3
-test reads the timestamp and filename from the reference trailer, builds with
-those exact values, and asserts full byte equality.
+For the single-audio-track mobile output:
+
+```powershell
+$env:FPS_ZILEM_MOBILE_SOURCE = "E:\path\to\source.mp4"
+$env:FPS_ZILEM_MOBILE_REFERENCE = "E:\path\to\reference.mp4"
+uv run pytest tests/test_zilem_patcher.py::test_golden_mobile_fixture_matches_reference -q
+```
+
+All three tests skip when their variables are unset or the files are missing.
+The v1 test compares the patcher output with the reference minus its trailer.
+The V3 and mobile tests read the timestamp and filename from the reference
+trailer, build with those exact values, and assert full byte equality.
 
 ## Limits
 
