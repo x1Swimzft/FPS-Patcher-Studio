@@ -2,6 +2,22 @@
 
 All notable changes to FPS Patcher Studio are documented in this file.
 
+## [2.5.0] - 2026-11-14
+
+### Added
+- **X1T 1080p Mobile** (`zilem-mobile`, alias `x1t-zilem-mobile`): the single-audio-track reference container, now a visible preset. The source is copied unchanged, the movie-level `udta` is dropped, the last four AAC sample sizes point at a four-sample filler chunk in a 68-byte `mdat`, and the rebuilt `moov` is written after it with the reference tag and the `ZETA_OPTIMIZED/3` trailer. `mvhd`, audio `tkhd`/`mdhd`, `stsd`, `stts`, `sgpd` and `sbgp` are untouched, so the movie and media durations do not change and no audio track is duplicated.
+- `verify_zilem_tail_output()` plus a golden test that reproduces the reference file byte-for-byte.
+
+### Changed
+- The preset picker now offers three presets: **X1T 1080p** (default), **X1T 1080p Mobile** and **X1T 720p**.
+- The portable build's `READ_ME_FIRST.txt` lists the current presets instead of the retired BXD ones.
+
+### Verification
+- 694 tests, 2 skipped; ruff and mypy clean.
+- Golden pair `Deppart Prototype 1.mp4` (258,100,994 B) → `Deppart Prototype 1_zilem.mp4` (258,181,333 B) matches byte-for-byte, including the 79-byte trailer and `moov` at 258,101,062.
+- A CLI build of the same source differs from the reference only in the 7 bytes of the trailer timestamp.
+- Matching a container fingerprint still does not prove that TikTok skips transcoding; that claim remains unverified.
+
 ## [2.4.1] - 2026-11-13
 
 ### Fixed

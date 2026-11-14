@@ -125,11 +125,13 @@ Run:   FPSPatcherStudio.exe   (no install needed; delete the folder to remove)
 Data:  %APPDATA%\FPSPatcherStudio  (settings.json, queue.json, logs)
 
 Presets (v$version):
-  - X1T For PC (x1t-pc / bxd-pc): Full PC TikTok bypass (indeterminate mvhd, 10x audio ghosts, trailing bytes).
-  - X1T For Mobile (x1t-mobile / bxd-mobile): TikTok bypass (indeterminate mvhd) + ISO-BMFF compliant container for iOS / Android.
-  - X1T Hybrid (x1t-hybrid / bxd-hybrid): TikTok bypass + bounded last-sample tail extension + free box.
-  - X1T Clean (x1t-clean / bxd-clean): Pure video timescale patch with TikTok bypass (audio untouched).
-  - X1T Repair: Lossless repair for broken non-standard containers.
+  - X1T 1080p (default, zilem-v3): Zilem container-only rewrite with the reference
+    tag and ZETA_OPTIMIZED/3 trailer. No re-encode.
+  - X1T 1080p Mobile (zilem-mobile): single-audio-track reference container,
+    four replaced tail audio samples, same tag and trailer. No re-encode.
+  - X1T 720p (tiktok-ts-remux): H.264 copied, AAC 128k re-encoded into MPEG-TS.
+  - Hidden presets stay available to saved settings, queue overrides and the CLI:
+    zilem, tiktok-ts, tiktok-ts-1080, bxd-pc, bxd-mobile, bxd-hybrid, bxd-clean.
 
 FFmpeg is OPTIONAL (used for video thumbnails).
   - Put ffmpeg.exe + ffprobe.exe in a 'bin' folder next to FPSPatcherStudio.exe,

@@ -47,8 +47,8 @@ If you are still on **2.0.1–2.0.3**, install 2.4.1 manually once. Those builds
 
 Windows 10/11 x64. Pick one:
 
-- **Installer:** `FPSPatcherStudio-v2.4.1-Setup.exe`
-- **Portable:** `FPSPatcherStudio-v2.4.1-win64.zip` — extract the whole folder, then run `FPSPatcherStudio.exe`
+- **Installer:** `FPSPatcherStudio-v2.5.0-Setup.exe`
+- **Portable:** `FPSPatcherStudio-v2.5.0-win64.zip` — extract the whole folder, then run `FPSPatcherStudio.exe`
 
 The builds are **unsigned**, so Windows SmartScreen may warn. Verify the SHA-256 against the release checksum before running.
 
